@@ -27,8 +27,18 @@
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
       </nav>
       <a href="#download" class="btn btn-sm">Download</a>
+      <button class="hamburger" id="hamburger" aria-label="Menü öffnen" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
     </div>
   </header>
+  <nav class="mobile-nav" id="mobileNav">
+    <a href="#features" class="mobile-link">Features</a>
+    <a href="#extension" class="mobile-link">Extension</a>
+    <a href="#pricing" class="mobile-link">Preise</a>
+    <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener" class="mobile-link">Discord</a>
+    <a href="#download" class="btn btn-primary mobile-link">Download</a>
+  </nav>
 
   <!-- ── Hero ───────────────────────────────────────────────────────────── -->
   <section class="hero">
@@ -217,6 +227,23 @@
       document.getElementById('dlWin')?.classList.remove('btn-primary');
       document.getElementById('dlWin')?.classList.add('btn-secondary');
     }
+
+    // Hamburger menu toggle
+    const hamburger = document.getElementById('hamburger');
+    const mobileNav = document.getElementById('mobileNav');
+    hamburger?.addEventListener('click', () => {
+      const isOpen = mobileNav.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen);
+    });
+    // Close mobile nav when a link is clicked
+    document.querySelectorAll('.mobile-link').forEach(link => {
+      link.addEventListener('click', () => {
+        mobileNav.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
   </script>
 </body>
 </html>
