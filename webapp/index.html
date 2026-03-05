@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Flipcheck</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%236366F1'/><text x='50%' y='55%' dominant-baseline='middle' text-anchor='middle' fill='white' font-size='18' font-weight='800'>▲</text></svg>">
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- ── Login Screen ─────────────────────────────────────────────── -->
+<div id="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-mark">▲</div>
+      <span class="login-logo-text">Flipcheck</span>
+    </div>
+    <div>
+      <p class="login-title">Willkommen zurück</p>
+      <p class="login-subtitle">Melde dich mit deinem Discord-Account an, um auf dein Konto zuzugreifen.</p>
+    </div>
+    <button class="btn-discord" onclick="Auth.login()">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+        <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057c.003.022.015.043.032.054a19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+      </svg>
+      Mit Discord anmelden
+    </button>
+    <p style="font-size:11px;color:var(--text-muted);">
+      Kein Account? Flipcheck Pro auf
+      <a href="https://whop.com/flipcheck" target="_blank" rel="noopener">whop.com/flipcheck</a>
+    </p>
+  </div>
+</div>
+
+<!-- ── App Shell ─────────────────────────────────────────────────── -->
+<div id="app-shell">
+
+  <!-- Desktop Sidebar (hidden on mobile) -->
+  <aside class="app-sidebar">
+    <div class="sidebar-logo">
+      <span style="color:var(--accent);font-size:16px">▲</span>
+      Flipcheck
+    </div>
+    <nav class="sidebar-nav">
+      <button class="sidebar-nav-item" data-nav="flipcheck">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="8" cy="8" r="6"/>
+          <path d="M8 5v3l2 1"/>
+        </svg>
+        Flipcheck
+      </button>
+      <button class="sidebar-nav-item" data-nav="inventory">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="2" y="2" width="12" height="12" rx="2"/>
+          <path d="M5 8h6M5 5h6M5 11h4"/>
+        </svg>
+        Inventar
+      </button>
+      <button class="sidebar-nav-item" data-nav="analytics">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 12l4-4 3 2 5-6"/>
+        </svg>
+        Analytics
+      </button>
+      <button class="sidebar-nav-item" data-nav="history">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <path d="M8 3v5l3 1.5"/>
+          <circle cx="8" cy="8" r="6"/>
+        </svg>
+        Preisverlauf
+      </button>
+      <button class="sidebar-nav-item" data-nav="alerts">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 2a5 5 0 0 1 5 5v2l1 2H2l1-2V7a5 5 0 0 1 5-5z"/>
+          <path d="M6.5 12.5a1.5 1.5 0 0 0 3 0"/>
+        </svg>
+        Alarme
+      </button>
+      <button class="sidebar-nav-item" data-nav="settings">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="8" cy="8" r="2"/>
+          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.22 3.22l1.42 1.42M11.36 11.36l1.42 1.42M3.22 12.78l1.42-1.42M11.36 4.64l1.42-1.42"/>
+        </svg>
+        Einstellungen
+      </button>
+    </nav>
+  </aside>
+
+  <!-- Main content area -->
+  <div class="app-content">
+    <!-- Mobile topbar -->
+    <header class="app-topbar">
+      <div class="app-topbar-logo">
+        <span>▲</span>
+        Flipcheck
+      </div>
+    </header>
+
+    <!-- View container -->
+    <main id="app"></main>
+
+    <!-- Mobile bottom navigation -->
+    <nav class="bottom-nav">
+      <button class="bottom-nav-item" data-nav="flipcheck">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
+          <circle cx="10" cy="10" r="7"/>
+          <path d="M10 6.5v3.5l2 1"/>
+        </svg>
+        Check
+      </button>
+      <button class="bottom-nav-item" data-nav="inventory">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="14" height="14" rx="2"/>
+          <path d="M6.5 10h7M6.5 6.5h7M6.5 13.5h5"/>
+        </svg>
+        Inventar
+      </button>
+      <button class="bottom-nav-item" data-nav="analytics">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 15l5-5 3.5 2.5L17 5"/>
+        </svg>
+        Analytics
+      </button>
+      <button class="bottom-nav-item" data-nav="alerts">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10 2.5a6.25 6.25 0 0 1 6.25 6.25v2.5l1.25 2.5H2.5l1.25-2.5V8.75A6.25 6.25 0 0 1 10 2.5z"/>
+          <path d="M8.125 15.625a1.875 1.875 0 0 0 3.75 0"/>
+        </svg>
+        Alarme
+      </button>
+      <button class="bottom-nav-item" data-nav="settings">
+        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="10" cy="10" r="2.5"/>
+          <path d="M10 1.5v2.5M10 16v2.5M1.5 10H4M16 10h2.5M3.96 3.96l1.77 1.77M14.27 14.27l1.77 1.77M3.96 16.04l1.77-1.77M14.27 5.73l1.77-1.77"/>
+        </svg>
+        Mehr
+      </button>
+    </nav>
+  </div>
+</div>
+
+<!-- ── Modal ──────────────────────────────────────────────────────── -->
+<div id="modal-overlay">
+  <div id="modal-box">
+    <div class="modal-header">
+      <span id="modal-title"></span>
+      <button id="modal-close" aria-label="Schließen">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div id="modal-body"></div>
+    <div id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- ── Toast Container ────────────────────────────────────────────── -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ── Scripts (load order matters) ─────────────────────────────── -->
+<script src="lib/constants.js"></script>
+<script src="lib/toast.js"></script>
+<script src="lib/modal.js"></script>
+<script src="lib/storage.js"></script>
+<script src="app.js"></script>
+<script src="views/flipcheck.js"></script>
+<script src="views/inventory.js"></script>
+<script src="views/analytics.js"></script>
+<script src="views/history.js"></script>
+<script src="views/alerts.js"></script>
+<script src="views/settings.js"></script>
+
+<!-- Chart.js CDN (used by analytics + flipcheck price chart) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+</body>
+</html>
