@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flipcheck — Datenschutzerklärung</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0A0A0F; --surface: #111118; --border: #1E1E2E;
+      --text: #F1F5F9; --text2: #94A3B8; --dim: #475569;
+      --accent: #6366F1;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+      font-size: 14px; line-height: 1.7;
+      max-width: 720px; margin: 0 auto; padding: 48px 24px;
+    }
+    .logo { color: var(--accent); font-weight: 900; font-size: 13px; letter-spacing: .08em; margin-bottom: 32px; display: block; }
+    h1 { font-size: 26px; font-weight: 800; margin-bottom: 8px; }
+    .subtitle { color: var(--dim); font-size: 13px; margin-bottom: 40px; }
+    h2 { font-size: 16px; font-weight: 700; color: var(--text); margin: 32px 0 10px; border-bottom: 1px solid var(--border); padding-bottom: 6px; }
+    p { color: var(--text2); margin-bottom: 12px; }
+    ul { color: var(--text2); padding-left: 20px; margin-bottom: 12px; }
+    ul li { margin-bottom: 5px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 18px 20px; margin-bottom: 12px;
+    }
+    .card strong { color: var(--text); }
+    footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--dim); font-size: 12px; }
+  </style>
+</head>
+<body>
+
+  <span class="logo">▲ FLIPCHECK</span>
+  <h1>Datenschutzerklärung</h1>
+  <p class="subtitle">Zuletzt aktualisiert: März 2026 · Chrome Browser Extension v1.2</p>
+
+  <h2>1. Verantwortlicher</h2>
+  <p>
+    Verantwortlich im Sinne der DSGVO für die Flipcheck Chrome Extension ist:<br />
+    <strong>Flipcheck</strong> · Kontakt: <a href="mailto:hello@joinflipcheck.app">hello@joinflipcheck.app</a>
+  </p>
+
+  <h2>2. Welche Daten werden verarbeitet?</h2>
+  <p>Die Extension verarbeitet ausschließlich folgende Daten:</p>
+  <div class="card">
+    <strong>a) EAN / ASIN (Produktkennzeichnungen)</strong>
+    <p>Werden vom Nutzer eingegeben oder automatisch von Produktseiten extrahiert, um Marktdaten abzufragen. Diese Daten werden an <code>api.joinflipcheck.app</code> übertragen.</p>
+  </div>
+  <div class="card">
+    <strong>b) Authentifizierungstoken (JWT)</strong>
+    <p>Wird in <code>chrome.storage.local</code> gespeichert. Dient der Authentifizierung gegenüber dem Flipcheck-Backend. Verlässt das Gerät nur als Bearer-Token im HTTP-Header.</p>
+  </div>
+  <div class="card">
+    <strong>c) Nutzereinstellungen</strong>
+    <p>Standard-Kategorie, Modus, Versandkosten u.a. werden lokal in <code>chrome.storage.local</code> gespeichert. Diese Daten verlassen das Gerät nicht.</p>
+  </div>
+  <div class="card">
+    <strong>d) Letzte Checks (Recent)</strong>
+    <p>Die letzten 6 Checks (EAN/ASIN, Verdict, Profit) werden lokal in <code>chrome.storage.local</code> gespeichert. Kein Server-Sync.</p>
+  </div>
+
+  <h2>3. Welche Daten werden NICHT verarbeitet?</h2>
+  <ul>
+    <li>Keine Browserhistorie, keine Cookies, keine Passwörter</li>
+    <li>Keine personenbezogenen Daten außer dem optionalen Discord-Profil (Name, E-Mail) — ausschließlich für das Nutzer-Profil angezeigt</li>
+    <li>Kein Tracking, kein Remarketing, keine Werbung</li>
+    <li>Keine Weitergabe an Dritte</li>
+    <li>Keine Seiteninhalt-Analyse außer EAN/ASIN-Extraktion auf Produktseiten</li>
+  </ul>
+
+  <h2>4. Rechtsgrundlage der Verarbeitung</h2>
+  <p>
+    Die Verarbeitung erfolgt auf Grundlage von <strong>Art. 6 Abs. 1 lit. b DSGVO</strong> (Vertragserfüllung / Nutzung des Dienstes) und <strong>Art. 6 Abs. 1 lit. f DSGVO</strong> (berechtigtes Interesse an der Bereitstellung der Kernfunktionen).
+  </p>
+
+  <h2>5. Datenübertragung an Dritte</h2>
+  <p>
+    API-Anfragen werden an <strong>api.joinflipcheck.app</strong> gesendet. Dieser Server wird von Flipcheck betrieben. Es erfolgt keine Weitergabe an weitere Dritte. Der Server ist in der EU/EWR gehostet.
+  </p>
+
+  <h2>6. Datenspeicherung und Löschung</h2>
+  <p>
+    Lokal gespeicherte Daten (Token, Einstellungen, Recent) können jederzeit gelöscht werden:
+  </p>
+  <ul>
+    <li>Über <strong>Einstellungen → Abmelden</strong> in der Extension</li>
+    <li>Durch Deinstallation der Extension (löscht alle lokalen Daten)</li>
+    <li>Über die Chrome-Einstellungen: <em>Erweiterungen → Flipcheck → Details → Daten löschen</em></li>
+  </ul>
+
+  <h2>7. Berechtigungen der Extension</h2>
+  <p>Die Extension benötigt folgende Chrome-Berechtigungen:</p>
+  <ul>
+    <li><strong>storage</strong> — Für lokale Speicherung von Token und Einstellungen</li>
+    <li><strong>alarms</strong> — Für regelmäßige Cache-Bereinigung</li>
+    <li><strong>contextMenus</strong> — Für Rechtsklick-Menü (EAN direkt prüfen)</li>
+    <li><strong>tabs</strong> — Für die automatische ASIN-Erkennung der aktiven Tab-URL</li>
+    <li><strong>host_permissions</strong> auf eBay.de, Amazon.de, Kaufland.de u.a. — Um Badges und Panels auf Produktseiten einzublenden und EANs zu extrahieren</li>
+  </ul>
+
+  <h2>8. Betroffenenrechte (DSGVO)</h2>
+  <p>Du hast das Recht auf:</p>
+  <ul>
+    <li><strong>Auskunft</strong> (Art. 15 DSGVO): Welche Daten wir über dich haben</li>
+    <li><strong>Berichtigung</strong> (Art. 16 DSGVO)</li>
+    <li><strong>Löschung</strong> (Art. 17 DSGVO): "Recht auf Vergessenwerden"</li>
+    <li><strong>Einschränkung</strong> (Art. 18 DSGVO)</li>
+    <li><strong>Widerspruch</strong> (Art. 21 DSGVO)</li>
+    <li><strong>Beschwerde</strong> bei einer Datenschutzbehörde (z. B. LfDI)</li>
+  </ul>
+  <p>Für Anfragen: <a href="mailto:hello@joinflipcheck.app">hello@joinflipcheck.app</a></p>
+
+  <h2>9. Cookies</h2>
+  <p>
+    Die Extension selbst setzt keine Cookies. Das Popup und die Options-Seite sind isolierte Extension-Seiten ohne Cookie-Tracking.
+  </p>
+
+  <h2>10. Änderungen dieser Datenschutzerklärung</h2>
+  <p>
+    Wir behalten uns vor, diese Erklärung bei wesentlichen Änderungen der Extension zu aktualisieren. Die aktuelle Version ist stets unter <a href="https://joinflipcheck.app/privacy">joinflipcheck.app/privacy</a> verfügbar.
+  </p>
+
+  <footer>
+    © 2026 Flipcheck · <a href="mailto:hello@joinflipcheck.app">hello@joinflipcheck.app</a> ·
+    <a href="https://joinflipcheck.app/privacy">joinflipcheck.app/privacy</a>
+  </footer>
+
+</body>
+</html>

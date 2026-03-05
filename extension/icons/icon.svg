@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <!-- Background -->
+  <rect width="128" height="128" rx="28" fill="#111118"/>
+  <!-- Border -->
+  <rect x="1" y="1" width="126" height="126" rx="27" fill="none" stroke="#2E2E42" stroke-width="2"/>
+  <!-- Triangle / Arrow mark (▲ FC) -->
+  <!-- Indigo triangle pointing up -->
+  <polygon points="64,20 98,84 30,84" fill="#6366F1" opacity="0.15"/>
+  <polygon points="64,26 93,78 35,78" fill="none" stroke="#6366F1" stroke-width="5" stroke-linejoin="round"/>
+  <!-- Inner triangle filled -->
+  <polygon points="64,38 83,70 45,70" fill="#6366F1"/>
+  <!-- FC text -->
+  <text x="64" y="112" text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, Inter, sans-serif"
+        font-size="22" font-weight="800" fill="#6366F1" letter-spacing="3">FC</text>
+</svg>

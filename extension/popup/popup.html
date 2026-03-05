@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flipcheck</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- ══ HEADER ════════════════════════════════════════════════════════════ -->
+  <div class="fc-header">
+    <span class="fc-logo">▲ FLIPCHECK</span>
+    <span class="fc-detect-pill" id="pageDetectPill" style="display:none"></span>
+    <div class="fc-bridge-pill" id="bridgePill">
+      <div class="fc-bridge-dot"></div>
+      <span id="bridgeLabel">Desktop</span>
+    </div>
+    <button class="fc-icon-btn" id="settingsBtn" title="Einstellungen">⚙</button>
+  </div>
+
+  <!-- ══ BANNERS ═══════════════════════════════════════════════════════════ -->
+  <div class="fc-banner fc-banner-auth" id="authBanner" style="display:none">
+    <span>Kein Token — bitte anmelden.</span>
+    <a href="#" id="authLink">→ Anmelden</a>
+  </div>
+  <div class="fc-banner fc-banner-upgrade" id="upgradeBanner" style="display:none">
+    <span>🔒 Tageslimit erreicht</span>
+    <a id="upgradeLink" href="https://whop.com/flipcheck" target="_blank" rel="noopener">⚡ Upgrade</a>
+  </div>
+
+  <!-- ══ TABS ══════════════════════════════════════════════════════════════ -->
+  <div class="fc-tabs">
+    <button class="fc-tab active" id="tabSingle" data-panel="panelSingle">Einzeln</button>
+    <button class="fc-tab"        id="tabBatch"  data-panel="panelBatch">Batch</button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SINGLE TAB
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="fc-panel" id="panelSingle">
+
+    <!-- Market Toggle -->
+    <div class="fc-market-toggle">
+      <button class="fc-mkt-btn active" data-market="ebay">
+        <span class="fc-mkt-icon">🛒</span> eBay
+      </button>
+      <button class="fc-mkt-btn" data-market="amazon">
+        <span class="fc-mkt-icon">📦</span> Amazon
+      </button>
+      <button class="fc-mkt-btn" data-market="kaufland">
+        <span class="fc-mkt-icon">🏬</span> Kaufland
+      </button>
+    </div>
+
+    <!-- EAN / ASIN Search -->
+    <div class="fc-search-row">
+      <div class="fc-search-inp-wrap">
+        <span class="fc-search-lbl">EAN / ASIN</span>
+        <input class="fc-search-inp" id="eanInp" type="text" inputmode="text"
+               maxlength="50" placeholder="EAN, ASIN oder Modell-Nr." autocomplete="off" spellcheck="false" />
+      </div>
+      <button class="fc-check-btn" id="checkBtn">→</button>
+    </div>
+    <!-- Manual page scan + EAN ↔ ASIN lookup -->
+    <div class="fc-scan-row">
+      <button class="fc-scan-page-btn" id="scanPageBtn" title="EAN von der aktuellen Produktseite holen">🔍 Seite scannen</button>
+      <button class="fc-ean-asin-btn"  id="eanToAsinBtn"  style="display:none">EAN → ASIN</button>
+      <button class="fc-ean-asin-btn"  id="asinToEanBtn"  style="display:none">ASIN → EAN</button>
+    </div>
+
+    <!-- Kosten Row: EK + Versand rein + Versand raus -->
+    <div class="fc-costs-row" id="ebayFeeRow">
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">EK €</span>
+        <input class="fc-inp" id="ekInp" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Vers. rein</span>
+        <input class="fc-inp" id="fcShipIn" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Vers. raus</span>
+        <input class="fc-inp" id="fcShipOut" type="number" step="0.01" min="0" placeholder="4.99" />
+      </div>
+    </div>
+
+    <!-- Amazon EK Row (only EK + ShipIn for amazon) -->
+    <div class="fc-costs-row" id="amzFeeRow" style="display:none">
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">EK €</span>
+        <input class="fc-inp" id="ekInpAmz" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Vers. Lager</span>
+        <input class="fc-inp" id="fcAmzShipIn" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">PREP (€/Stk.)</span>
+        <input class="fc-inp" id="fcPrepFee" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+    </div>
+
+    <!-- Options Row: Kategorie + Modus -->
+    <div class="fc-opts-row">
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Kategorie</span>
+        <select class="fc-inp" id="catSel"></select>
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Modus</span>
+        <select class="fc-inp" id="modeSel">
+          <option value="low">LOW</option>
+          <option value="mid" selected>MID</option>
+          <option value="high">HIGH</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Amazon Extras: FBA/FBM toggle -->
+    <div class="fc-amz-extras" id="amzExtras">
+      <div class="fc-amz-row">
+        <span class="fc-amz-lbl">Versand-Methode:</span>
+        <div class="fc-fbm-toggle">
+          <button class="fc-fbm-btn active" data-method="fba">FBA</button>
+          <button class="fc-fbm-btn"        data-method="fbm">FBM</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Loading Skeleton -->
+    <div class="fc-loading" id="fcLoading">
+      <div class="fc-skel-wrap">
+        <div class="fc-skel fc-skel-lg"></div>
+        <div class="fc-skel fc-skel-md"></div>
+        <div class="fc-skel fc-skel-full"></div>
+        <div class="fc-skel fc-skel-sm"></div>
+      </div>
+    </div>
+
+    <!-- Error -->
+    <div class="fc-error" id="fcError"></div>
+
+    <!-- Result Card (injected by JS) -->
+    <div class="fc-result" id="fcResult"></div>
+
+    <!-- Recent Checks -->
+    <div id="recentSection">
+      <div class="fc-divider"></div>
+      <div class="fc-recent-hdr">Letzte Checks</div>
+      <div class="fc-recent-list" id="recentList">
+        <div class="fc-empty">Noch keine Checks.</div>
+      </div>
+    </div>
+
+  </div><!-- /panelSingle -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       BATCH TAB
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="fc-panel" id="panelBatch" style="display:none">
+
+    <div class="fc-batch-ta-wrap">
+      <label class="fc-batch-lbl">EANs (eine pro Zeile, max. 50)</label>
+      <textarea class="fc-batch-ta" id="batchTa"
+                placeholder="4010355040672&#10;4005176025181&#10;5901234123457&#10;…"
+                rows="5" spellcheck="false"></textarea>
+      <div class="fc-batch-count" id="batchTaCount">0 EANs</div>
+    </div>
+
+    <div class="fc-batch-opts">
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">EK (€, global)</span>
+        <input class="fc-inp" id="batchEkInp" type="number" step="0.01" min="0" placeholder="0.00" />
+      </div>
+      <div class="fc-inp-wrap">
+        <span class="fc-inp-lbl">Modus</span>
+        <select class="fc-inp" id="batchModeSel">
+          <option value="low">LOW</option>
+          <option value="mid" selected>MID</option>
+          <option value="high">HIGH</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="fc-batch-run-btn" id="batchRunBtn">→ Alle prüfen</button>
+
+    <div class="fc-batch-prog" id="batchProgress">
+      <div class="fc-batch-prog-track">
+        <div class="fc-batch-prog-bar" id="batchProgressBar" style="width:0%"></div>
+      </div>
+      <span class="fc-batch-prog-lbl" id="batchProgressLabel">0 / 0</span>
+    </div>
+
+    <div class="fc-batch-err" id="batchError"></div>
+
+    <div id="batchResultWrap" style="display:none">
+      <div class="fc-batch-res-hdr">
+        <span class="fc-batch-res-ttl" id="batchResultCount">0 Ergebnisse</span>
+        <div class="fc-batch-exp">
+          <button class="fc-exp-btn" id="batchCsvBtn">↓ CSV</button>
+          <button class="fc-exp-btn" id="batchCopyBtn">⎘ Copy</button>
+        </div>
+      </div>
+      <div class="fc-batch-summary" id="batchSummary"></div>
+      <div class="fc-batch-tbl-wrap">
+        <table class="fc-batch-tbl">
+          <thead>
+            <tr>
+              <th style="width:72px">EAN</th>
+              <th style="width:50px">Verdict</th>
+              <th style="width:42px">VK</th>
+              <th style="width:54px">Profit</th>
+              <th style="width:38px">Marge</th>
+              <th style="width:36px;text-align:right">Sales</th>
+            </tr>
+          </thead>
+          <tbody id="batchTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /panelBatch -->
+
+  <!-- ══════════════════════════════════════════════════════════════════════
+       SETTINGS PANEL
+       ══════════════════════════════════════════════════════════════════════ -->
+  <div class="fc-panel" id="panelSettings" style="display:none">
+    <div class="fc-settings-section">
+      <div class="fc-settings-title">eBay Research Cookie</div>
+      <div class="fc-settings-desc">Cookie direkt vom Network-Tab kopieren (Request: <code>sh/research/api/search</code>)</div>
+      <textarea class="fc-settings-ta" id="cookieTa" rows="5"
+                placeholder="__uzma=...; __uzmb=...; ebaysid=...; s=...;"
+                spellcheck="false"></textarea>
+      <div class="fc-settings-actions">
+        <button class="fc-settings-btn" id="cookieSaveBtn">Cookie aktualisieren</button>
+        <span class="fc-settings-status" id="cookieStatus"></span>
+      </div>
+    </div>
+  </div><!-- /panelSettings -->
+
+  <script src="popup.js"></script>
+</body>
+</html>

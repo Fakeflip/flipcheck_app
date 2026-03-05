@@ -1,0 +1,269 @@
+/* Flipcheck Extension — Options Page Styles */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:         #0E0E15;
+  --surface:    #111118;
+  --surface2:   #16161F;
+  --border:     #1E1E2E;
+  --border2:    #2E2E42;
+  --indigo:     #6366F1;
+  --indigo-dark:#5558E8;
+  --text:       #F1F5F9;
+  --text-muted: #94A3B8;
+  --text-dim:   #475569;
+  --green:      #10B981;
+  --yellow:     #F59E0B;
+  --red:        #EF4444;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 100vh;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────────── */
+.opt-layout {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+/* ── Page Header ─────────────────────────────────────────────────────────────── */
+.opt-page-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 32px;
+}
+.opt-logo {
+  color: var(--indigo);
+  font-weight: 800;
+  font-size: 18px;
+  letter-spacing: .06em;
+}
+.opt-version {
+  font-size: 11px;
+  color: var(--text-dim);
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+/* ── Section ─────────────────────────────────────────────────────────────────── */
+.opt-section {
+  margin-bottom: 28px;
+}
+.opt-section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 10px;
+}
+.opt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+/* ── Rows ─────────────────────────────────────────────────────────────────────── */
+.opt-row {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.opt-row:last-child { border-bottom: none; }
+.opt-row-label { flex: 1; }
+.opt-row-label strong { display: block; font-size: 13px; font-weight: 600; color: var(--text); }
+.opt-row-label small { display: block; font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+
+/* ── Profile Row ─────────────────────────────────────────────────────────────── */
+.opt-profile-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--surface2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--indigo);
+  flex-shrink: 0;
+  border: 1px solid var(--border2);
+}
+.opt-profile-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.opt-plan-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: .05em;
+}
+
+/* ── Token Area ─────────────────────────────────────────────────────────────── */
+.opt-token-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.opt-token-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+.opt-token-dot.active { background: var(--green); }
+.opt-token-dot.inactive { background: var(--red); }
+
+/* ── Inputs ─────────────────────────────────────────────────────────────────── */
+.opt-inp {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 8px 12px;
+  outline: none;
+  transition: border-color .15s;
+  font-family: monospace;
+}
+.opt-inp:focus { border-color: var(--indigo); }
+.opt-inp::placeholder { color: var(--text-dim); }
+
+.opt-inp-wrap {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.opt-inp-wrap:last-child { border-bottom: none; }
+.opt-inp-label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+
+select.opt-inp {
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23475569' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 28px;
+}
+
+/* ── Buttons ─────────────────────────────────────────────────────────────────── */
+.opt-btn {
+  background: var(--indigo);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 7px 14px;
+  cursor: pointer;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.opt-btn:hover { background: var(--indigo-dark); }
+.opt-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+.opt-btn-ghost {
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border2);
+}
+.opt-btn-ghost:hover { border-color: var(--indigo); color: var(--text); background: var(--surface2); }
+
+.opt-btn-danger {
+  background: transparent;
+  color: var(--red);
+  border: 1px solid #EF444433;
+}
+.opt-btn-danger:hover { background: #EF444411; }
+
+/* ── Toggle Switch ─────────────────────────────────────────────────────────── */
+.opt-toggle {
+  position: relative;
+  display: inline-block;
+  width: 36px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.opt-toggle input { opacity: 0; width: 0; height: 0; }
+.opt-toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  inset: 0;
+  background: var(--border2);
+  border-radius: 10px;
+  transition: background .2s;
+}
+.opt-toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  left: 3px;
+  top: 3px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform .2s;
+}
+.opt-toggle input:checked + .opt-toggle-slider { background: var(--indigo); }
+.opt-toggle input:checked + .opt-toggle-slider::before { transform: translateX(16px); }
+
+/* ── Bridge Status ─────────────────────────────────────────────────────────── */
+.opt-bridge-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.opt-bridge-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-dim);
+}
+.opt-bridge-dot.connected { background: var(--green); }
+.opt-bridge-info {
+  font-size: 12px;
+  color: var(--text-muted);
+  flex: 1;
+}
+
+/* ── Toast ───────────────────────────────────────────────────────────────────── */
+.opt-toast {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity .2s, transform .2s;
+  pointer-events: none;
+  z-index: 9999;
+}
+.opt-toast.show { opacity: 1; transform: none; }
+.opt-toast.success { border-color: #10B98144; color: var(--green); }
+.opt-toast.error   { border-color: #EF444444; color: var(--red); }

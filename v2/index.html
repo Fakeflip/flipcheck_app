@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FLIPCHECK</title>
+
+  <!-- Inter Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════ SHELL ══ -->
+<div id="app">
+
+  <!-- Sidebar -->
+  <aside id="sidebar">
+    <div class="sidebar-brand">
+      <div class="brand-logo">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <rect width="18" height="18" rx="5" fill="#6366F1"/>
+          <path d="M5 13L9 5L13 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M6.5 10.5h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <span class="brand-name">FLIPCHECK</span>
+        <span class="brand-version" id="appVersion">v2.0.0</span>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <div class="nav-section-label">Analyse</div>
+
+      <a class="nav-item" data-view="analytics" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor" opacity=".4"/>
+          <rect x="6" y="5" width="3" height="10" rx="1" fill="currentColor" opacity=".7"/>
+          <rect x="11" y="1" width="3" height="14" rx="1" fill="currentColor"/>
+        </svg>
+        <span>Analytics</span>
+      </a>
+
+      <a class="nav-item" data-view="flipcheck" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+        </svg>
+        <span>Flipcheck</span>
+      </a>
+
+      <a class="nav-item" data-view="batch" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="1" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="1" y="6.25" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="1" y="11.5" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span>Batch</span>
+        <span class="nav-badge">NEU</span>
+      </a>
+
+      <div class="nav-section-label" style="margin-top:8px">Verwaltung</div>
+
+      <a class="nav-item" data-view="inventory" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5 5V3.5A3 3 0 0 1 11 3.5V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M5.5 9h5M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Inventory</span>
+      </a>
+
+      <a class="nav-item" data-view="history" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,12 5,7 8,9 12,4 15,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M12 4h3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Preishistorie</span>
+      </a>
+
+      <a class="nav-item" data-view="dealscan" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M10.5 10.5L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M4.5 6.5h4M6.5 4.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Deal-Scanner</span>
+      </a>
+
+      <a class="nav-item" data-view="competition" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="5" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <circle cx="11" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M1 13c0-2.21 1.79-4 4-4M15 13c0-2.21-1.79-4-4-4M8 13c0-2.21 0-4 0-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Konkurrenz</span>
+        <span class="nav-badge">NEU</span>
+      </a>
+
+      <a class="nav-item" data-view="alerts" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M8 2a5 5 0 0 0-5 5c0 5.5-2 7-2 7h14s-2-1.5-2-7a5 5 0 0 0-5-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M9.73 14a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Preisalarm</span>
+        <span class="nav-badge">NEU</span>
+      </a>
+
+      <a class="nav-item" data-view="marketplace" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <rect x="1" y="3" width="4.5" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="5.75" y="1" width="4.5" height="12" rx="1" stroke="currentColor" stroke-width="1.5"/>
+          <rect x="10.5" y="5" width="4.5" height="8" rx="1" stroke="currentColor" stroke-width="1.5"/>
+        </svg>
+        <span>Marktplatz</span>
+        <span class="nav-badge">NEU</span>
+      </a>
+
+      <a class="nav-item" data-view="sales" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <polyline points="1,11 5,6 8,8 12,3 15,5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13 3h2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Verkäufe</span>
+        <span class="nav-badge">NEU</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a class="nav-item" data-view="settings" href="#">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M3.05 12.95l1.41-1.41M11.54 4.46l1.41-1.41" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+        <span>Einstellungen</span>
+      </a>
+
+      <button class="nav-item nav-logout" id="btnLogout">
+        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M6 2H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h3M10 11l3-3-3-3M6 8h7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main id="main">
+    <div id="topbar">
+      <div id="topbar-left">
+        <h1 id="page-title">Analytics</h1>
+      </div>
+      <div id="topbar-right">
+        <div class="status-pill" id="backendStatus">
+          <span class="status-dot"></span>
+          <span class="status-text">Verbinden…</span>
+        </div>
+        <div class="status-pill user-pill" id="userPill" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <circle cx="8" cy="5" r="3" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M2 14c0-3.314 2.686-6 6-6s6 2.686 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span id="userPillText">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- View Container -->
+    <div id="view-root"></div>
+  </main>
+
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ AUTH GATE ══ -->
+<div id="auth-gate">
+  <div class="gate-glow gate-glow-1"></div>
+  <div class="gate-glow gate-glow-2"></div>
+  <div class="gate-card">
+    <div class="gate-logo">
+      <svg width="32" height="32" viewBox="0 0 18 18" fill="none">
+        <rect width="18" height="18" rx="5" fill="#6366F1"/>
+        <path d="M5 13L9 5L13 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6.5 10.5h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <h2 class="gate-title">FLIPCHECK</h2>
+    <p class="gate-sub">Melde dich an um fortzufahren</p>
+    <button class="btn btn-primary btn-gate" id="btnLogin">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
+        <path d="M2.5 13.5c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+      Mit Discord anmelden
+    </button>
+    <div class="gate-hint" id="gateHint"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ TOAST CONTAINER ══ -->
+<div id="toast-container" aria-live="polite"></div>
+
+<!-- ═══════════════════════════════════════════════════════ MODAL ══ -->
+<div id="modal-overlay" role="dialog" aria-modal="true" style="display:none">
+  <div id="modal-box">
+    <div id="modal-header">
+      <h3 id="modal-title"></h3>
+      <button id="modal-close" aria-label="Schließen">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+    <div id="modal-body"></div>
+    <div id="modal-footer"></div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ SCRIPTS ══ -->
+<script src="assets/lib/constants.js"></script>
+<script src="assets/lib/error-reporter.js"></script>
+<script src="assets/lib/toast.js"></script>
+<script src="assets/lib/modal.js"></script>
+<script src="assets/lib/storage.js"></script>
+<script src="assets/lib/html.js"></script>
+<script src="assets/views/listing.js"></script>
+<script src="assets/views/analytics.js"></script>
+<script src="assets/views/flipcheck.js"></script>
+<script src="assets/views/batch.js"></script>
+<script src="assets/views/inventory-data.js"></script>
+<script src="assets/views/inventory.js"></script>
+<script src="assets/views/history.js"></script>
+<script src="assets/views/dealscan.js"></script>
+<script src="assets/views/competition.js"></script>
+<script src="assets/views/alerts.js"></script>
+<script src="assets/views/marketplace.js"></script>
+<script src="assets/views/sales.js"></script>
+<script src="assets/views/settings.js"></script>
+<!-- Onboarding Wizard Overlay (shown before app on first run) -->
+<div id="wizard-root" style="display:none"></div>
+
+<script src="assets/views/onboarding.js"></script>
+<script src="assets/app.js"></script>
+
+</body>
+</html>

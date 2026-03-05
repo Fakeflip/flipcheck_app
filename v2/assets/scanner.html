@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+  <title>Flipcheck Scanner</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #0A0A0F;
+      color: #F1F5F9;
+      font-family: -apple-system, BlinkMacSystemFont, "Inter", sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 800; font-size: 18px; letter-spacing: .04em;
+      margin-bottom: 24px;
+    }
+    .logo-icon {
+      width: 32px; height: 32px;
+      background: #6366F1; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .card {
+      width: 100%; max-width: 400px;
+      background: #111118;
+      border: 1px solid #1E1E2E;
+      border-radius: 16px;
+      padding: 24px;
+    }
+    .card-title {
+      font-size: 15px; font-weight: 700; color: #F1F5F9;
+      margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 12px; color: #475569;
+      margin-bottom: 20px;
+    }
+
+    /* Camera view */
+    #camWrapper {
+      position: relative;
+      width: 100%; aspect-ratio: 1;
+      border-radius: 12px; overflow: hidden;
+      background: #000;
+      margin-bottom: 16px;
+    }
+    #camView {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .scan-overlay {
+      position: absolute; inset: 0;
+      pointer-events: none;
+    }
+    .scan-frame {
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 60%; aspect-ratio: 1;
+      border: 2px solid rgba(99,102,241,0.8);
+      border-radius: 8px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+    }
+    .scan-line {
+      position: absolute;
+      left: 10%; right: 10%;
+      height: 2px;
+      background: #6366F1;
+      box-shadow: 0 0 8px #6366F1;
+      animation: scanLine 2s ease-in-out infinite;
+    }
+    @keyframes scanLine {
+      0%   { top: 20%; }
+      50%  { top: 75%; }
+      100% { top: 20%; }
+    }
+
+    /* Flash overlay on scan */
+    #flashOverlay {
+      position: fixed; inset: 0;
+      background: rgba(16,185,129,0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 100;
+    }
+    #flashOverlay.active { opacity: 1; }
+
+    /* Status */
+    #status {
+      font-size: 12px; color: #475569;
+      text-align: center; margin-bottom: 16px;
+    }
+    #status.ok  { color: #10B981; }
+    #status.err { color: #EF4444; }
+
+    /* Scanned list */
+    #scanList {
+      list-style: none;
+      margin-bottom: 16px;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    #scanList li {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: #16161F;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: monospace;
+      margin-bottom: 4px;
+      animation: slideIn .2s ease;
+    }
+    #scanList li .dot { width: 6px; height: 6px; border-radius: 50%; background: #10B981; flex-shrink: 0; }
+    @keyframes slideIn { from { transform: translateY(-6px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* Divider */
+    .divider {
+      display: flex; align-items: center; gap: 10px;
+      margin: 16px 0;
+      font-size: 11px; color: #475569;
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; height: 1px; background: #1E1E2E;
+    }
+
+    /* Manual input fallback */
+    #manualSection { display: none; }
+    #manualSection.visible { display: block; }
+
+    .input-row { display: flex; gap: 8px; }
+    input[type="text"] {
+      flex: 1;
+      background: #16161F;
+      border: 1px solid #1E1E2E;
+      border-radius: 8px;
+      color: #F1F5F9;
+      font-size: 14px;
+      padding: 10px 12px;
+      font-family: monospace;
+      outline: none;
+    }
+    input[type="text"]:focus { border-color: #6366F1; }
+
+    button {
+      background: #6366F1;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px 16px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:active { background: #5558E8; }
+    button.ghost {
+      background: #16161F;
+      color: #94A3B8;
+      border: 1px solid #1E1E2E;
+    }
+
+    .hint {
+      font-size: 11px; color: #334155;
+      text-align: center; margin-top: 16px;
+    }
+
+    /* No camera support */
+    #noSupportMsg { display: none; }
+  </style>
+</head>
+<body>
+
+<div id="flashOverlay"></div>
+
+<div class="logo">
+  <div class="logo-icon">
+    <svg width="16" height="16" viewBox="0 0 18 18" fill="none">
+      <path d="M5 13L9 5L13 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M6.5 10.5h5" stroke="white" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+  </div>
+  FLIPCHECK
+</div>
+
+<div class="card">
+  <div class="card-title">Barcode Scanner</div>
+  <div class="card-sub">Halte den Barcode in den Rahmen — EAN wird automatisch erkannt</div>
+
+  <div id="certHint" style="display:none;background:#1A1A26;border:1px solid #2E2E42;border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:11px;color:#94A3B8;line-height:1.5">
+    ⚠️ <strong style="color:#F1F5F9">Sicherheitswarnung im Browser?</strong><br>
+    Tippe auf <em>„Erweitert"</em> → <em>„Weiter zu …"</em> (Chrome) oder <em>„Website besuchen"</em> (Safari) um fortzufahren. Das Zertifikat ist intern und ungefährlich.
+  </div>
+
+  <div id="camWrapper">
+    <video id="camView" autoplay muted playsinline></video>
+    <div class="scan-overlay">
+      <div class="scan-frame"></div>
+      <div class="scan-line"></div>
+    </div>
+  </div>
+
+  <div id="status">Kamera wird gestartet…</div>
+
+  <ul id="scanList"></ul>
+
+  <div id="noSupportMsg">
+    <p style="font-size:12px;color:#EF4444;margin-bottom:12px">
+      ⚠️ Dein Browser unterstützt keine automatische Barcode-Erkennung (BarcodeDetector API fehlt).<br>
+      Bitte gib die EAN manuell ein:
+    </p>
+  </div>
+
+  <div class="divider">oder manuell</div>
+
+  <div id="manualSection" class="visible">
+    <div class="input-row" style="margin-bottom:8px">
+      <input id="manualEan" type="text" inputmode="numeric" placeholder="EAN eingeben…" maxlength="14" />
+      <button id="btnSend">Senden</button>
+    </div>
+    <button class="ghost" id="btnClearList" style="width:100%;font-size:12px;padding:8px">Liste leeren</button>
+  </div>
+
+  <p class="hint" id="counterHint">0 EANs gesendet</p>
+</div>
+
+<script>
+(async () => {
+  const camView    = document.getElementById('camView');
+  const statusEl   = document.getElementById('status');
+  const scanList   = document.getElementById('scanList');
+  const flashEl    = document.getElementById('flashOverlay');
+  const manualInp  = document.getElementById('manualEan');
+  const btnSend    = document.getElementById('btnSend');
+  const btnClear   = document.getElementById('btnClearList');
+  const counterEl  = document.getElementById('counterHint');
+  const camWrapper = document.getElementById('camWrapper');
+
+  let sentCount  = 0;
+  let lastScan   = '';
+  let cooldownAt = 0;
+  const SERVER   = window.location.origin;
+
+  function updateCounter() {
+    counterEl.textContent = `${sentCount} EAN${sentCount !== 1 ? 's' : ''} gesendet`;
+  }
+
+  function flash() {
+    flashEl.classList.add('active');
+    setTimeout(() => flashEl.classList.remove('active'), 200);
+  }
+
+  function addToList(ean) {
+    const li = document.createElement('li');
+    li.innerHTML = `<span class="dot"></span><span>${ean}</span>`;
+    scanList.prepend(li);
+    while (scanList.children.length > 5) scanList.removeChild(scanList.lastChild);
+  }
+
+  async function sendEan(ean) {
+    const now = Date.now();
+    if (ean === lastScan && now - cooldownAt < 1500) return;
+    lastScan   = ean;
+    cooldownAt = now;
+
+    try {
+      const r = await fetch(`${SERVER}/scan`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ ean }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        sentCount++;
+        updateCounter();
+        flash();
+        addToList(ean);
+        statusEl.textContent = `✓ EAN ${ean} gesendet`;
+        statusEl.className   = 'ok';
+        setTimeout(() => { statusEl.textContent = 'Bereit zum Scannen…'; statusEl.className = ''; }, 2000);
+      } else {
+        statusEl.textContent = `Fehler: ungültige EAN (${ean})`;
+        statusEl.className   = 'err';
+      }
+    } catch (e) {
+      statusEl.textContent = 'Verbindung fehlgeschlagen';
+      statusEl.className   = 'err';
+    }
+  }
+
+  // Manual send
+  btnSend.addEventListener('click', () => {
+    const ean = manualInp.value.trim();
+    if (/^\d{8,14}$/.test(ean)) {
+      sendEan(ean);
+      manualInp.value = '';
+      manualInp.focus();
+    } else {
+      statusEl.textContent = 'Ungültige EAN — bitte 8–14 Ziffern eingeben';
+      statusEl.className   = 'err';
+    }
+  });
+  manualInp.addEventListener('keydown', e => { if (e.key === 'Enter') btnSend.click(); });
+  btnClear.addEventListener('click', () => { scanList.innerHTML = ''; sentCount = 0; updateCounter(); });
+
+  // Zeige Hinweis wenn nicht sicherer Kontext (noch auf HTTP)
+  if (!window.isSecureContext) {
+    document.getElementById('certHint').style.display = 'block';
+    statusEl.textContent = 'HTTPS erforderlich — bitte https:// URL verwenden';
+    statusEl.className   = 'err';
+    camWrapper.style.display = 'none';
+    return;
+  }
+
+  // ── Kamera starten ───────────────────────────────────────────────────────────
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } },
+    });
+    camView.srcObject = stream;
+    statusEl.textContent = 'Bereit zum Scannen…';
+  } catch (e) {
+    statusEl.textContent = 'Kamera-Zugriff verweigert — bitte Berechtigung erteilen';
+    statusEl.className   = 'err';
+    camWrapper.style.display = 'none';
+    return;
+  }
+
+  // ── Native BarcodeDetector (Chrome / Android WebView) ───────────────────────
+  if ('BarcodeDetector' in window) {
+    const detector = new BarcodeDetector({
+      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'qr_code'],
+    });
+    let scanning = true;
+    async function scan() {
+      if (!scanning) return;
+      try {
+        if (camView.readyState === camView.HAVE_ENOUGH_DATA) {
+          const barcodes = await detector.detect(camView);
+          for (const bc of barcodes) {
+            const raw = bc.rawValue.replace(/\D/g, '');
+            if (/^\d{8,14}$/.test(raw)) { await sendEan(raw); break; }
+          }
+        }
+      } catch {}
+      requestAnimationFrame(scan);
+    }
+    requestAnimationFrame(scan);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { scanning = false; stream.getTracks().forEach(t => t.stop()); }
+    });
+    return;
+  }
+
+  // ── ZXing Fallback via dynamic import (Safari / Firefox) ────────────────────
+  try {
+    statusEl.textContent = 'Lade Scanner…';
+    const { BrowserMultiFormatReader } = await import('https://esm.sh/@zxing/browser@0.1.4');
+    const codeReader = new BrowserMultiFormatReader();
+
+    // Stop our stream so ZXing can open the camera with its own constraints
+    stream.getTracks().forEach(t => t.stop());
+    camView.srcObject = null;
+
+    await codeReader.decodeFromConstraints(
+      { video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } } },
+      camView,
+      (result) => {
+        if (!result) return;
+        const raw = result.getText().replace(/\D/g, '');
+        if (/^\d{8,14}$/.test(raw)) sendEan(raw);
+      }
+    );
+
+    statusEl.textContent = 'Bereit zum Scannen…';
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { codeReader.reset(); }
+    });
+    return;
+  } catch (e) {
+    console.error('ZXing failed:', e);
+  }
+
+  // ── Kein Scanner verfügbar ───────────────────────────────────────────────────
+  statusEl.textContent = 'Scanner nicht verfügbar — bitte manuell eingeben';
+  statusEl.className   = 'err';
+  camWrapper.style.display = 'none';
+})();
+</script>
+</body>
+</html>

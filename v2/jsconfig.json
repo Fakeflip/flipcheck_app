@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    /* Enable TypeScript's type-checker on all plain JS files.
+     * No compilation — checkJs only gives IDE feedback + `tsc --noEmit` validation.
+     * Run: npx tsc --noEmit --project jsconfig.json   */
+    "checkJs":               true,
+    "noEmit":                true,
+    "strictNullChecks":      true,
+    "noImplicitAny":         false,
+    "target":                "ES2020",
+    "lib":                   ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleResolution":      "bundler",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck":          true,
+
+    /* Path aliases — renderer files live under assets/ */
+    "baseUrl": "."
+  },
+  "include": [
+    "assets/**/*.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "out"
+  ]
+}

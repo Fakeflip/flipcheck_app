@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    /* Strict type-checking on core library + app files (no compilation).
+     *
+     * Scope: assets/lib/*.js + assets/app.js — the pure business-logic layer.
+     * View files (assets/views/*.js) are DOM-heavy renderers; their event callbacks
+     * and querySelector results are inherently hard to type without TS syntax, so
+     * they are excluded from the strict pass.  The editor still provides full
+     * IntelliSense on them via globals.d.ts + types.js.
+     *
+     * Run: npm run typecheck   (= tsc --noEmit --project tsconfig.json)
+     */
+    "checkJs":               true,
+    "noEmit":                true,
+    "allowJs":               true,
+    "strictNullChecks":      true,
+    "noImplicitAny":         true,
+    "target":                "ES2020",
+    "lib":                   ["ES2020", "DOM", "DOM.Iterable"],
+    "moduleResolution":      "bundler",
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck":          true,
+
+    /* Path aliases — renderer files live under assets/ */
+    "baseUrl": "."
+  },
+  "include": [
+    "assets/lib/*.js",
+    "assets/app.js",
+    "assets/globals.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "out",
+    "tests"
+  ]
+}

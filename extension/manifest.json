@@ -1,0 +1,904 @@
+{
+  "manifest_version": 3,
+  "name": "Flipcheck",
+  "version": "1.3.0",
+  "description": "eBay-Reseller Profitabilitätsanalyse — BUY/HOLD/SKIP auf 125+ Shops. EAN-Extraktion, Profit-Badges, Deal Scanner.",
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    },
+    "default_title": "Flipcheck"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "permissions": [
+    "storage",
+    "alarms",
+    "contextMenus",
+    "tabs"
+  ],
+  "commands": {
+    "toggle-panel": {
+      "suggested_key": {
+        "default": "Alt+F",
+        "mac": "Alt+F"
+      },
+      "description": "Flipcheck Panel öffnen/schließen"
+    }
+  },
+  "host_permissions": [
+    "https://api.joinflipcheck.app/*",
+    "http://127.0.0.1:8766/*",
+    "https://*.ebay.de/*",
+    "https://*.amazon.de/*",
+    "https://*.amazon.fr/*",
+    "https://*.amazon.it/*",
+    "https://*.amazon.es/*",
+    "https://*.amazon.nl/*",
+    "https://*.amazon.at/*",
+    "https://*.amazon.co.uk/*",
+    "https://*.amazon.pl/*",
+    "https://*.kaufland.de/*",
+    "https://*.kaufland.at/*",
+    "https://*.otto.de/*",
+    "https://*.saturn.de/*",
+    "https://*.saturn.at/*",
+    "https://*.mediamarkt.de/*",
+    "https://*.mediamarkt.at/*",
+    "https://*.mediamarkt.ch/*",
+    "https://*.conrad.de/*",
+    "https://*.alternate.de/*",
+    "https://*.notebooksbilliger.de/*",
+    "https://*.cyberport.de/*",
+    "https://*.idealo.de/*",
+    "https://*.thalia.de/*",
+    "https://*.hugendubel.de/*",
+    "https://*.dm.de/*",
+    "https://*.rossmann.de/*",
+    "https://*.zalando.de/*",
+    "https://*.aboutyou.de/*",
+    "https://*.decathlon.de/*",
+    "https://*.bauhaus.info/*",
+    "https://*.hornbach.de/*",
+    "https://*.tchibo.de/*",
+    "https://*.rewe.de/*",
+    "https://*.penny.de/*",
+    "https://*.lidl.de/*",
+    "https://*.obi.de/*",
+    "https://*.metro.de/*",
+    "https://*.euronics.de/*",
+    "https://*.expert.de/*",
+    "https://*.ep.de/*",
+    "https://*.computeruniverse.net/*",
+    "https://*.mindfactory.de/*",
+    "https://*.caseking.de/*",
+    "https://*.jacob.de/*",
+    "https://*.getgoods.de/*",
+    "https://*.proshop.de/*",
+    "https://*.pearl.de/*",
+    "https://*.pollin.de/*",
+    "https://*.reichelt.de/*",
+    "https://*.voelkner.de/*",
+    "https://*.galaxus.de/*",
+    "https://*.galaxus.ch/*",
+    "https://*.digitec.ch/*",
+    "https://*.technikdirekt.de/*",
+    "https://*.hifi.de/*",
+    "https://*.tink.de/*",
+    "https://*.rebuy.de/*",
+    "https://*.momox.de/*",
+    "https://*.medimops.de/*",
+    "https://*.refurbed.de/*",
+    "https://*.backmarket.de/*",
+    "https://*.swappie.com/*",
+    "https://*.asgoodasnew.com/*",
+    "https://*.vinted.de/*",
+    "https://*.kleinanzeigen.de/*",
+    "https://*.hm.com/*",
+    "https://*.zara.com/*",
+    "https://*.uniqlo.com/*",
+    "https://*.c-a.com/*",
+    "https://*.bonprix.de/*",
+    "https://*.sportscheck.com/*",
+    "https://*.peek-cloppenburg.de/*",
+    "https://*.jack-wolfskin.de/*",
+    "https://*.adidas.de/*",
+    "https://*.nike.com/*",
+    "https://*.puma.com/*",
+    "https://*.footlocker.de/*",
+    "https://*.snipes.com/*",
+    "https://*.planet-sports.de/*",
+    "https://*.engelbert-strauss.de/*",
+    "https://*.s-oliver.de/*",
+    "https://*.esprit.de/*",
+    "https://*.asos.com/*",
+    "https://*.lululemon.com/*",
+    "https://*.new-yorker.de/*",
+    "https://*.kik.de/*",
+    "https://*.primark.com/*",
+    "https://*.takko.com/*",
+    "https://*.ikea.com/*",
+    "https://*.wayfair.de/*",
+    "https://*.xxxlutz.de/*",
+    "https://*.poco.de/*",
+    "https://*.westwing.de/*",
+    "https://*.home24.de/*",
+    "https://*.roller.de/*",
+    "https://*.hagebau.de/*",
+    "https://*.toom.de/*",
+    "https://*.hellweg.de/*",
+    "https://*.globus-baumarkt.de/*",
+    "https://*.intersport.de/*",
+    "https://*.bergfreunde.de/*",
+    "https://*.fahrrad.de/*",
+    "https://*.globetrotter.de/*",
+    "https://*.bergzeit.de/*",
+    "https://*.sportokay.com/*",
+    "https://*.bike24.com/*",
+    "https://*.douglas.de/*",
+    "https://*.notino.de/*",
+    "https://*.flaconi.de/*",
+    "https://*.parfumdreams.de/*",
+    "https://*.mueller.de/*",
+    "https://*.medpex.de/*",
+    "https://*.shop-apotheke.com/*",
+    "https://*.weltbild.de/*",
+    "https://*.buecher.de/*",
+    "https://*.smyths.de/*",
+    "https://*.mytoys.de/*",
+    "https://*.windeln.de/*",
+    "https://*.babymarkt.de/*",
+    "https://*.baby-walz.de/*",
+    "https://*.zooplus.de/*",
+    "https://*.fressnapf.de/*",
+    "https://*.das-futterhaus.de/*",
+    "https://*.maxi-zoo.de/*",
+    "https://*.zooroyal.de/*",
+    "https://*.kfzteile24.de/*",
+    "https://*.autodoc.de/*",
+    "https://*.polo.de/*",
+    "https://*.thomann.de/*",
+    "https://*.musicstore.de/*",
+    "https://*.netto-online.de/*",
+    "https://*.norma24.de/*",
+    "https://*.action.de/*",
+    "https://*.christ.de/*",
+    "https://*.game.de/*",
+    "https://*.office-partner.de/*",
+    "https://*.staples.de/*",
+    "https://*.aliexpress.com/*",
+    "https://*.etsy.com/*",
+    "https://*.fnac.com/*",
+    "https://*.keller-sports.de/*",
+    "https://*.breuninger.com/*",
+    "https://*.lodenfrey.de/*",
+    "https://*.sport2000.de/*",
+    "https://*.campz.de/*",
+    "https://*.addnature.de/*",
+    "https://*.trendyol.com/*",
+    "https://*.shein.com/*",
+    "https://*.meindl.de/*",
+    "https://*.lowa.de/*",
+    "https://*.apple.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.ebay.de/*",
+        "https://www.amazon.de/*",
+        "https://www.amazon.fr/*",
+        "https://www.amazon.it/*",
+        "https://www.amazon.es/*",
+        "https://www.amazon.nl/*",
+        "https://www.amazon.at/*",
+        "https://www.amazon.co.uk/*",
+        "https://www.amazon.pl/*",
+        "https://www.kaufland.de/*",
+        "https://www.kaufland.at/*",
+        "https://www.otto.de/*",
+        "https://www.saturn.de/*",
+        "https://www.saturn.at/*",
+        "https://www.mediamarkt.de/*",
+        "https://www.mediamarkt.at/*",
+        "https://www.mediamarkt.ch/*",
+        "https://www.conrad.de/*",
+        "https://www.alternate.de/*",
+        "https://www.notebooksbilliger.de/*",
+        "https://www.cyberport.de/*",
+        "https://www.idealo.de/*",
+        "https://www.thalia.de/*",
+        "https://www.hugendubel.de/*",
+        "https://www.dm.de/*",
+        "https://www.rossmann.de/*",
+        "https://www.zalando.de/*",
+        "https://www.aboutyou.de/*",
+        "https://www.decathlon.de/*",
+        "https://www.bauhaus.info/*",
+        "https://www.hornbach.de/*",
+        "https://www.tchibo.de/*",
+        "https://www.rewe.de/*",
+        "https://shop.rewe.de/*",
+        "https://www.penny.de/*",
+        "https://www.lidl.de/*",
+        "https://www.obi.de/*",
+        "https://www.metro.de/*",
+        "https://www.euronics.de/*",
+        "https://www.expert.de/*",
+        "https://www.ep.de/*",
+        "https://www.computeruniverse.net/*",
+        "https://www.mindfactory.de/*",
+        "https://www.caseking.de/*",
+        "https://www.jacob.de/*",
+        "https://www.getgoods.de/*",
+        "https://www.proshop.de/*",
+        "https://www.pearl.de/*",
+        "https://www.pollin.de/*",
+        "https://www.reichelt.de/*",
+        "https://www.voelkner.de/*",
+        "https://www.galaxus.de/*",
+        "https://www.galaxus.ch/*",
+        "https://www.digitec.ch/*",
+        "https://www.technikdirekt.de/*",
+        "https://www.hifi.de/*",
+        "https://www.tink.de/*",
+        "https://www.rebuy.de/*",
+        "https://www.momox.de/*",
+        "https://www.medimops.de/*",
+        "https://www.refurbed.de/*",
+        "https://www.backmarket.de/*",
+        "https://www.swappie.com/*",
+        "https://www.asgoodasnew.com/*",
+        "https://www.vinted.de/*",
+        "https://www.kleinanzeigen.de/*",
+        "https://www.hm.com/*",
+        "https://www2.hm.com/*",
+        "https://www.zara.com/*",
+        "https://www.uniqlo.com/*",
+        "https://www.c-a.com/*",
+        "https://www.bonprix.de/*",
+        "https://www.sportscheck.com/*",
+        "https://www.peek-cloppenburg.de/*",
+        "https://www.jack-wolfskin.de/*",
+        "https://www.adidas.de/*",
+        "https://www.nike.com/*",
+        "https://www.puma.com/*",
+        "https://www.footlocker.de/*",
+        "https://www.snipes.com/*",
+        "https://www.planet-sports.de/*",
+        "https://www.engelbert-strauss.de/*",
+        "https://www.s-oliver.de/*",
+        "https://www.esprit.de/*",
+        "https://www.asos.com/*",
+        "https://www.lululemon.com/*",
+        "https://www.new-yorker.de/*",
+        "https://www.kik.de/*",
+        "https://www.primark.com/*",
+        "https://www.takko.com/*",
+        "https://www.ikea.com/*",
+        "https://www.wayfair.de/*",
+        "https://www.xxxlutz.de/*",
+        "https://www.poco.de/*",
+        "https://www.westwing.de/*",
+        "https://www.home24.de/*",
+        "https://www.roller.de/*",
+        "https://www.hagebau.de/*",
+        "https://www.toom.de/*",
+        "https://www.hellweg.de/*",
+        "https://www.globus-baumarkt.de/*",
+        "https://www.intersport.de/*",
+        "https://www.bergfreunde.de/*",
+        "https://www.fahrrad.de/*",
+        "https://www.globetrotter.de/*",
+        "https://www.bergzeit.de/*",
+        "https://www.sportokay.com/*",
+        "https://www.bike24.com/*",
+        "https://www.douglas.de/*",
+        "https://www.notino.de/*",
+        "https://www.flaconi.de/*",
+        "https://www.parfumdreams.de/*",
+        "https://www.mueller.de/*",
+        "https://www.medpex.de/*",
+        "https://www.shop-apotheke.com/*",
+        "https://www.weltbild.de/*",
+        "https://www.buecher.de/*",
+        "https://www.smyths.de/*",
+        "https://www.mytoys.de/*",
+        "https://www.windeln.de/*",
+        "https://www.babymarkt.de/*",
+        "https://www.baby-walz.de/*",
+        "https://www.zooplus.de/*",
+        "https://www.fressnapf.de/*",
+        "https://www.das-futterhaus.de/*",
+        "https://www.maxi-zoo.de/*",
+        "https://www.zooroyal.de/*",
+        "https://www.kfzteile24.de/*",
+        "https://www.autodoc.de/*",
+        "https://www.polo.de/*",
+        "https://www.thomann.de/*",
+        "https://www.musicstore.de/*",
+        "https://www.netto-online.de/*",
+        "https://www.norma24.de/*",
+        "https://www.action.de/*",
+        "https://www.christ.de/*",
+        "https://www.game.de/*",
+        "https://www.office-partner.de/*",
+        "https://www.staples.de/*",
+        "https://www.aliexpress.com/*",
+        "https://www.etsy.com/*",
+        "https://www.fnac.com/*",
+        "https://www.keller-sports.de/*",
+        "https://www.breuninger.com/*",
+        "https://www.sport2000.de/*",
+        "https://www.campz.de/*",
+        "https://www.addnature.de/*",
+        "https://www.trendyol.com/*",
+        "https://www.shein.com/*"
+      ],
+      "js": [
+        "content/panel-component.js"
+      ],
+      "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://www.ebay.de/sch/*",
+        "https://www.ebay.de/b/*",
+        "https://www.ebay.de/s/*",
+        "https://www.ebay.de/usr/*",
+        "https://www.ebay.de/str/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/ebay-serp.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.ebay.de/itm/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/ebay-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.amazon.de/*/dp/*",
+        "https://www.amazon.de/dp/*",
+        "https://www.amazon.de/gp/product/*",
+        "https://www.amazon.fr/*/dp/*",
+        "https://www.amazon.fr/dp/*",
+        "https://www.amazon.fr/gp/product/*",
+        "https://www.amazon.it/*/dp/*",
+        "https://www.amazon.it/dp/*",
+        "https://www.amazon.it/gp/product/*",
+        "https://www.amazon.es/*/dp/*",
+        "https://www.amazon.es/dp/*",
+        "https://www.amazon.es/gp/product/*",
+        "https://www.amazon.nl/*/dp/*",
+        "https://www.amazon.nl/dp/*",
+        "https://www.amazon.nl/gp/product/*",
+        "https://www.amazon.at/*/dp/*",
+        "https://www.amazon.at/dp/*",
+        "https://www.amazon.at/gp/product/*",
+        "https://www.amazon.co.uk/*/dp/*",
+        "https://www.amazon.co.uk/dp/*",
+        "https://www.amazon.co.uk/gp/product/*",
+        "https://www.amazon.pl/*/dp/*",
+        "https://www.amazon.pl/dp/*",
+        "https://www.amazon.pl/gp/product/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/amazon-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.amazon.de/s*",
+        "https://www.amazon.fr/s*",
+        "https://www.amazon.it/s*",
+        "https://www.amazon.es/s*",
+        "https://www.amazon.nl/s*",
+        "https://www.amazon.at/s*",
+        "https://www.amazon.co.uk/s*",
+        "https://www.amazon.pl/s*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/amazon-serp.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.kaufland.de/product/*",
+        "https://www.kaufland.at/product/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/kaufland-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.otto.de/p/*",
+        "https://www.otto.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/otto-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.saturn.de/de/product/*",
+        "https://www.saturn.de/*",
+        "https://www.saturn.at/de/product/*",
+        "https://www.saturn.at/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/saturn-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.mediamarkt.de/de/product/*",
+        "https://www.mediamarkt.de/*",
+        "https://www.mediamarkt.at/de/product/*",
+        "https://www.mediamarkt.at/*",
+        "https://www.mediamarkt.ch/de/product/*",
+        "https://www.mediamarkt.ch/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/mediamarkt-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.conrad.de/de/p/*",
+        "https://www.conrad.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/conrad-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.alternate.de/*/html/*",
+        "https://www.alternate.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/alternate-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.notebooksbilliger.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/notebooksbilliger-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.cyberport.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/cyberport-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.idealo.de/preisvergleich/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/idealo-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.thalia.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/thalia-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.hugendubel.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/hugendubel-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.dm.de/p/*",
+        "https://www.dm.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/dm-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.rossmann.de/de/p/*",
+        "https://www.rossmann.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/rossmann-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.zalando.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/zalando-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.aboutyou.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/aboutyou-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.decathlon.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/decathlon-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.bauhaus.info/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/bauhaus-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.hornbach.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/hornbach-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.tchibo.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/tchibo-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.rewe.de/*",
+        "https://shop.rewe.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/rewe-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.penny.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/penny-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.lidl.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/lidl-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.obi.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/obi-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.metro.de/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/metro-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.euronics.de/*",
+        "https://www.expert.de/*",
+        "https://www.ep.de/*",
+        "https://www.computeruniverse.net/*",
+        "https://www.mindfactory.de/*",
+        "https://www.caseking.de/*",
+        "https://www.jacob.de/*",
+        "https://www.getgoods.de/*",
+        "https://www.proshop.de/*",
+        "https://www.pearl.de/*",
+        "https://www.pollin.de/*",
+        "https://www.reichelt.de/*",
+        "https://www.voelkner.de/*",
+        "https://www.galaxus.de/*",
+        "https://www.galaxus.ch/*",
+        "https://www.digitec.ch/*",
+        "https://www.technikdirekt.de/*",
+        "https://www.hifi.de/*",
+        "https://www.tink.de/*",
+        "https://www.rebuy.de/*",
+        "https://www.momox.de/*",
+        "https://www.medimops.de/*",
+        "https://www.refurbed.de/*",
+        "https://www.backmarket.de/*",
+        "https://www.swappie.com/*",
+        "https://www.asgoodasnew.com/*",
+        "https://www.vinted.de/*",
+        "https://www.kleinanzeigen.de/*",
+        "https://www.hm.com/*",
+        "https://www2.hm.com/*",
+        "https://www.zara.com/*",
+        "https://www.uniqlo.com/*",
+        "https://www.c-a.com/*",
+        "https://www.bonprix.de/*",
+        "https://www.sportscheck.com/*",
+        "https://www.peek-cloppenburg.de/*",
+        "https://www.jack-wolfskin.de/*",
+        "https://www.adidas.de/*",
+        "https://www.nike.com/*",
+        "https://www.puma.com/*",
+        "https://www.footlocker.de/*",
+        "https://www.snipes.com/*",
+        "https://www.planet-sports.de/*",
+        "https://www.engelbert-strauss.de/*",
+        "https://www.s-oliver.de/*",
+        "https://www.esprit.de/*",
+        "https://www.asos.com/*",
+        "https://www.lululemon.com/*",
+        "https://www.new-yorker.de/*",
+        "https://www.kik.de/*",
+        "https://www.primark.com/*",
+        "https://www.takko.com/*",
+        "https://www.ikea.com/*",
+        "https://www.wayfair.de/*",
+        "https://www.xxxlutz.de/*",
+        "https://www.poco.de/*",
+        "https://www.westwing.de/*",
+        "https://www.home24.de/*",
+        "https://www.roller.de/*",
+        "https://www.hagebau.de/*",
+        "https://www.toom.de/*",
+        "https://www.hellweg.de/*",
+        "https://www.globus-baumarkt.de/*",
+        "https://www.intersport.de/*",
+        "https://www.bergfreunde.de/*",
+        "https://www.fahrrad.de/*",
+        "https://www.globetrotter.de/*",
+        "https://www.bergzeit.de/*",
+        "https://www.sportokay.com/*",
+        "https://www.bike24.com/*",
+        "https://www.douglas.de/*",
+        "https://www.notino.de/*",
+        "https://www.flaconi.de/*",
+        "https://www.parfumdreams.de/*",
+        "https://www.mueller.de/*",
+        "https://www.medpex.de/*",
+        "https://www.shop-apotheke.com/*",
+        "https://www.weltbild.de/*",
+        "https://www.buecher.de/*",
+        "https://www.smyths.de/*",
+        "https://www.mytoys.de/*",
+        "https://www.windeln.de/*",
+        "https://www.babymarkt.de/*",
+        "https://www.baby-walz.de/*",
+        "https://www.zooplus.de/*",
+        "https://www.fressnapf.de/*",
+        "https://www.das-futterhaus.de/*",
+        "https://www.maxi-zoo.de/*",
+        "https://www.zooroyal.de/*",
+        "https://www.kfzteile24.de/*",
+        "https://www.autodoc.de/*",
+        "https://www.polo.de/*",
+        "https://www.thomann.de/*",
+        "https://www.musicstore.de/*",
+        "https://www.netto-online.de/*",
+        "https://www.norma24.de/*",
+        "https://www.action.de/*",
+        "https://www.christ.de/*",
+        "https://www.game.de/*",
+        "https://www.office-partner.de/*",
+        "https://www.staples.de/*",
+        "https://www.aliexpress.com/*",
+        "https://www.etsy.com/*",
+        "https://www.fnac.com/*",
+        "https://www.keller-sports.de/*",
+        "https://www.breuninger.com/*",
+        "https://www.sport2000.de/*",
+        "https://www.campz.de/*",
+        "https://www.addnature.de/*",
+        "https://www.trendyol.com/*",
+        "https://www.shein.com/*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/generic-product.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*.png"
+      ],
+      "matches": [
+        "<all_urls>"
+      ]
+    }
+  ]
+}

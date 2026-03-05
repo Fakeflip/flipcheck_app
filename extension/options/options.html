@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Flipcheck — Einstellungen</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+<div class="opt-layout">
+
+  <!-- Page Header -->
+  <div class="opt-page-header">
+    <span class="opt-logo">▲ FLIPCHECK</span>
+    <span class="opt-version" id="extVersion">v1.0.0</span>
+  </div>
+
+  <!-- ── Section: Mein Konto ─────────────────────────────────────────────── -->
+  <div class="opt-section">
+    <div class="opt-section-title">Mein Konto</div>
+    <div class="opt-card" id="profileCard">
+      <div class="opt-row">
+        <div class="opt-profile-avatar" id="profileAvatar">?</div>
+        <div class="opt-row-label" id="profileInfo">
+          <strong id="profileName">Lade…</strong>
+          <small id="profileEmail"></small>
+        </div>
+        <span class="opt-plan-badge" id="profilePlan" style="display:none"></span>
+      </div>
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>Token-Status</strong>
+          <small>Authentifizierungstoken für API-Zugriff</small>
+        </div>
+        <div class="opt-token-status">
+          <div class="opt-token-dot" id="tokenDot"></div>
+          <span id="tokenStatusText">Prüfe…</span>
+        </div>
+      </div>
+      <div class="opt-row">
+        <div style="flex:1"></div>
+        <button class="opt-btn opt-btn-danger" id="logoutBtn">Abmelden</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section: Token / Auth ──────────────────────────────────────────── -->
+  <div class="opt-section">
+    <div class="opt-section-title">Token / Authentifizierung</div>
+    <div class="fc-card" style="margin-bottom:12px">
+      <div class="fc-card-title">Login</div>
+      <button class="fc-btn-primary" id="loginBtn" style="width:100%">
+        <span style="margin-right:6px">🔗</span> Mit Discord anmelden
+      </button>
+      <div class="fc-hint" style="margin-top:8px">Öffnet Discord-Login im Browser. Nach dem Login erscheint dein Profil automatisch.</div>
+    </div>
+    <div class="opt-card">
+      <div class="opt-inp-wrap">
+        <label class="opt-inp-label" for="tokenInp">
+          JWT manuell eingeben (falls Desktop nicht läuft)
+        </label>
+        <input class="opt-inp" id="tokenInp" type="password"
+               placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9…" autocomplete="off" />
+      </div>
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <small style="color:var(--text-dim)">
+            Du findest deinen Token in der Flipcheck Desktop-App unter Einstellungen → Token.
+          </small>
+        </div>
+        <button class="opt-btn" id="saveTokenBtn">Speichern</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section: Desktop-Verbindung ───────────────────────────────────── -->
+  <div class="opt-section">
+    <div class="opt-section-title">Desktop-Verbindung (Bridge)</div>
+    <div class="opt-card">
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>Flipcheck Desktop</strong>
+          <small>Verbindung zu localhost:8766</small>
+        </div>
+        <div class="opt-bridge-row" id="bridgeStatusRow">
+          <div class="opt-bridge-dot" id="bridgeDot"></div>
+          <span class="opt-bridge-info" id="bridgeInfo">Prüfe…</span>
+        </div>
+      </div>
+      <div class="opt-inp-wrap">
+        <label class="opt-inp-label" for="backendUrl">
+          Backend-URL (Standard: https://api.joinflipcheck.app)
+        </label>
+        <input class="opt-inp" id="backendUrl" type="url"
+               placeholder="https://api.joinflipcheck.app"
+               style="font-family:inherit" />
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Section: Einstellungen ────────────────────────────────────────── -->
+  <div class="opt-section">
+    <div class="opt-section-title">Einstellungen</div>
+    <div class="opt-card">
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>Standard-Kategorie</strong>
+          <small>Für Popup und Panel-Checks</small>
+        </div>
+        <select class="opt-inp" id="settingCat" style="width:180px">
+          <!-- Filled by JS -->
+        </select>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>Preis-Modus</strong>
+          <small>LOW = konservativ, MID = realistisch, HIGH = optimistisch</small>
+        </div>
+        <select class="opt-inp" id="settingMode" style="width:100px">
+          <option value="low">LOW</option>
+          <option value="mid" selected>MID</option>
+          <option value="high">HIGH</option>
+        </select>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>MwSt-Modus</strong>
+          <small>Differenzbesteuerung = kein Vorsteuerabzug</small>
+        </div>
+        <select class="opt-inp" id="settingVat" style="width:160px">
+          <option value="no_vat" selected>Differenzbesteuerung</option>
+          <option value="ust_19">Regelbesteuerung (19%)</option>
+        </select>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>EK-Eingabe</strong>
+          <small>Bruttopreis (inkl. MwSt.) oder Nettopreis</small>
+        </div>
+        <select class="opt-inp" id="settingEkMode" style="width:120px">
+          <option value="gross" selected>Brutto</option>
+          <option value="net">Netto</option>
+        </select>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>SERP-Badges eBay</strong>
+          <small>BUY/HOLD/SKIP auf eBay Suchergebnissen anzeigen</small>
+        </div>
+        <label class="opt-toggle">
+          <input type="checkbox" id="settingSerpBadges" checked />
+          <span class="opt-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>SERP-Badges Amazon</strong>
+          <small>BUY/HOLD/SKIP auf Amazon Suchergebnissen anzeigen</small>
+        </div>
+        <label class="opt-toggle">
+          <input type="checkbox" id="settingAmazonSerpBadges" checked />
+          <span class="opt-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="opt-row">
+        <div class="opt-row-label">
+          <strong>Auto-Panel</strong>
+          <small>Panel automatisch öffnen wenn EAN erkannt</small>
+        </div>
+        <label class="opt-toggle">
+          <input type="checkbox" id="settingAutoPanel" checked />
+          <span class="opt-toggle-slider"></span>
+        </label>
+      </div>
+
+      <div class="fc-setting-row">
+        <div class="fc-setting-info">
+          <div class="fc-setting-label">Keepa API Key</div>
+          <div class="fc-setting-desc">Für Amazon-Daten (keepa.com/api)</div>
+        </div>
+        <input class="fc-inp-small" id="keepaKey" type="password" placeholder="xxxx-xxxx-xxxx" style="width:120px" />
+      </div>
+      <div class="fc-setting-row">
+        <div class="fc-setting-info">
+          <div class="fc-setting-label">Standard Versand EK</div>
+          <div class="fc-setting-desc">Einkaufsversand (€)</div>
+        </div>
+        <input class="fc-inp-small" id="defaultShipIn" type="number" step="0.01" min="0" value="0.00" style="width:70px" />
+      </div>
+      <div class="fc-setting-row">
+        <div class="fc-setting-info">
+          <div class="fc-setting-label">Standard Versand VK</div>
+          <div class="fc-setting-desc">Verkaufsversand (€)</div>
+        </div>
+        <input class="fc-inp-small" id="defaultShipOut" type="number" step="0.01" min="0" value="3.49" style="width:70px" />
+      </div>
+
+      <div class="opt-row">
+        <div style="flex:1"></div>
+        <button class="opt-btn" id="saveSettingsBtn">Einstellungen speichern</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="opt-toast" id="toast"></div>
+
+<script src="options.js"></script>
+</body>
+</html>
