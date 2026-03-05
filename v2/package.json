@@ -44,7 +44,7 @@
     "coverageDirectory": "coverage"
   },
   "build": {
-    "appId": "com.joinflipcheck.app",
+    "appId": "app.flipcheck.desktop",
     "productName": "FLIPCHECK",
     "afterSign": "scripts/notarize.js",
     "directories": {
