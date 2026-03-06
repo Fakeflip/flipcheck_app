@@ -119,8 +119,8 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
         run: |
-          VERSION=$(curl -s https://raw.githubusercontent.com/${{ github.repository }}/main/v2/package.json | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
-          gh release edit "v${VERSION}" \
+          TAG="${{ github.ref_name }}"
+          gh release edit "$TAG" \
             --repo ${{ github.repository }} \
             --draft=false \
-            --latest 2>/dev/null || true
+            --latest
