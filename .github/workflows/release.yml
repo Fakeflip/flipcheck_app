@@ -103,14 +103,13 @@ jobs:
       - name: Upload Windows assets
         env:
           GH_TOKEN: ${{ secrets.GH_TOKEN }}
-        shell: bash
+        shell: pwsh
         run: |
-          VERSION=$(node -p "require('./package.json').version")
-          gh release upload "v${VERSION}" \
-            dist/FLIPCHECK-Setup-*.exe \
-            dist/FLIPCHECK-Setup-*.exe.blockmap \
-            dist/latest.yml \
-            --repo ${{ github.repository }} --clobber
+          $version = node -p "require('./package.json').version"
+          $exe      = (Get-ChildItem dist\FLIPCHECK-Setup-*.exe | Where-Object Extension -eq '.exe').FullName
+          $blockmap = "$exe.blockmap"
+          $yml      = "dist\latest.yml"
+          gh release upload "v$version" $exe $blockmap $yml --repo ${{ github.repository }} --clobber
 
   publish-release:
     needs: [build-mac, build-win]
