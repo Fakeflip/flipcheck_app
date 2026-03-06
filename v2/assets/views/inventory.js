@@ -657,6 +657,7 @@ const InventoryView = (() => {
             </select>
           </div>
         </div>
+        ${_buildCatRowHtml("ebay", null)}
         <div class="input-group">
           <label class="input-label">Label</label>
           <input id="mLabel" class="input" type="text" placeholder="Tag, Kategorie…" />
@@ -678,12 +679,13 @@ const InventoryView = (() => {
           if (!ean) { Toast.error("EAN fehlt", "Bitte eine EAN eingeben."); return; }
           await Storage.upsertItem({
             ean,
-            title: document.getElementById("mTitle")?.value.trim() || "",
-            ek: parseFloat(document.getElementById("mEk")?.value) || null,
-            qty: parseInt(document.getElementById("mQty")?.value) || 1,
+            title:  document.getElementById("mTitle")?.value.trim() || "",
+            ek:     parseFloat(document.getElementById("mEk")?.value) || null,
+            qty:    parseInt(document.getElementById("mQty")?.value) || 1,
             market: document.getElementById("mMarket")?.value || "ebay",
             status: document.getElementById("mStatus")?.value || "IN_STOCK",
-            label: document.getElementById("mLabel")?.value.trim() || "",
+            cat_id: document.getElementById("invCatSel")?.value || null,
+            label:  document.getElementById("mLabel")?.value.trim() || "",
             source: document.getElementById("mSource")?.value.trim() || "",
           });
           Modal.close(true);
@@ -692,6 +694,7 @@ const InventoryView = (() => {
         }},
       ],
     });
+    setTimeout(() => _bindCatRowUpdater("mMarket"), 0);
   }
 
   function openEditModal(id, container) {
@@ -732,6 +735,7 @@ const InventoryView = (() => {
             </select>
           </div>
         </div>
+        ${_buildCatRowHtml(item.market || "ebay", item.cat_id)}
         <div class="input-group">
           <label class="input-label">Label</label>
           <input id="eLabel" class="input" type="text" value="${esc(item.label||"")}" />
@@ -769,6 +773,7 @@ const InventoryView = (() => {
             qty:    parseInt(document.getElementById("eQty")?.value)  || item.qty,
             market: document.getElementById("eMarket")?.value || item.market,
             status: newStatus,
+            cat_id: document.getElementById("invCatSel")?.value || item.cat_id || null,
             label:  document.getElementById("eLabel")?.value.trim()  || "",
             source: document.getElementById("eSource")?.value.trim() || "",
             notes:  document.getElementById("eNotes")?.value.trim()  || "",
@@ -781,6 +786,7 @@ const InventoryView = (() => {
         }},
       ],
     });
+    setTimeout(() => _bindCatRowUpdater("eMarket"), 0);
   }
 
   function _buildCatOptions(selectedId) {
@@ -796,6 +802,77 @@ const InventoryView = (() => {
         return cat ? `<option value="${cat.id}" ${cat.id === sel ? "selected" : ""}>${cat.label}</option>` : "";
       }).join("")}</optgroup>`
     ).join("");
+  }
+
+  function _buildAmzCatOptions(selectedId) {
+    const cats = [
+      ["computer_tablets",  "Computer / Tablets (7 %)"],
+      ["handys",            "Smartphones (7 %)"],
+      ["konsolen",          "Gaming / Konsolen (8 %)"],
+      ["foto_camcorder",    "Foto & Camcorder (7 %)"],
+      ["tv_video_audio",    "TV, Video & Audio (7 %)"],
+      ["haushaltsgeraete",  "Haushaltsgeräte (7 %)"],
+      ["drucker",           "Drucker (7 %)"],
+      ["handy_zubehoer",    "Handy-Zubehör (15 %)"],
+      ["notebook_zubehoer", "Notebook-Zubehör (15 %)"],
+      ["kabel",             "Kabel & Stecker (15 %)"],
+      ["mode",              "Mode (15 %)"],
+      ["sport_freizeit",    "Sport & Freizeit (15 %)"],
+      ["spielzeug",         "Spielzeug (15 %)"],
+      ["buecher",           "Bücher (15 %)"],
+      ["sonstiges",         "Sonstiges (15 %)"],
+    ];
+    const sel = selectedId || "sonstiges";
+    return cats.map(([v, l]) => `<option value="${v}" ${v === sel ? "selected" : ""}>${esc(l)}</option>`).join("");
+  }
+
+  function _buildKlCatOptions(selectedId) {
+    const cats = [
+      ["kl_elektronik",  "Elektronik / Computer (8,5 %)"],
+      ["kl_handys",      "Handys / Smartphones (8,5 %)"],
+      ["kl_gaming",      "Gaming / Konsolen (8,5 %)"],
+      ["kl_foto",        "Foto & Camcorder (8,5 %)"],
+      ["kl_haushalt_el", "Haushaltsgeräte (8,5 %)"],
+      ["kl_buecher",     "Bücher & Medien (8,5 %)"],
+      ["kl_sport",       "Sport & Freizeit (10,5 %)"],
+      ["kl_spielzeug",   "Spielzeug (10,5 %)"],
+      ["kl_haushalt",    "Haushalt & Küche (10,5 %)"],
+      ["kl_garten",      "Garten & DIY (10,5 %)"],
+      ["kl_mode",        "Kleidung & Schuhe (17,5 %)"],
+      ["kl_sonstiges",   "Sonstiges (10,5 %)"],
+    ];
+    const sel = selectedId || "kl_sonstiges";
+    return cats.map(([v, l]) => `<option value="${v}" ${v === sel ? "selected" : ""}>${esc(l)}</option>`).join("");
+  }
+
+  function _buildCatRowHtml(market, catId) {
+    if (market === "other") return `<div id="invCatRow" style="display:none"></div>`;
+    let opts;
+    if (market === "amz") opts = _buildAmzCatOptions(catId);
+    else if (market === "kaufland") opts = _buildKlCatOptions(catId);
+    else opts = _buildCatOptions(catId);
+    return `<div id="invCatRow" class="input-group">
+      <label class="input-label">Kategorie (Gebühr)</label>
+      <select id="invCatSel" class="select">${opts}</select>
+    </div>`;
+  }
+
+  function _bindCatRowUpdater(marketSelId) {
+    const mkt = document.getElementById(marketSelId);
+    if (!mkt) return;
+    mkt.addEventListener("change", (e) => {
+      const row = document.getElementById("invCatRow");
+      const catSel = document.getElementById("invCatSel");
+      if (!row) return;
+      const newMkt = e.target.value;
+      if (newMkt === "other") { row.style.display = "none"; return; }
+      row.style.display = "";
+      if (catSel) {
+        if (newMkt === "amz")      catSel.innerHTML = _buildAmzCatOptions("");
+        else if (newMkt === "kaufland") catSel.innerHTML = _buildKlCatOptions("");
+        else catSel.innerHTML = _buildCatOptions("");
+      }
+    });
   }
 
   function openSoldModal(id, container) {
@@ -940,21 +1017,18 @@ const InventoryView = (() => {
         ? Math.min(totalQty, Math.max(1, parseInt(document.getElementById("soldQtyInp")?.value) || totalQty))
         : 1;
 
-      const MKT_FEE_RATES_INV = { amz: 0.15, kaufland: 0.105, other: 0 };
-      const MKT_FEE_LABELS    = { ebay: "eBay-Gebühr", amz: "Amazon-Gebühr", kaufland: "Kaufland-Gebühr", other: "Gebühr" };
+      const MKT_FEE_LABELS = { ebay: "eBay-Gebühr", amz: "Amazon-Gebühr", kaufland: "Kaufland-Gebühr", other: "Gebühr" };
 
       const updatePreview = () => {
         const vk      = parseFloat(document.getElementById("soldVk")?.value)      || 0;
         const shipOut = parseFloat(document.getElementById("soldShipOut")?.value) || 0;
-        const catId   = document.getElementById("soldCatId")?.value               || "sonstiges";
+        const catId   = document.getElementById("soldCatId")?.value               || item.cat_id || "sonstiges";
         const soldQty = getQty();
         const el      = document.getElementById("soldProfitPreview");
         if (!el) return;
         if (!vk || !item.ek) { el.textContent = "Profit-Vorschau erscheint nach VK-Eingabe"; return; }
         const market     = item.market || "ebay";
-        const fee        = market === "ebay"
-          ? calcEbayFee(vk, catId)
-          : vk * (MKT_FEE_RATES_INV[market] ?? 0);
+        const fee        = calcMarketFee(vk, market, catId);
         const feeLabel   = MKT_FEE_LABELS[market] || "Gebühr";
         const unitProfit = vk - item.ek - shipOut - fee;
         const roi        = item.ek > 0 ? (unitProfit / item.ek * 100) : 0;

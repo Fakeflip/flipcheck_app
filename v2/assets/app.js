@@ -154,7 +154,7 @@ function calcEbayFee(priceGross, catId) {
 }
 
 /**
- * Market-specific flat fee rates for Amazon and Kaufland.
+ * Market-specific flat fee rates for Amazon and Kaufland (fallback if no category set).
  * eBay uses the tiered calcEbayFee() instead.
  * @type {Record<string, number>}
  */
@@ -163,6 +163,42 @@ const MARKET_FEE_RATES = {
   kaufland: 0.105,  // Kaufland: ~10.5% seller commission
   other:    0,
 };
+
+/**
+ * Amazon referral fee rates by category (used in calcMarketFee + inventory profit calc).
+ * @type {Record<string, number>}
+ */
+const AMAZON_FEE_CATEGORIES = {
+  computer_tablets: 0.07, handys: 0.07, konsolen: 0.08, foto_camcorder: 0.07,
+  tv_video_audio: 0.07, haushaltsgeraete: 0.07, drucker: 0.07,
+  handy_zubehoer: 0.15, notebook_zubehoer: 0.15, kabel: 0.15,
+  mode: 0.15, sport_freizeit: 0.15, spielzeug: 0.15, buecher: 0.15, sonstiges: 0.15,
+};
+
+/**
+ * Kaufland seller commission rates by category.
+ * @type {Record<string, number>}
+ */
+const KAUFLAND_FEE_CATEGORIES = {
+  kl_elektronik: 0.085, kl_handys: 0.085, kl_gaming: 0.085, kl_foto: 0.085,
+  kl_haushalt_el: 0.085, kl_buecher: 0.085,
+  kl_sport: 0.105, kl_spielzeug: 0.105, kl_haushalt: 0.105, kl_garten: 0.105,
+  kl_mode: 0.175, kl_sonstiges: 0.105,
+};
+
+/**
+ * Calculate the platform fee for any market — single source of truth for all fee logic.
+ * @param {number} vk      - Gross sell price
+ * @param {string} market  - "ebay" | "amz" | "kaufland" | "other"
+ * @param {string} [catId] - Category ID (eBay cat for eBay, kl_* for Kaufland, Amazon cat for amz)
+ * @returns {number} Fee in EUR
+ */
+function calcMarketFee(vk, market, catId) {
+  if (market === "ebay")     return calcEbayFee(vk, catId || "sonstiges");
+  if (market === "amz")      return vk * (AMAZON_FEE_CATEGORIES[catId] ?? MARKET_FEE_RATES.amz);
+  if (market === "kaufland") return vk * (KAUFLAND_FEE_CATEGORIES[catId] ?? MARKET_FEE_RATES.kaufland);
+  return 0;
+}
 
 /**
  * Calculate the real per-unit profit for one inventory item.
@@ -181,12 +217,7 @@ function calcRealProfit(item) {
   const ek      = Number(item.ek)         || 0;
   const shipOut = Number(item.ship_out)   || 0;
   const market  = item.market || "ebay";
-  let fee = 0;
-  if (market === "ebay") {
-    fee = calcEbayFee(vk, item.cat_id || "sonstiges");
-  } else {
-    fee = vk * (MARKET_FEE_RATES[market] ?? 0);
-  }
+  const fee     = calcMarketFee(vk, market, item.cat_id);
   return vk - ek - shipOut - fee;
 }
 
@@ -668,6 +699,18 @@ async function initApp() {
     setTimeout(() => runAlertChecks(), 30_000);
     App._alertsInterval = /** @type {number} */ (/** @type {unknown} */ (setInterval(() => runAlertChecks(), 15 * 60 * 1000)));
   }
+
+  // ── First-launch changelog — show once per app version on first boot ────────
+  setTimeout(async () => {
+    try {
+      const currentVersion = await window.fc.version();
+      const settings = await Storage.getSettings();
+      if (currentVersion && currentVersion !== settings.lastChangelogVersion) {
+        await Storage.saveSettings({ lastChangelogVersion: currentVersion });
+        _showUpdateChangelog(currentVersion, null);
+      }
+    } catch { /* non-critical — skip silently */ }
+  }, 1500);
 
   // ── Global auto-update listeners — shown immediately, no matter which view is active
   if (window.fc?.onUpdateAvailable) {
