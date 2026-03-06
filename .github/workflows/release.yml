@@ -1,108 +1,61 @@
-name: Release
+name: Build & Release
 
-# ─── Trigger ──────────────────────────────────────────────────────────────────
-# Push a semver tag to create a release:
-#   git tag v2.1.0 && git push --tags
 on:
-  push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
-      tag:
-        description: 'Tag to release (e.g. v2.0.5)'
-        required: true
-        default: 'v2.0.5'
+      version:
+        description: "Version to release (e.g. 2.0.1)"
+        required: false
 
-env:
-  NODE_VERSION: '20'
-
-# Grant GITHUB_TOKEN permission to create releases and upload assets
 permissions:
   contents: write
 
-# ─── Jobs ─────────────────────────────────────────────────────────────────────
 jobs:
-
-  # ── macOS — sign + notarize + publish DMG (arm64 & x64) ────────────────────
   build-mac:
-    name: macOS (arm64 + x64)
     runs-on: macos-latest
-    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: v2
+
+    env:
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      CSC_LINK: ${{ secrets.CSC_LINK }}
+      CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: v2/package-lock.json
+          node-version: 20
 
       - name: Install dependencies
-        working-directory: v2
         run: npm ci
 
-      # Import the "Developer ID Application" certificate into a temporary keychain.
-      # The .p12 file is stored base64-encoded in CERT_P12_BASE64 GitHub Secret.
-      - name: Import Developer ID certificate
-        env:
-          CERT_P12_BASE64:   ${{ secrets.CERT_P12_BASE64 }}
-          CERT_P12_PASSWORD: ${{ secrets.CERT_P12_PASSWORD }}
-        run: |
-          echo "$CERT_P12_BASE64" | base64 --decode > /tmp/cert.p12
-          security create-keychain -p "" build.keychain
-          security import /tmp/cert.p12 \
-            -k build.keychain \
-            -P "$CERT_P12_PASSWORD" \
-            -T /usr/bin/codesign
-          security list-keychains -d user -s build.keychain
-          security set-keychain-settings -t 3600 -u build.keychain
-          security unlock-keychain -p "" build.keychain
-          # Allow codesign to access the key without a UI prompt
-          security set-key-partition-list \
-            -S apple-tool:,apple:,codesign: -s -k "" build.keychain
-          rm -f /tmp/cert.p12
+      - name: Build & release (Mac)
+        run: npm run release -- --mac --publish always
 
-      - name: Build, sign & notarize (macOS)
-        working-directory: v2
-        env:
-          APPLE_ID:                    ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID:               ${{ secrets.APPLE_TEAM_ID }}
-          GH_TOKEN:                    ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build -- --mac --publish always
-
-      # Clean up the temporary keychain so it doesn't persist across jobs
-      - name: Delete build keychain
-        if: always()
-        run: security delete-keychain build.keychain || true
-
-  # ── Windows — NSIS installer (unsigned; add WIN_CERT_* secrets for signing) ─
   build-win:
-    name: Windows (x64)
     runs-on: windows-latest
-    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: v2
+
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'npm'
-          cache-dependency-path: v2/package-lock.json
+          node-version: 20
 
       - name: Install dependencies
-        working-directory: v2
         run: npm ci
 
-      - name: Build Windows installer
-        working-directory: v2
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run build -- --win --publish always
+      - name: Build & release (Windows)
+        run: npm run release -- --win --publish always
