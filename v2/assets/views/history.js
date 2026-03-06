@@ -24,6 +24,11 @@ const HistoryView = (() => {
           <h1>Preishistorie</h1>
           <p>Preisentwicklung pro Produkt über Zeit verfolgen</p>
         </div>
+        <div class="page-header-right" style="gap:6px;flex-wrap:wrap">
+          <input id="histScanEan" class="input" type="text" placeholder="EAN scannen…" style="width:155px;font-size:12px;padding:6px 10px" autocomplete="off" />
+          <input id="histScanEk" class="input" type="number" step="0.01" min="0" placeholder="EK €" style="width:72px;font-size:12px;padding:6px 10px" />
+          <button class="btn btn-primary btn-sm" id="btnHistScan">Prüfen</button>
+        </div>
       </div>
 
       <div class="fc-split-320">
@@ -76,6 +81,46 @@ const HistoryView = (() => {
       );
       renderList(container, filtered);
     });
+
+    // Scan form — EAN + EK → Flipcheck → save to history → reload
+    const scanBtn = container.querySelector("#btnHistScan");
+    const scanEan = container.querySelector("#histScanEan");
+    const scanEk  = container.querySelector("#histScanEk");
+
+    // Guard against duplicate listeners on reload
+    if (scanBtn && !scanBtn._histScanBound) {
+      scanBtn._histScanBound = true;
+
+      async function runHistScan() {
+        const ean = scanEan?.value.trim();
+        const ek  = parseFloat(scanEk?.value) || 0;
+        if (!ean) { Toast.error("EAN fehlt", "Bitte EAN eingeben."); return; }
+        if (scanBtn) scanBtn.disabled = true;
+        const origLabel = scanBtn.textContent;
+        scanBtn.innerHTML = `<div class="spinner spinner-sm" style="width:12px;height:12px;border-width:1.5px"></div>`;
+        try {
+          const { ok, data } = await API.flipcheck(ean, ek, "mid");
+          if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
+          await Storage.savePrice({ ean, title: data.title || ean, browse_avg: data.browse_avg, browse_median: data.sell_price_median, research_avg: data.sell_price_avg, sales_30d: data.sales_30d });
+          if (data.price_series?.length) {
+            await Storage.savePriceSeries({ ean, title: data.title || ean, price_series: data.price_series, qty_series: data.qty_series || [] });
+          }
+          Toast.success("Gespeichert", `${esc(data.title || ean)} — ${fmtEur(data.sell_price_median ?? data.browse_avg)}`);
+          if (scanEan) scanEan.value = "";
+          if (scanEk)  scanEk.value  = "";
+          await loadList(container);
+          loadDetail(ean, container);
+        } catch (err) {
+          Toast.error("Fehler", err.message || "Prüfung fehlgeschlagen.");
+        } finally {
+          if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = origLabel; }
+        }
+      }
+
+      scanBtn.addEventListener("click", runHistScan);
+      scanEan?.addEventListener("keydown", e => { if (e.key === "Enter") scanEk?.focus(); });
+      scanEk?.addEventListener("keydown",  e => { if (e.key === "Enter") runHistScan(); });
+    }
   }
 
   function renderList(container, items) {
@@ -166,6 +211,25 @@ const HistoryView = (() => {
       detailEl.innerHTML = renderDetailEmpty();
       Toast.success("Gelöscht");
     });
+
+    // Per-entry delete — event delegation (remove old before attaching new)
+    if (detailEl._delDelegate) detailEl.removeEventListener("click", detailEl._delDelegate);
+    detailEl._delDelegate = async (e) => {
+      const delBtn = e.target.closest(".btn-hist-del-entry");
+      if (!delBtn) return;
+      const ts = delBtn.dataset.ts;
+      if (!ts) return;
+      const ok = await Modal.confirm("Eintrag löschen", `Datenpunkt vom ${fmtDate(ts)} löschen?`, { confirmLabel: "Löschen", danger: true });
+      if (!ok) return;
+      const res = await Storage.deleteHistoryEntry(ean, ts);
+      if (res?.ok) {
+        Toast.success("Gelöscht", "Datenpunkt entfernt.");
+        loadDetail(ean, container);
+      } else {
+        Toast.error("Fehler", "Eintrag konnte nicht gelöscht werden.");
+      }
+    };
+    detailEl.addEventListener("click", detailEl._delDelegate);
   }
 
   function calcTrend(prices) {
@@ -278,6 +342,7 @@ const HistoryView = (() => {
                   <th class="col-right">Browse</th>
                   <th class="col-right">Stk.</th>
                   <th class="col-right">Quelle</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -300,6 +365,7 @@ const HistoryView = (() => {
                     <td class="col-right col-num" style="font-size:12px;color:var(--text-muted)">${fmtEur(e.browse_median ?? e.browse_avg)}</td>
                     <td class="col-right col-num" style="font-size:12px">${e.qty != null ? e.qty : (e.sales_30d != null ? e.sales_30d : "—")}</td>
                     <td class="col-right"><span class="badge ${e.from_series ? "badge-gray" : "badge-green"}" style="font-size:9px">${e.from_series ? "Research" : "Live"}</span></td>
+                    <td><button class="btn btn-ghost btn-icon btn-hist-del-entry" data-ts="${esc(e.ts)}" title="Eintrag löschen" style="padding:2px 5px;opacity:.5"><svg width="10" height="10" viewBox="0 0 16 16" fill="none"><path d="M3 4h10M6 4V2h4v2M13 4l-1 10H4L3 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></button></td>
                   </tr>
                 `}).join("")}
               </tbody>

@@ -416,7 +416,7 @@ const InventoryView = (() => {
         <td class="col-right text-sm">${ageHtml}</td>
         <td>
           <div class="row" style="gap:4px;justify-content:flex-end">
-            ${item.ean ? `<button class="btn btn-ghost btn-icon btn-inv-flip" data-id="${esc(item.id)}" data-ean="${esc(item.ean)}" title="Flipcheck prüfen">
+            ${item.ean ? `<button class="btn btn-ghost btn-icon btn-inv-flip" data-id="${esc(item.id)}" data-ean="${esc(item.ean)}" data-ek="${esc(item.ek ?? 0)}" title="Flipcheck prüfen">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="5" stroke="currentColor" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M7 4.5v5M4.5 7h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/></svg>
             </button>` : ""}
             ${item.status !== "SOLD" ? `<button class="btn btn-ghost btn-icon btn-inv-sold" data-id="${esc(item.id)}" title="Als verkauft markieren">
@@ -563,16 +563,64 @@ const InventoryView = (() => {
       const flipBtn = e.target.closest(".btn-inv-flip");
       if (flipBtn) {
         const ean = flipBtn.dataset.ean;
-        if (ean && typeof App !== "undefined" && typeof navigateTo === "function") {
-          App._navPayload = { ean };
-          navigateTo("flipcheck");
-        }
+        const ek  = parseFloat(flipBtn.dataset.ek) || 0;
+        if (ean) openPricecheckModal(ean, ek, flipBtn);
         return;
       }
     });
   }
 
   // ── Modals ───────────────────────────────────────────────────────────────
+
+  async function openPricecheckModal(ean, ek, btn) {
+    // Briefly show loading state on the trigger button
+    const origHtml = btn ? btn.innerHTML : "";
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<div class="spinner spinner-sm" style="width:11px;height:11px;border-width:1.5px"></div>`;
+    }
+
+    try {
+      const { ok, data } = await API.flipcheck(ean, ek || 0, "mid");
+      if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
+
+      const verdict = data.verdict || "—";
+      const vc = { BUY: "var(--green)", HOLD: "var(--yellow)", SKIP: "var(--red)" }[verdict] || "var(--dim)";
+      const vb = { BUY: "var(--green-sub)", HOLD: "var(--yellow-sub)", SKIP: "var(--red-sub)" }[verdict] || "transparent";
+      const profit = data.profit_median ?? data.profit;
+      const margin = data.margin_pct;
+
+      await Modal.open({
+        title: `🔍 ${esc(data.title || ean)}`,
+        body: `<div class="col gap-14">
+          <div class="row" style="align-items:center;gap:14px">
+            <div style="background:${vb};border:1px solid ${vc}44;border-radius:10px;padding:8px 18px;font-size:18px;font-weight:800;color:${vc};flex-shrink:0">${esc(verdict)}</div>
+            <div>
+              <div style="font-size:22px;font-weight:800;line-height:1;color:var(--text-primary)">${profit != null ? fmtEur(profit) : "—"}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${margin != null ? `${margin.toFixed(1)} % Marge` : "EK = 0 → kein Profit"}</div>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${fmtEur(data.sell_price_median)}</div><div class="fc-amz-kpi-l">Median VK</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${profit != null ? fmtEur(profit) : "—"}</div><div class="fc-amz-kpi-l">Profit</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${margin != null ? margin.toFixed(1) + " %" : "—"}</div><div class="fc-amz-kpi-l">Marge</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${data.sales_30d ?? "—"}</div><div class="fc-amz-kpi-l">Verk./30d</div></div>
+          </div>
+          <div style="font-size:11px;color:var(--dim);padding-top:8px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">
+            <span>EAN: <strong style="color:var(--text-secondary)">${esc(ean)}</strong></span>
+            <span>EK: <strong style="color:var(--text-secondary)">${fmtEur(ek)}</strong></span>
+            ${data.competition != null ? `<span>Konkurrenten: <strong style="color:var(--text-secondary)">${data.competition}</strong></span>` : ""}
+            ${data.sales_last_day != null ? `<span>Ø/Tag: <strong style="color:var(--text-secondary)">${data.sales_last_day.toFixed(1)}</strong></span>` : ""}
+          </div>
+        </div>`,
+        buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }],
+      });
+    } catch (err) {
+      Toast.error("Flipcheck fehlgeschlagen", err.message || "Backend nicht erreichbar");
+    } finally {
+      if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
+  }
 
   function openAddModal(container) {
     const body = `

@@ -141,6 +141,12 @@ contextBridge.exposeInMainWorld("fc", {
    * @returns {Promise<{ok: boolean}>}
    */
   priceHistoryDeleteEan: (ean) => ipcRenderer.invoke("priceHistory:deleteEan", ean),
+  /**
+   * @param {string} ean
+   * @param {string} ts
+   * @returns {Promise<{ok: boolean}>}
+   */
+  priceHistoryDeleteEntry: (ean, ts) => ipcRenderer.invoke("priceHistory:deleteEntry", { ean, ts }),
 
   // ── Seller / Competition Tracker ──────────────────────────────────────────
 

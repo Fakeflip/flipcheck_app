@@ -36,8 +36,9 @@ const FlipcheckView = (() => {
     { id: "sport_freizeit",    label: "Sport & Freizeit",               group: "Sonstiges (Flat)",     tiers: [[null, 0.115]] },
     { id: "spielzeug",         label: "Spielzeug / LEGO",               group: "Sonstiges (Flat)",     tiers: [[null, 0.115]] },
     { id: "haushalt_garten",   label: "Haushalt & Garten",              group: "Sonstiges (Flat)",     tiers: [[null, 0.115]] },
-    { id: "buecher",           label: "Bücher & Medien",                group: "Sonstiges (Flat)",     tiers: [[null, 0.15]]  },
-    { id: "sonstiges",         label: "Sonstiges",                      group: "Sonstiges (Flat)",     tiers: [[null, 0.13]]  },
+    { id: "buecher",           label: "Bücher & Medien",                group: "Sonstiges (Flat)",        tiers: [[null, 0.15]]  },
+    { id: "sonstiges",         label: "Sonstiges",                      group: "Sonstiges (Flat)",        tiers: [[null, 0.13]]  },
+    { id: "durchstarter",      label: "Durchstarter / Sonderaktion",    group: "Sonderkonditionen (0 %)", tiers: [[null, 0.00]]  },
   ];
 
   // calcEbayFee is global (defined in app.js — EBAY_FEE_CATEGORIES + calcEbayFee)

@@ -708,6 +708,16 @@ ipcMain.handle("priceHistory:deleteEan", (_e, ean) => {
   return { ok: true };
 });
 
+ipcMain.handle("priceHistory:deleteEntry", (_e, { ean, ts }) => {
+  const data = readHist();
+  if (!data[ean]) return { ok: false };
+  const before = data[ean].entries.length;
+  data[ean].entries = data[ean].entries.filter(e => e.ts !== ts);
+  if (data[ean].entries.length === before) return { ok: false };
+  writeHist(data);
+  return { ok: true };
+});
+
 // Remove all EANs whose most-recent entry is older than 90 days.
 // Safe to call at any time (e.g. from Settings → "Daten bereinigen").
 ipcMain.handle("priceHistory:vacuum", () => {

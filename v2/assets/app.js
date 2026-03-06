@@ -127,6 +127,8 @@ const EBAY_FEE_CATEGORIES = [
   { id: "haushalt_garten",   label: "Haushalt & Garten",                     tiers: [[null, 0.115]] },
   { id: "buecher",           label: "Bücher & Medien",                       tiers: [[null, 0.15]]  },
   { id: "sonstiges",         label: "Sonstiges",                             tiers: [[null, 0.13]]  },
+  // ── Sonderkonditionen ────────────────────────────────────────────────────
+  { id: "durchstarter",      label: "Durchstarter / Sonderaktion (0 %)",     tiers: [[null, 0.00]]  },
 ];
 
 /**
@@ -477,6 +479,59 @@ function showGate(message) {
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 /**
+ * Show changelog modal for a downloaded update.
+ * Fetches release notes from GitHub if not already provided by electron-updater.
+ * @param {string} version
+ * @param {string|null} releaseNotesRaw
+ */
+async function _showUpdateChangelog(version, releaseNotesRaw) {
+  let notes = "";
+
+  // Try to use what electron-updater already sent
+  if (releaseNotesRaw && typeof releaseNotesRaw === "string" && releaseNotesRaw.trim()) {
+    notes = releaseNotesRaw.trim();
+  } else {
+    // Fetch from GitHub Releases API (repo is public)
+    try {
+      const resp = await fetch(
+        `https://api.github.com/repos/Fakeflip/flipcheck_app/releases/tags/v${version}`,
+        { headers: { Accept: "application/vnd.github+json" } }
+      );
+      if (resp.ok) {
+        const rel = await resp.json();
+        notes = rel.body || "";
+      }
+    } catch { /* offline — proceed without notes */ }
+  }
+
+  // Convert Markdown-ish plain text to simple HTML for display
+  const notesHtml = notes
+    ? notes
+        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+        .replace(/^#{1,3} (.+)$/gm, "<strong style='color:var(--text-primary)'>$1</strong>")
+        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+        .replace(/^[-*] (.+)$/gm, "• $1")
+        .replace(/\n/g, "<br>")
+    : "<span style='color:var(--text-muted)'>Keine Changelog-Informationen verfügbar.</span>";
+
+  Modal.open({
+    title: `🚀 Flipcheck v${version}`,
+    body: `
+      <div class="col gap-12">
+        <p class="text-secondary text-sm">Eine neue Version wurde heruntergeladen und ist bereit zum Installieren.</p>
+        <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;font-size:12px;line-height:1.7;color:var(--text-secondary);max-height:260px;overflow-y:auto">
+          ${notesHtml}
+        </div>
+        <p class="text-muted" style="font-size:11px">Die App wird nach der Installation neu gestartet.</p>
+      </div>`,
+    buttons: [
+      { label: "Später", variant: "btn-ghost", value: false },
+      { label: "Jetzt installieren & neu starten", variant: "btn-primary", action: () => window.fc?.installUpdate?.() },
+    ],
+  });
+}
+
+/**
  * Application entry point — wires up event listeners, resolves config, checks auth.
  * Called once on `DOMContentLoaded`.
  * @returns {Promise<void>}
@@ -624,19 +679,24 @@ async function initApp() {
         bar.classList.add("visible");
       }
     });
-    window.fc.onUpdateDownloaded((info) => {
-      const bar     = document.getElementById("update-bar");
-      const text    = document.getElementById("updateBarText");
-      const btn     = document.getElementById("btnInstallUpdate");
+    window.fc.onUpdateDownloaded(async (info) => {
+      const version = info?.version || "?";
+
+      // ── Show update banner ────────────────────────────────────────────
+      const bar  = document.getElementById("update-bar");
+      const text = document.getElementById("updateBarText");
+      const btn  = document.getElementById("btnInstallUpdate");
       if (bar && text) {
-        text.textContent = `🚀 Update v${info?.version || "?"} heruntergeladen — jetzt installieren?`;
+        text.textContent = `🚀 Update v${version} bereit`;
         bar.classList.add("visible", "ready");
       }
       if (btn) {
         btn.style.display = "flex";
-        btn.onclick = () => window.fc?.installUpdate?.();
+        btn.onclick = () => _showUpdateChangelog(version, info?.releaseNotes);
       }
-      Toast.success("Update bereit", `v${info?.version || "?"} — Klicke im Banner auf Installieren.`);
+
+      // ── Auto-show changelog modal ─────────────────────────────────────
+      _showUpdateChangelog(version, info?.releaseNotes);
     });
   }
 }

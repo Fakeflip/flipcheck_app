@@ -133,6 +133,17 @@ const Storage = (() => {
     catch { return null; }
   }
 
+  /**
+   * Delete a single price entry by EAN + timestamp.
+   * @param {string} ean
+   * @param {string} ts
+   * @returns {Promise<{ok: boolean}|null>}
+   */
+  async function deleteHistoryEntry(ean, ts) {
+    try { return await window.fc.priceHistoryDeleteEntry(ean, ts); }
+    catch { return null; }
+  }
+
   // ── Settings ──────────────────────────────────────────────────────────────
 
   /** @type {FC_Settings|null} */
@@ -423,7 +434,7 @@ const Storage = (() => {
 
   return {
     listInventory, upsertItem, deleteItem, bulkUpdate,
-    savePrice, savePriceSeries, getHistory, listHistory, deleteHistory,
+    savePrice, savePriceSeries, getHistory, listHistory, deleteHistory, deleteHistoryEntry,
     getSettings, saveSettings,
     calcInventoryAnalytics,
     /** Discard memoised result (exposed for tests and external forced-refresh). */
