@@ -517,12 +517,16 @@ function showGate(message) {
  */
 async function _showUpdateChangelog(version, releaseNotesRaw) {
   let notes = "";
+  let notesAreHtml = false; // electron-updater sends HTML; GitHub API sends Markdown
 
-  // Try to use what electron-updater already sent
+  // 1. Use what electron-updater already sent (may be HTML)
   if (releaseNotesRaw && typeof releaseNotesRaw === "string" && releaseNotesRaw.trim()) {
     notes = releaseNotesRaw.trim();
-  } else {
-    // Fetch from GitHub Releases API (repo is public)
+    notesAreHtml = /<[a-z][\s\S]*?>/i.test(notes); // detect HTML tags
+  }
+
+  // 2. Fall back to GitHub Releases API (returns raw Markdown in `body`)
+  if (!notes) {
     try {
       const resp = await fetch(
         `https://api.github.com/repos/Fakeflip/flipcheck_app/releases/tags/v${version}`,
@@ -531,19 +535,30 @@ async function _showUpdateChangelog(version, releaseNotesRaw) {
       if (resp.ok) {
         const rel = await resp.json();
         notes = rel.body || "";
+        notesAreHtml = false; // GitHub API body is always Markdown
       }
     } catch { /* offline — proceed without notes */ }
   }
 
-  // Convert Markdown-ish plain text to simple HTML for display
-  const notesHtml = notes
-    ? notes
-        .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-        .replace(/^#{1,3} (.+)$/gm, "<strong style='color:var(--text-primary)'>$1</strong>")
-        .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-        .replace(/^[-*] (.+)$/gm, "• $1")
-        .replace(/\n/g, "<br>")
-    : "<span style='color:var(--text-muted)'>Keine Changelog-Informationen verfügbar.</span>";
+  // Strip trivial placeholders like "<p>FLIPCHECK 2.0.6</p>" or just the version string
+  const stripped = notes.replace(/<[^>]+>/g, "").trim();
+  if (!stripped || /^flipcheck\s*\d/i.test(stripped) || stripped.length < 10) notes = "";
+
+  let notesHtml;
+  if (!notes) {
+    notesHtml = `<span style='color:var(--text-muted)'>Keine Changelog-Informationen verfügbar.</span>`;
+  } else if (notesAreHtml) {
+    // Already valid HTML from electron-updater — render directly
+    notesHtml = notes;
+  } else {
+    // Markdown from GitHub API → lightweight HTML conversion
+    notesHtml = notes
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/^#{1,3} (.+)$/gm, `<strong style='color:var(--text-primary)'>$1</strong>`)
+      .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+      .replace(/^[-*] (.+)$/gm, "• $1")
+      .replace(/\n/g, "<br>");
+  }
 
   Modal.open({
     title: `🚀 Flipcheck v${version}`,
