@@ -397,9 +397,17 @@ const SettingsView = (() => {
   }
 
   // ─── Profile card ──────────────────────────────────────────────────────────
+  function _jwtClaims(token) {
+    try { return JSON.parse(atob((token || "").split(".")[1])); } catch { return {}; }
+  }
+
   async function loadProfile(container) {
     const profileSection = container.querySelector("#profileSection");
     if (!profileSection) return;
+
+    // Fallback: extract basic info from JWT claims without a server round-trip
+    const claims = _jwtClaims(App.token);
+
     try {
       const r = await API.call("/auth/me");
       if (!r.ok || !r.data) throw new Error("not_ok");
@@ -487,13 +495,31 @@ const SettingsView = (() => {
         </div>
       `;
     } catch {
-      profileSection.innerHTML = `
-        <div class="settings-row" style="border:none">
-          <div class="settings-row-left">
-            <h4>Nicht angemeldet</h4>
-            <p>Token abgelaufen oder ungültig</p>
+      // If /auth/me fails but we still have a valid token, show basic info from JWT claims.
+      // Only show the "not logged in" state if there are no claims at all.
+      const name = claims.discord_username || claims.sub || "";
+      if (!name) {
+        profileSection.innerHTML = `
+          <div class="settings-row" style="border:none">
+            <div class="settings-row-left">
+              <h4>Nicht angemeldet</h4>
+              <p>Token abgelaufen oder ungültig</p>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="window.location.reload()">Neu einloggen</button>
           </div>
-          <button class="btn btn-primary btn-sm" onclick="window.location.reload()">Neu einloggen</button>
+        `;
+        return;
+      }
+      const initials = name.slice(0, 2).toUpperCase();
+      profileSection.innerHTML = `
+        <div class="st-profile-top">
+          <div style="display:flex;align-items:center;gap:14px;flex:1;min-width:0">
+            <div class="profile-avatar profile-avatar-fallback">${initials}</div>
+            <div style="min-width:0">
+              <div class="st-profile-name">${esc(name)}</div>
+              <div class="text-xs" style="color:var(--text-muted);margin-top:2px">Profil wird geladen…</div>
+            </div>
+          </div>
         </div>
       `;
     }
