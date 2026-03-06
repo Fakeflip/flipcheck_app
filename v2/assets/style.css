@@ -208,10 +208,13 @@ img { display: block; max-width: 100%; }
 /* ── Nav ─────────────────────────────────────────────────────────────── */
 .sidebar-nav {
   flex: 1;
+  min-height: 0;
   padding: 8px 10px;
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .nav-section-label {
@@ -272,6 +275,16 @@ img { display: block; max-width: 100%; }
   border-radius: var(--r-full);
 }
 
+.nav-ext-badge {
+  margin-left: auto;
+  font-size: 11px;
+  opacity: 0.3;
+  flex-shrink: 0;
+  transition: opacity 0.15s;
+}
+.nav-item.nav-external { text-decoration: none; }
+.nav-item.nav-external:hover .nav-ext-badge { opacity: 0.65; }
+
 /* ── Sidebar Footer ──────────────────────────────────────────────────── */
 .sidebar-footer {
   padding: 10px 10px 16px;
@@ -282,6 +295,43 @@ img { display: block; max-width: 100%; }
 }
 .nav-logout { color: var(--text-muted); }
 .nav-logout:hover { color: var(--red); background: var(--red-subtle); }
+
+/* ── Update Banner ───────────────────────────────────────────────────── */
+#update-bar {
+  position: fixed;
+  top: 0;
+  /* starts after sidebar */
+  left: var(--sidebar-w, 220px);
+  right: 0;
+  z-index: 900;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 20px;
+  font-size: 12px;
+  font-weight: 500;
+  background: var(--accent);
+  color: #fff;
+  border-bottom: 1px solid rgba(255,255,255,.15);
+}
+#update-bar.visible  { display: flex; }
+#update-bar.ready    { background: var(--green); }
+#update-bar #btnInstallUpdate {
+  background: rgba(255,255,255,.18);
+  border: 1px solid rgba(255,255,255,.3);
+  color: #fff;
+  border-radius: var(--r-sm);
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+#update-bar #btnInstallUpdate:hover { background: rgba(255,255,255,.28); }
 
 /* ── Main ────────────────────────────────────────────────────────────── */
 #main {
@@ -2056,7 +2106,7 @@ img { display: block; max-width: 100%; }
 }
 @media (max-width: 800px) {
   #sidebar { width: 60px; }
-  .brand-text, .nav-item span, .nav-badge, .nav-section-label, .sidebar-footer .nav-item span { display: none; }
+  .brand-text, .nav-item span, .nav-badge, .nav-ext-badge, .nav-section-label, .sidebar-footer .nav-item span { display: none; }
   .nav-item { justify-content: center; padding: 8px; }
   .nav-icon { opacity: 1; }
   #view-root { padding: 16px; }

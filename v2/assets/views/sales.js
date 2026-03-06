@@ -119,7 +119,11 @@ const SalesView = (() => {
       ["Produkt","EAN","EK","VK","Plattform","Fee %","Gewinn (netto)","ROI %","Datum"],
     ];
     sold.forEach(i => {
-      const fee = ((FEES[i.market] ?? 0) * 100).toFixed(1);
+      const _mkt     = i.market || "ebay";
+      const _feeAmt  = _mkt === "ebay" && i.sell_price
+        ? calcEbayFee(i.sell_price, i.cat_id || "sonstiges")
+        : (i.sell_price || 0) * (FLAT_FEES[_mkt] ?? 0);
+      const fee = i.sell_price > 0 ? ((_feeAmt / i.sell_price) * 100).toFixed(1) : "0.0";
       const prof = netProfit(i).toFixed(2).replace(".",",");
       const r    = (itemRoi(i) ?? 0).toFixed(1).replace(".",",");
       rows.push([
@@ -327,10 +331,14 @@ const SalesView = (() => {
       </tr></thead>
       <tbody>
         ${rows.map(i => {
-          const profit = netProfit(i);
-          const roi    = itemRoi(i);
-          const fee    = FEES[i.market] ?? 0;
-          const plat   = PLATFORM_LABELS[i.market] || i.market || "—";
+          const profit  = netProfit(i);
+          const roi     = itemRoi(i);
+          const _market = i.market || "ebay";
+          const _feeAmt = _market === "ebay" && i.sell_price
+            ? calcEbayFee(i.sell_price, i.cat_id || "sonstiges")
+            : (i.sell_price || 0) * (FLAT_FEES[_market] ?? 0);
+          const fee     = i.sell_price > 0 ? _feeAmt / i.sell_price : 0;
+          const plat    = PLATFORM_LABELS[i.market] || i.market || "—";
           return `<tr>
             <td style="max-width:200px">
               <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(i.title||i.ean)}">${esc((i.title||i.ean||"—").slice(0,32))}</div>

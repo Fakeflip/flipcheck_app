@@ -613,6 +613,32 @@ async function initApp() {
     setTimeout(() => runAlertChecks(), 30_000);
     App._alertsInterval = /** @type {number} */ (/** @type {unknown} */ (setInterval(() => runAlertChecks(), 15 * 60 * 1000)));
   }
+
+  // ── Global auto-update listeners — shown immediately, no matter which view is active
+  if (window.fc?.onUpdateAvailable) {
+    window.fc.onUpdateAvailable((info) => {
+      const bar  = document.getElementById("update-bar");
+      const text = document.getElementById("updateBarText");
+      if (bar && text) {
+        text.textContent = `⬇ Update v${info?.version || "?"} wird heruntergeladen…`;
+        bar.classList.add("visible");
+      }
+    });
+    window.fc.onUpdateDownloaded((info) => {
+      const bar     = document.getElementById("update-bar");
+      const text    = document.getElementById("updateBarText");
+      const btn     = document.getElementById("btnInstallUpdate");
+      if (bar && text) {
+        text.textContent = `🚀 Update v${info?.version || "?"} heruntergeladen — jetzt installieren?`;
+        bar.classList.add("visible", "ready");
+      }
+      if (btn) {
+        btn.style.display = "flex";
+        btn.onclick = () => window.fc?.installUpdate?.();
+      }
+      Toast.success("Update bereit", `v${info?.version || "?"} — Klicke im Banner auf Installieren.`);
+    });
+  }
 }
 
 // ─── Global Error Handlers ────────────────────────────────────────────────────

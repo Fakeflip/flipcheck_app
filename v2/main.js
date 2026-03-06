@@ -865,19 +865,29 @@ function fireDiscordWebhook(webhookUrl, eventId, data) {
     if (data.username != null) fields.push({ name: "Verkäufer", value: `@${data.username}`, inline: true });
     if (data.count    != null) fields.push({ name: "Listings",  value: String(data.count),  inline: true });
     if (data.newCount != null) fields.push({ name: "Neu",       value: `+${data.newCount}`, inline: true });
+    if (data.username != null) {
+      const sellerUrl = `https://www.ebay.de/sch/${encodeURIComponent(data.username)}/m.html?_sop=10`;
+      fields.push({ name: "🔗 Neue Artikel", value: `[eBay öffnen →](${sellerUrl})`, inline: true });
+    }
   }
   const productName = data.product || data.title || data.ean || "Produkt";
+  // For new_listing: make the embed title clickable (links to seller's newest listings)
+  const embedUrl = eventId === "new_listing" && data.username
+    ? `https://www.ebay.de/sch/${encodeURIComponent(data.username)}/m.html?_sop=10`
+    : undefined;
+  const embed = {
+    color:       colors[eventId] || 0x6366F1,
+    author:      { name: "▲ FLIPCHECK" },
+    title:       `${icons[eventId] || "🔔"} ${labels[eventId] || eventId}`,
+    description: `**${productName}**`,
+    fields,
+    footer:    { text: `Flipcheck · ${new Date().toLocaleString("de-DE")}` },
+    timestamp: new Date().toISOString(),
+  };
+  if (embedUrl) embed.url = embedUrl;
   const payload = JSON.stringify({
     username: "Flipcheck",
-    embeds: [{
-      color:       colors[eventId] || 0x6366F1,
-      author:      { name: "▲ FLIPCHECK" },
-      title:       `${icons[eventId] || "🔔"} ${labels[eventId] || eventId}`,
-      description: `**${productName}**`,
-      fields,
-      footer:    { text: `Flipcheck · ${new Date().toLocaleString("de-DE")}` },
-      timestamp: new Date().toISOString(),
-    }],
+    embeds: [embed],
   });
   return new Promise((resolve, reject) => {
     const url  = new URL(webhookUrl);

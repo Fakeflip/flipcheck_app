@@ -431,6 +431,21 @@ const DealScanView = (() => {
   // ── Scan ─────────────────────────────────────────────────────────────────
   function startScan(container) {
     if (_scanning) return;
+
+    // Kaufland backend endpoint not yet implemented — show placeholder
+    if (_source === "kaufland") {
+      const resultsEl = container?.querySelector("#dsResults");
+      if (resultsEl) resultsEl.innerHTML = `
+        <div class="empty-state" style="padding:80px 40px">
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+            <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/>
+          </svg>
+          <p class="empty-title">🔜 Kaufland-Scanner</p>
+          <p class="empty-sub">Der Kaufland Deal-Scanner ist in Entwicklung und bald verfügbar.</p>
+        </div>`;
+      return;
+    }
+
     const sel = _activeSelected();
     if (sel.size === 0) { Toast.warning("Kategorien", "Bitte mind. eine Kategorie wählen."); return; }
 
