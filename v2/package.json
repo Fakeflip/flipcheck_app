@@ -1,6 +1,6 @@
 {
   "name": "flipcheck-v2",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "eBay Reseller Profitability Analysis",
   "author": "Marco Arnold",
   "repository": {
@@ -23,7 +23,7 @@
   "devDependencies": {
     "@electron/notarize": "^2.5.0",
     "electron": "^39.2.7",
-    "electron-builder": "^24.9.1",
+    "electron-builder": "^26.8.1",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "typescript": "^5.9.3"
@@ -52,6 +52,7 @@
   "build": {
     "appId": "app.flipcheck.desktop",
     "productName": "FLIPCHECK",
+    "afterPack": "build/afterPack.js",
     "directories": {
       "output": "dist"
     },
@@ -96,9 +97,8 @@
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
-      "notarize": {
-        "teamId": "3S8CTWCYHT"
-      }
+      "sign": "build/customSign.js",
+      "notarize": true
     },
     "dmg": {
       "title": "FLIPCHECK ${version}",
