@@ -922,15 +922,15 @@ const InventoryView = (() => {
         <div class="input-group">
           <label class="input-label">Kategorie (für eBay-Gebühr)</label>
           <select id="soldCatId" class="select">${_buildCatOptions(item.cat_id)}</select>
-        </div>` : `
+        </div>` : item.market === "amz" ? `
         <div class="input-group">
-          <label class="input-label">Marktgebühr</label>
-          <div class="input-prefix-wrap" style="cursor:default;pointer-events:none;opacity:.7">
-            <span class="prefix">%</span>
-            <input class="input" type="text" readonly value="${item.market === "amz" ? "15,0 (Amazon Referral)" : item.market === "kaufland" ? "10,5 (Kaufland Provision)" : "0"}"/>
-          </div>
-        </div>`}
-        <input type="hidden" id="soldCatId" value="${esc(item.cat_id || "sonstiges")}"/>
+          <label class="input-label">Kategorie (Amazon Referral)</label>
+          <select id="soldCatId" class="select">${_buildAmzCatOptions(item.cat_id)}</select>
+        </div>` : item.market === "kaufland" ? `
+        <div class="input-group">
+          <label class="input-label">Kategorie (Kaufland Provision)</label>
+          <select id="soldCatId" class="select">${_buildKlCatOptions(item.cat_id)}</select>
+        </div>` : `<input type="hidden" id="soldCatId" value=""/>`}
         <div class="input-group">
           <label class="input-label">Verkaufsdatum</label>
           <input id="soldDate" class="input" type="date" value="${new Date().toISOString().slice(0,10)}" />

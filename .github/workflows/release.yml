@@ -27,10 +27,8 @@ jobs:
         run: |
           VERSION=${{ steps.ver.outputs.version }}
           TAG="v${VERSION}"
-          # Create tag if it doesn't exist
           git tag $TAG 2>/dev/null || true
           git push origin $TAG 2>/dev/null || true
-          # Create release if it doesn't exist
           gh release view $TAG --repo ${{ github.repository }} 2>/dev/null || \
             gh release create $TAG \
               --repo ${{ github.repository }} \
@@ -63,8 +61,21 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build & release (Mac)
-        run: npm run release -- --mac --publish always
+      - name: Build (Mac)
+        run: npm run build:mac
+
+      - name: Upload Mac assets
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release upload "v${VERSION}" \
+            dist/FLIPCHECK-*.dmg \
+            dist/FLIPCHECK-*.dmg.blockmap \
+            dist/FLIPCHECK-*-mac.zip \
+            dist/FLIPCHECK-*-mac.zip.blockmap \
+            dist/latest-mac.yml \
+            --repo ${{ github.repository }} --clobber
 
   build-win:
     needs: create-release
@@ -86,8 +97,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build & release (Windows)
-        run: npm run release -- --win --publish always
+      - name: Build (Windows)
+        run: npm run build:win
+
+      - name: Upload Windows assets
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          gh release upload "v${VERSION}" \
+            dist/FLIPCHECK-Setup-*.exe \
+            dist/FLIPCHECK-Setup-*.exe.blockmap \
+            dist/latest.yml \
+            --repo ${{ github.repository }} --clobber
 
   publish-release:
     needs: [build-mac, build-win]
