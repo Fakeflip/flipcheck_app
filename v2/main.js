@@ -455,6 +455,10 @@ function startBackend(port) {
 
 // ─── Window ───────────────────────────────────────────────────────────────────
 function createWindow() {
+  const iconFile = process.platform === "win32"
+    ? path.join(__dirname, "assets", "icon.ico")
+    : path.join(__dirname, "assets", "icon.icns");
+
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 820,
@@ -462,6 +466,7 @@ function createWindow() {
     minHeight: 640,
     backgroundColor: "#0A0A0F",
     title: "FLIPCHECK",
+    icon: iconFile,
     show: false,
     titleBarStyle: "hidden",
     titleBarOverlay: { color: "#0A0A0F", symbolColor: "#ffffff", height: 32 },
