@@ -1,17 +1,45 @@
 name: Build & Release
 
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Version to release (e.g. 2.0.1)"
-        required: false
 
 permissions:
   contents: write
 
 jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version from package.json
+        id: ver
+        run: echo "version=$(node -p "require('./v2/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub release (if not exists)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          VERSION=${{ steps.ver.outputs.version }}
+          TAG="v${VERSION}"
+          # Create tag if it doesn't exist
+          git tag $TAG 2>/dev/null || true
+          git push origin $TAG 2>/dev/null || true
+          # Create release if it doesn't exist
+          gh release view $TAG --repo ${{ github.repository }} 2>/dev/null || \
+            gh release create $TAG \
+              --repo ${{ github.repository }} \
+              --title "$VERSION" \
+              --notes "FLIPCHECK $VERSION" \
+              --draft
+
   build-mac:
+    needs: create-release
     runs-on: macos-latest
     defaults:
       run:
@@ -39,6 +67,7 @@ jobs:
         run: npm run release -- --mac --publish always
 
   build-win:
+    needs: create-release
     runs-on: windows-latest
     defaults:
       run:
@@ -59,3 +88,17 @@ jobs:
 
       - name: Build & release (Windows)
         run: npm run release -- --win --publish always
+
+  publish-release:
+    needs: [build-mac, build-win]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish release (remove draft)
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+        run: |
+          VERSION=$(curl -s https://raw.githubusercontent.com/${{ github.repository }}/main/v2/package.json | python3 -c "import sys,json; print(json.load(sys.stdin)['version'])")
+          gh release edit "v${VERSION}" \
+            --repo ${{ github.repository }} \
+            --draft=false \
+            --latest 2>/dev/null || true
