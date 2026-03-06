@@ -6,7 +6,7 @@ const DealScanView = (() => {
   let _scanning   = false;
   let _sortKey    = "score";
   let _filterV    = "all";
-  let _source     = "ebay";  // "ebay" | "amazon"
+  let _source     = "ebay";  // "ebay" | "amazon" | "kaufland"
 
   // eBay scan categories
   const EBAY_CATS = [
@@ -28,11 +28,21 @@ const DealScanView = (() => {
     { id: "sport",      label: "Sport",      icon: "🏃" },
   ];
 
+  // Kaufland categories — must match KL_SCAN_CATS keys in backend
+  const KL_CATS = [
+    { id: "gaming",      label: "Gaming",      icon: "🎮" },
+    { id: "elektronik",  label: "Elektronik",  icon: "⚡" },
+    { id: "haushalt",    label: "Haushalt",    icon: "🏠" },
+    { id: "spielzeug",   label: "Spielzeug",   icon: "🧸" },
+    { id: "sport",       label: "Sport",       icon: "🏃" },
+  ];
+
   let _selectedCats    = new Set(EBAY_CATS.map(c => c.id));
   let _selectedAmzCats = new Set(AMZ_CATS.map(c => c.id));
+  let _selectedKlCats  = new Set(KL_CATS.map(c => c.id));
 
-  function _activeCats()     { return _source === "amazon" ? AMZ_CATS : EBAY_CATS; }
-  function _activeSelected() { return _source === "amazon" ? _selectedAmzCats : _selectedCats; }
+  function _activeCats()     { return _source === "amazon" ? AMZ_CATS : _source === "kaufland" ? KL_CATS : EBAY_CATS; }
+  function _activeSelected() { return _source === "amazon" ? _selectedAmzCats : _source === "kaufland" ? _selectedKlCats : _selectedCats; }
   function _dealId(deal)     { return deal.item_id || deal.asin || String(deal.rank); }
 
   // ── Lifecycle ────────────────────────────────────────────────────────────
@@ -55,13 +65,15 @@ const DealScanView = (() => {
   // ── Render: shell ────────────────────────────────────────────────────────
   function renderView() {
     const isAmz = _source === "amazon";
+    const isKl  = _source === "kaufland";
+    const subtitle = isAmz ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
+                   : isKl  ? "Scannt Kaufland nach günstigen Produkten mit eBay-Flip-Potenzial"
+                   :         "Scannt eBay automatisch nach profitablen Produkten in deinem Budget";
     return `
       <div class="page-header">
         <div class="page-header-left">
           <h1>Deal-Scanner</h1>
-          <p id="dsSubtitle">${isAmz
-            ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
-            : "Scannt eBay automatisch nach profitablen Produkten in deinem Budget"}</p>
+          <p id="dsSubtitle">${subtitle}</p>
         </div>
       </div>
 
@@ -72,8 +84,9 @@ const DealScanView = (() => {
 
           <!-- Source toggle -->
           <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:8px;padding:3px;display:flex;gap:3px;margin-bottom:12px" id="dsSrcToggle">
-            <button class="ds-src-btn ${!isAmz ? "active" : ""}" data-src="ebay">🛒 eBay</button>
+            <button class="ds-src-btn ${!isAmz && !isKl ? "active" : ""}" data-src="ebay">🛒 eBay</button>
             <button class="ds-src-btn ${isAmz  ? "active" : ""}" data-src="amazon">📦 Amazon</button>
+            <button class="ds-src-btn ${isKl   ? "active" : ""}" data-src="kaufland">🏬 Kaufland</button>
           </div>
 
           <div class="panel mb-12">
@@ -84,7 +97,7 @@ const DealScanView = (() => {
                 <label class="input-label">Budget</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">€</span>
-                  <input id="dsBudget" class="input" type="number" step="5" min="5" value="${isAmz ? 150 : 100}"/>
+                  <input id="dsBudget" class="input" type="number" step="5" min="5" value="${isAmz ? 150 : isKl ? 80 : 100}"/>
                 </div>
                 <span class="input-hint">Max. Einkaufspreis pro Artikel</span>
               </div>
@@ -106,14 +119,14 @@ const DealScanView = (() => {
                 </div>
               </div>
 
-              <!-- Amazon-only: Min. Preisdrop -->
-              <div class="input-group" id="dsDropRow" style="display:${isAmz ? "block" : "none"}">
+              <!-- Amazon/Kaufland-only: Min. Preisdrop -->
+              <div class="input-group" id="dsDropRow" style="display:${isAmz || isKl ? "block" : "none"}">
                 <label class="input-label">Min. Preisdrop</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">%</span>
                   <input id="dsMinDrop" class="input" type="number" step="1" min="5" max="80" value="15"/>
                 </div>
-                <span class="input-hint">Unter 90-Tage-Schnitt (Amazon)</span>
+                <span class="input-hint">Unter 90-Tage-Schnitt</span>
               </div>
 
               <div class="grid-2-sm">
@@ -352,17 +365,17 @@ const DealScanView = (() => {
 
       // Subtitle
       const sub = container.querySelector("#dsSubtitle");
-      if (sub) sub.textContent = _source === "amazon"
-        ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
-        : "Scannt eBay automatisch nach profitablen Produkten in deinem Budget";
+      if (sub) sub.textContent = _source === "amazon"   ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
+                               : _source === "kaufland" ? "Scannt Kaufland nach günstigen Produkten mit eBay-Flip-Potenzial"
+                               :                         "Scannt eBay automatisch nach profitablen Produkten in deinem Budget";
 
       // Show/hide drop input
       const dropRow = container.querySelector("#dsDropRow");
-      if (dropRow) dropRow.style.display = _source === "amazon" ? "block" : "none";
+      if (dropRow) dropRow.style.display = (_source === "amazon" || _source === "kaufland") ? "block" : "none";
 
       // Budget default (only if not yet edited by user)
       const budgetInp = container.querySelector("#dsBudget");
-      if (budgetInp && !budgetInp._touched) budgetInp.value = _source === "amazon" ? 150 : 100;
+      if (budgetInp && !budgetInp._touched) budgetInp.value = _source === "amazon" ? 150 : _source === "kaufland" ? 80 : 100;
 
       // Re-render category chips
       const chipsEl = container.querySelector("#dsCatChips");
@@ -450,6 +463,13 @@ const DealScanView = (() => {
 
     if (_source === "amazon") {
       endpoint = `${base}/deals/amazon/stream`;
+      params   = new URLSearchParams({
+        budget, min_margin: minMargin, min_roi: minRoi,
+        min_drop_pct: minDrop, limit,
+        categories: [...sel].join(","), mode,
+      });
+    } else if (_source === "kaufland") {
+      endpoint = `${base}/deals/kaufland/stream`;
       params   = new URLSearchParams({
         budget, min_margin: minMargin, min_roi: minRoi,
         min_drop_pct: minDrop, limit,
@@ -598,7 +618,7 @@ const DealScanView = (() => {
     const statusText  = _container?.querySelector("#dsStatusText");
     const foundCount  = _container?.querySelector("#dsFoundCount");
     const progressBar = _container?.querySelector("#dsProgressBar");
-    const src = _source === "amazon" ? "Amazon" : "eBay";
+    const src = _source === "amazon" ? "Amazon" : _source === "kaufland" ? "Kaufland" : "eBay";
     if (statusText)  statusText.textContent  = `${src} wird durchsucht… ${found} / ${total}`;
     if (foundCount)  foundCount.textContent  = `${found} gefunden`;
     if (progressBar) progressBar.style.width = `${Math.min(100, (found / Math.max(1, total)) * 100)}%`;

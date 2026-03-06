@@ -335,7 +335,9 @@ const FlipcheckView = (() => {
   }
 
   function renderLoading(market = "ebay") {
-    const label = market === "amazon" ? "Amazon/Keepa-Daten werden abgerufen…" : "eBay-Daten werden abgerufen…";
+    const label = market === "amazon"   ? "Amazon/Keepa-Daten werden abgerufen…"
+                : market === "kaufland" ? "Kaufland-Daten werden abgerufen…"
+                :                        "eBay-Daten werden abgerufen…";
     return `<div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
       <div class="spinner"></div>
       <span class="text-secondary">${label}</span>
@@ -534,6 +536,14 @@ const FlipcheckView = (() => {
           </button>
           <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
         </div>
+        <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            🛒 eBay Verkäufe ↗
+          </a>
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            🏷 Idealo ↗
+          </a>
+        </div>
       </div>
 
       <!-- Inline price history chart -->
@@ -684,6 +694,14 @@ const FlipcheckView = (() => {
             Amazon öffnen ↗
           </a>
           <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
+        </div>
+        <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            🛒 eBay Verkäufe ↗
+          </a>
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            🏷 Idealo ↗
+          </a>
         </div>
       </div>
 
@@ -883,7 +901,9 @@ const FlipcheckView = (() => {
     const trendColor= trendDir === "up" ? "var(--green)" : trendDir === "down" ? "var(--red)" : "var(--text-muted)";
     const trendLabel= trendDir === "flat" ? "Stabil" : `${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}%`;
     const isFromSeries = Array.isArray(price_series) && price_series.length >= 2;
-    const seriesSource = chartWrap.dataset.market === "amazon" ? "Keepa/Buy Box" : "eBay Research";
+    const seriesSource = chartWrap.dataset.market === "amazon"   ? "Keepa/Buy Box"
+                       : chartWrap.dataset.market === "kaufland" ? "Kaufland Research"
+                       :                                           "eBay Research";
     const periodLabel  = isFromSeries ? `letzte 30 Tage (${seriesSource})` : `letzte ${chartEntries.length} Checks`;
 
     chartWrap.innerHTML = `

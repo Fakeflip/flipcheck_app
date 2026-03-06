@@ -8,7 +8,8 @@ const SalesView = (() => {
   let _filterMonth    = "";
   let _filterPlatform = "";
 
-  const FEES = { ebay: 0.13, amz: 0.15, kaufland: 0.105, other: 0 };
+  // Flat fees for non-eBay markets; eBay uses tiered calcEbayFee() from app.js
+  const FLAT_FEES = { amz: 0.15, kaufland: 0.105, other: 0 };
   const PLATFORM_LABELS = { ebay: "eBay", amz: "Amazon", kaufland: "Kaufland", other: "Sonstige" };
   const MONTH_DE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 
@@ -37,9 +38,13 @@ const SalesView = (() => {
 
   function netProfit(item) {
     if (item.sell_price == null || item.ek == null) return 0;
-    const fee = FEES[item.market] ?? 0;
-    const qty = item.qty || 1;
-    return (item.sell_price * (1 - fee) - item.ek) * qty;
+    const vk     = Number(item.sell_price) || 0;
+    const qty    = item.qty || 1;
+    const market = item.market || "ebay";
+    const feeAmt = market === "ebay"
+      ? calcEbayFee(vk, item.cat_id || "sonstiges")
+      : vk * (FLAT_FEES[market] ?? 0);
+    return (vk - feeAmt - item.ek) * qty;
   }
   function itemRoi(item) {
     const cost = (item.ek || 0) * (item.qty || 1);

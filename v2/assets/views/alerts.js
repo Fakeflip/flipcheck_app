@@ -25,7 +25,7 @@ const AlertsView = (() => {
       <div class="page-header">
         <div class="page-header-left">
           <h1>Preisalarm</h1>
-          <p>Automatische Benachrichtigung wenn der eBay-Preis dein Ziel unterschreitet</p>
+          <p>Automatische Benachrichtigung wenn der Marktpreis dein Ziel unterschreitet</p>
           <div class="al-stats-bar" id="alStatsBar" style="display:none"></div>
         </div>
         <div class="page-header-right">
@@ -92,6 +92,15 @@ const AlertsView = (() => {
                 <span style="font-weight:400;color:var(--dim)">(optional)</span>
               </label>
               <input id="alTitle" class="input" type="text" placeholder="z.B. Nintendo Switch Lite"/>
+            </div>
+
+            <div class="la-field">
+              <label class="input-label">Markt</label>
+              <select id="alMarket" class="select">
+                <option value="ebay">🛒 eBay</option>
+                <option value="amz">📦 Amazon</option>
+                <option value="kaufland">🏬 Kaufland</option>
+              </select>
             </div>
 
             <button class="btn btn-primary al-add-btn" id="alAdd">
@@ -473,6 +482,7 @@ const AlertsView = (() => {
       const ean    = _el.querySelector("#alEan")?.value.trim();
       const target = parseFloat(_el.querySelector("#alTarget")?.value);
       const title  = _el.querySelector("#alTitle")?.value.trim();
+      const market = _el.querySelector("#alMarket")?.value || "ebay";
 
       if (!ean || !/^\d{8,14}$/.test(ean)) {
         Toast.error("Ungültige EAN", "Bitte eine gültige EAN/GTIN (8–14 Ziffern) eingeben.");
@@ -490,7 +500,7 @@ const AlertsView = (() => {
       </svg> Wird hinzugefügt…`;
 
       try {
-        _alerts = await Storage.addAlert({ ean, target_price: target, title: title || null });
+        _alerts = await Storage.addAlert({ ean, target_price: target, title: title || null, market });
         renderList(); updateStatsBar();
         _el.querySelector("#alEan").value    = "";
         _el.querySelector("#alTarget").value = "";
@@ -578,6 +588,9 @@ const AlertsView = (() => {
   return { mount, unmount };
 })();
 
+// ── Market label map (used in notifications + Discord embeds) ────────────────
+const MARKET_LABELS_AL = { ebay: "eBay", amz: "Amazon", kaufland: "Kaufland" };
+
 // ── Background Alert Checker ────────────────────────────────────────────────
 // Called by app.js timer every 15 min and on "Jetzt prüfen"
 async function runAlertChecks() {
@@ -624,7 +637,8 @@ async function runAlertChecks() {
           newlyTriggered++;
 
           // Desktop notification
-          const notifBody = `${alert.title || alert.ean}: eBay ${fmt(currentPrice)} ≤ Ziel ${fmt(alert.target_price)}`;
+          const mktLabel  = MARKET_LABELS_AL[alert.market] || "eBay";
+          const notifBody = `${alert.title || alert.ean}: ${mktLabel} ${fmt(currentPrice)} ≤ Ziel ${fmt(alert.target_price)}`;
           try { await window.fc.notify("🎯 Preisalarm ausgelöst!", notifBody); } catch {}
           Toast.success("Preisalarm!", `${alert.title || alert.ean}: ${fmt(currentPrice)}`);
 
@@ -662,7 +676,7 @@ async function _fireAlertWebhook(webhookUrl, alert, currentPrice) {
       fields: [
         { name: "EAN",        value: String(alert.ean),               inline: true },
         { name: "Zielpreis",  value: fmt(alert.target_price),         inline: true },
-        { name: "eBay-Preis", value: fmt(currentPrice),               inline: true },
+        { name: `${MARKET_LABELS_AL[alert.market] || "eBay"}-Preis`, value: fmt(currentPrice), inline: true },
         { name: "Ersparnis",  value: savings > 0 ? `−${fmt(savings)}` : "—", inline: true },
       ],
       footer:    { text: `Flipcheck · ${new Date().toLocaleString("de-DE")}` },

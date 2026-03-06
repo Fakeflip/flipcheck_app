@@ -793,10 +793,19 @@ const InventoryView = (() => {
             </div>
           </div>
         </div>
+        ${(!item.market || item.market === "ebay") ? `
         <div class="input-group">
           <label class="input-label">Kategorie (für eBay-Gebühr)</label>
           <select id="soldCatId" class="select">${_buildCatOptions(item.cat_id)}</select>
-        </div>
+        </div>` : `
+        <div class="input-group">
+          <label class="input-label">Marktgebühr</label>
+          <div class="input-prefix-wrap" style="cursor:default;pointer-events:none;opacity:.7">
+            <span class="prefix">%</span>
+            <input class="input" type="text" readonly value="${item.market === "amz" ? "15,0 (Amazon Referral)" : item.market === "kaufland" ? "10,5 (Kaufland Provision)" : "0"}"/>
+          </div>
+        </div>`}
+        <input type="hidden" id="soldCatId" value="${esc(item.cat_id || "sonstiges")}"/>
         <div class="input-group">
           <label class="input-label">Verkaufsdatum</label>
           <input id="soldDate" class="input" type="date" value="${new Date().toISOString().slice(0,10)}" />
@@ -883,6 +892,9 @@ const InventoryView = (() => {
         ? Math.min(totalQty, Math.max(1, parseInt(document.getElementById("soldQtyInp")?.value) || totalQty))
         : 1;
 
+      const MKT_FEE_RATES_INV = { amz: 0.15, kaufland: 0.105, other: 0 };
+      const MKT_FEE_LABELS    = { ebay: "eBay-Gebühr", amz: "Amazon-Gebühr", kaufland: "Kaufland-Gebühr", other: "Gebühr" };
+
       const updatePreview = () => {
         const vk      = parseFloat(document.getElementById("soldVk")?.value)      || 0;
         const shipOut = parseFloat(document.getElementById("soldShipOut")?.value) || 0;
@@ -891,7 +903,11 @@ const InventoryView = (() => {
         const el      = document.getElementById("soldProfitPreview");
         if (!el) return;
         if (!vk || !item.ek) { el.textContent = "Profit-Vorschau erscheint nach VK-Eingabe"; return; }
-        const fee        = calcEbayFee(vk, catId);
+        const market     = item.market || "ebay";
+        const fee        = market === "ebay"
+          ? calcEbayFee(vk, catId)
+          : vk * (MKT_FEE_RATES_INV[market] ?? 0);
+        const feeLabel   = MKT_FEE_LABELS[market] || "Gebühr";
         const unitProfit = vk - item.ek - shipOut - fee;
         const roi        = item.ek > 0 ? (unitProfit / item.ek * 100) : 0;
         const color      = unitProfit >= 0 ? "var(--green)" : "var(--red)";
@@ -906,7 +922,7 @@ const InventoryView = (() => {
             <strong style="color:${color}">${unitProfit >= 0 ? "+" : ""}${fmtEur(unitProfit * soldQty)}</strong>
           </div>` : ""}
           <div style="display:flex;justify-content:space-between;margin-top:4px;color:var(--text-muted);font-size:11px">
-            <span>eBay-Gebühr: −${fmtEur(fee)} · Versand: −${fmtEur(shipOut)} · EK: −${fmtEur(item.ek)}</span>
+            <span>${feeLabel}: −${fmtEur(fee)} · Versand: −${fmtEur(shipOut)} · EK: −${fmtEur(item.ek)}</span>
             <span style="color:${color}">${roi >= 0 ? "+" : ""}${roi.toFixed(1)}%</span>
           </div>`;
       };

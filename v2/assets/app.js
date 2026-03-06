@@ -152,8 +152,22 @@ function calcEbayFee(priceGross, catId) {
 }
 
 /**
+ * Market-specific flat fee rates for Amazon and Kaufland.
+ * eBay uses the tiered calcEbayFee() instead.
+ * @type {Record<string, number>}
+ */
+const MARKET_FEE_RATES = {
+  amz:      0.15,   // Amazon: ~15% referral fee (varies by category, 15% is conservative)
+  kaufland: 0.105,  // Kaufland: ~10.5% seller commission
+  other:    0,
+};
+
+/**
  * Calculate the real per-unit profit for one inventory item.
- * Formula: sell_price − ek − ship_out − ebay_fee  (eBay fee only for market === "ebay").
+ * - eBay: uses tiered calcEbayFee() (category-aware)
+ * - Amazon: 15% flat referral fee
+ * - Kaufland: 10.5% flat commission
+ * - other: no fee
  * Returns null if sell_price or ek are missing.
  *
  * @param {FC_InventoryItem} item
@@ -164,9 +178,13 @@ function calcRealProfit(item) {
   const vk      = Number(item.sell_price) || 0;
   const ek      = Number(item.ek)         || 0;
   const shipOut = Number(item.ship_out)   || 0;
-  const fee     = (item.market === "ebay" || !item.market)
-    ? calcEbayFee(vk, item.cat_id || "sonstiges")
-    : 0;
+  const market  = item.market || "ebay";
+  let fee = 0;
+  if (market === "ebay") {
+    fee = calcEbayFee(vk, item.cat_id || "sonstiges");
+  } else {
+    fee = vk * (MARKET_FEE_RATES[market] ?? 0);
+  }
   return vk - ek - shipOut - fee;
 }
 
