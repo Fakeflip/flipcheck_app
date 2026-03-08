@@ -27,6 +27,11 @@ const HistoryView = (() => {
         <div class="page-header-right" style="gap:6px;flex-wrap:wrap">
           <input id="histScanEan" class="input" type="text" placeholder="EAN scannen…" style="width:155px;font-size:12px;padding:6px 10px" autocomplete="off" />
           <input id="histScanEk" class="input" type="number" step="0.01" min="0" placeholder="EK €" style="width:72px;font-size:12px;padding:6px 10px" />
+          <select id="histScanMarket" class="select" style="font-size:12px;padding:6px 10px;width:auto">
+            <option value="ebay">eBay</option>
+            <option value="amz">Amazon</option>
+            <option value="kaufland">Kaufland</option>
+          </select>
           <button class="btn btn-primary btn-sm" id="btnHistScan">Prüfen</button>
         </div>
       </div>
@@ -92,14 +97,15 @@ const HistoryView = (() => {
       scanBtn._histScanBound = true;
 
       async function runHistScan() {
-        const ean = scanEan?.value.trim();
-        const ek  = parseFloat(scanEk?.value) || 0;
+        const ean    = scanEan?.value.trim();
+        const ek     = parseFloat(scanEk?.value) || 0;
+        const market = container.querySelector("#histScanMarket")?.value || "ebay";
         if (!ean) { Toast.error("EAN fehlt", "Bitte EAN eingeben."); return; }
         if (scanBtn) scanBtn.disabled = true;
         const origLabel = scanBtn.textContent;
         scanBtn.innerHTML = `<div class="spinner spinner-sm" style="width:12px;height:12px;border-width:1.5px"></div>`;
         try {
-          const { ok, data } = await API.flipcheck(ean, ek, "mid");
+          const { ok, data } = await API.flipcheck(ean, ek, "mid", { market });
           if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
           await Storage.savePrice({ ean, title: data.title || ean, browse_avg: data.browse_avg, browse_median: data.sell_price_median, research_avg: data.sell_price_avg, sales_30d: data.sales_30d });
           if (data.price_series?.length) {

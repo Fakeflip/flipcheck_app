@@ -564,7 +564,7 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
             🛒 eBay Verkäufe ↗
           </a>
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
@@ -723,7 +723,7 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
             🛒 eBay Verkäufe ↗
           </a>
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">

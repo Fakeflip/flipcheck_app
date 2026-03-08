@@ -622,7 +622,7 @@ async function runAlertChecks() {
         const res = await fetch(`${base}/flipcheck`, {
           method:  "POST",
           headers: { "Content-Type": "application/json" },
-          body:    JSON.stringify({ ean: alert.ean, ek: 0, mode: "mid" }),
+          body:    JSON.stringify({ ean: alert.ean, ek: 0, mode: "mid", market: alert.market || "ebay" }),
         });
         if (!res.ok) continue;
         const data = await res.json();

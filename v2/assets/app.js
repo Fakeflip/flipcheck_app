@@ -215,10 +215,11 @@ function calcRealProfit(item) {
   if (!item || item.sell_price == null || item.ek == null) return null;
   const vk      = Number(item.sell_price) || 0;
   const ek      = Number(item.ek)         || 0;
+  const shipIn  = Number(item.ship_in)    || 0;
   const shipOut = Number(item.ship_out)   || 0;
   const market  = item.market || "ebay";
   const fee     = calcMarketFee(vk, market, item.cat_id);
-  return vk - ek - shipOut - fee;
+  return vk - ek - shipIn - shipOut - fee;
 }
 
 // ─── API Client ───────────────────────────────────────────────────────────────

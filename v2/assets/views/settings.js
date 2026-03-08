@@ -517,7 +517,7 @@ const SettingsView = (() => {
             <div class="profile-avatar profile-avatar-fallback">${initials}</div>
             <div style="min-width:0">
               <div class="st-profile-name">${esc(name)}</div>
-              <div class="text-xs" style="color:var(--text-muted);margin-top:2px">Profil wird geladen…</div>
+              <div class="text-xs" style="color:var(--text-muted);margin-top:2px">Discord Account</div>
             </div>
           </div>
         </div>
