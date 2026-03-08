@@ -270,15 +270,6 @@ contextBridge.exposeInMainWorld("fc", {
    */
   priceHistoryVacuum: () => ipcRenderer.invoke("priceHistory:vacuum"),
 
-  // ── Discord Rich Presence ─────────────────────────────────────────────────
-
-  /**
-   * Update Discord Rich Presence (no-op if Discord not running).
-   * @param {{ view: string, ean?: string, verdict?: string, profit?: number, invCount?: number }} state
-   * @returns {Promise<{ok: boolean}>}
-   */
-  setRpcActivity: (state) => ipcRenderer.invoke("rpc:setActivity", state),
-
   // ── Backend health ────────────────────────────────────────────────────────
 
   /**

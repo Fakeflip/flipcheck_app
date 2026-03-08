@@ -405,9 +405,6 @@ function navigateTo(viewKey) {
 
   App.currentView = viewKey;
 
-  // Discord Rich Presence — fire-and-forget, no-op if Discord not running
-  window.fc?.setRpcActivity?.({ view: viewKey }).catch?.(() => {});
-
   const ViewClass = VIEW_MAP[viewKey];
   if (ViewClass?.mount) {
     try {
