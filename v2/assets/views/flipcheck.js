@@ -1240,14 +1240,14 @@ const FlipcheckView = (() => {
       }
     });
 
-    // ── Link kopieren — erstellt flipcheck://check?ean=...&ek=...&market=...&cat=...
+    // ── Link kopieren — https://api.joinflipcheck.app/check?... (Discord-klickbar)
     container.querySelector("#btnCopyLink")?.addEventListener("click", () => {
       const ean = container.querySelector("#fcEan")?.value.trim();
       const ek  = container.querySelector("#fcEk")?.value.trim() || "0";
       const cat = container.querySelector("#fcCategory")?.value || "sonstiges";
       if (!ean) { Toast.error("EAN fehlt", "Bitte EAN eingeben."); return; }
       const params = new URLSearchParams({ ean, ek, market: selectedMarket, cat });
-      const url = `flipcheck://check?${params}`;
+      const url = `https://api.joinflipcheck.app/check?${params}`;
       navigator.clipboard.writeText(url).then(() => {
         Toast.success("Link kopiert!", "Füge den Link in Discord ein — Klick öffnet Flipcheck direkt mit diesen Werten.");
       }).catch(() => Toast.error("Kopieren fehlgeschlagen", url));

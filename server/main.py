@@ -17,7 +17,7 @@ from jose.exceptions import JWTError
 
 from fastapi import FastAPI, Depends, HTTPException, Header, Request, Security
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel
 from urllib.parse import urlencode, quote
@@ -150,6 +150,83 @@ def health():
         "service": "flipcheck-gate",
         "time":    datetime.utcnow().isoformat(),
     }
+
+
+# =========================================================
+# FLIPCHECK DEEP-LINK REDIRECT
+# =========================================================
+@app.get("/check", response_class=HTMLResponse)
+def check_redirect(
+    ean:    str = "",
+    ek:     str = "0",
+    market: str = "ebay",
+    cat:    str = "sonstiges",
+):
+    """
+    Renders a redirect page for flipcheck://check?... deep links.
+    Share https://api.joinflipcheck.app/check?ean=...&ek=...&market=...&cat=...
+    in Discord — clicking it opens the desktop app and auto-runs the check.
+    """
+    from urllib.parse import urlencode as _ue, quote as _q
+    params = _ue({"ean": ean, "ek": ek, "market": market, "cat": cat})
+    deep   = f"flipcheck://check?{params}"
+    mkt_label = {"ebay": "eBay", "amazon": "Amazon", "kaufland": "Kaufland"}.get(market, market.capitalize())
+
+    html = f"""<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <meta http-equiv="refresh" content="1; url={deep}"/>
+  <title>FLIPCHECK öffnen…</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{font-family:-apple-system,BlinkMacSystemFont,'Inter',sans-serif;
+         background:#0A0A0F;color:#E2E8F0;display:flex;align-items:center;
+         justify-content:center;min-height:100vh;padding:24px}}
+    .card{{background:#141420;border:1px solid #2D2D44;border-radius:16px;
+           padding:40px 48px;max-width:420px;width:100%;text-align:center;
+           box-shadow:0 20px 60px rgba(0,0,0,.5)}}
+    .logo{{font-size:28px;font-weight:800;letter-spacing:-.5px;
+           color:#6366F1;margin-bottom:24px}}
+    .spinner{{width:40px;height:40px;border:3px solid #2D2D44;
+              border-top-color:#6366F1;border-radius:50%;
+              animation:spin .8s linear infinite;margin:0 auto 24px}}
+    @keyframes spin{{to{{transform:rotate(360deg)}}}}
+    h1{{font-size:18px;font-weight:700;margin-bottom:8px}}
+    .sub{{font-size:13px;color:#94A3B8;line-height:1.6;margin-bottom:28px}}
+    .info{{background:#1A1A2E;border:1px solid #2D2D44;border-radius:10px;
+           padding:14px 16px;text-align:left;margin-bottom:24px;font-size:12px}}
+    .info-row{{display:flex;justify-content:space-between;padding:3px 0;color:#94A3B8}}
+    .info-row b{{color:#E2E8F0;font-weight:600}}
+    .btn{{display:inline-block;background:#6366F1;color:#fff;font-weight:700;
+          font-size:14px;padding:12px 28px;border-radius:10px;
+          text-decoration:none;border:none;cursor:pointer;width:100%;
+          letter-spacing:.01em}}
+    .btn:hover{{background:#4F46E5}}
+    .hint{{font-size:11px;color:#475569;margin-top:16px}}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">FLIPCHECK</div>
+    <div class="spinner"></div>
+    <h1>Check wird geöffnet…</h1>
+    <p class="sub">Flipcheck Desktop wird automatisch gestartet.</p>
+    <div class="info">
+      <div class="info-row"><span>EAN</span><b>{_q(ean)}</b></div>
+      <div class="info-row"><span>Einkaufspreis</span><b>€ {_q(ek)}</b></div>
+      <div class="info-row"><span>Marktplatz</span><b>{mkt_label}</b></div>
+    </div>
+    <a class="btn" href="{deep}">Flipcheck jetzt öffnen</a>
+    <p class="hint">Kein Flipcheck? <a href="https://joinflipcheck.app" style="color:#6366F1">joinflipcheck.app</a></p>
+  </div>
+  <script>
+    setTimeout(() => {{ window.location.href = "{deep}"; }}, 800);
+  </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
 
 
 # =========================================================
