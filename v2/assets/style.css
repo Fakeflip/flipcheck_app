@@ -2723,7 +2723,7 @@ html[data-platform="darwin"] .sidebar-brand {
 
 .sales-charts-row {
   display: grid;
-  grid-template-columns: 1fr 280px;
+  grid-template-columns: 2fr 1fr;
   gap: 12px;
 }
 .sales-chart-main { flex: 1; }
@@ -4128,3 +4128,27 @@ details.fc-accordion > summary + * { margin-top: 8px; }
   border-bottom: 1px solid var(--border);
   gap: 8px;
 }
+
+/* ── QuickLinks ──────────────────────────────────────────────────────────── */
+.ql-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--r-full);
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+  max-width: 240px;
+}
+.ql-chip:hover { background: var(--hover); border-color: var(--accent-bdr); color: var(--text-primary); }
+.ql-chip-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 120px; }
+.ql-chip-ek    { color: var(--text-muted); font-size: 11px; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.ql-chip-del   {
+  background: none; border: none; color: var(--dim); cursor: pointer;
+  font-size: 14px; line-height: 1; padding: 0 0 0 2px; opacity: .55; flex-shrink: 0;
+}
+.ql-chip-del:hover { color: var(--red); opacity: 1; }

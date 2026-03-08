@@ -587,6 +587,16 @@ app.whenReady().then(async () => {
     }
   }
 
+  // Auto-updater — start check BEFORE creating the window so it runs while the UI is loading
+  if (IS_PROD && autoUpdater) {
+    try {
+      autoUpdater.on("update-available",  info => mainWindow?.webContents.send("updater:available",  info));
+      autoUpdater.on("update-downloaded", info => mainWindow?.webContents.send("updater:downloaded", info));
+      autoUpdater.on("error", err => console.error("[Updater]", err.message));
+      autoUpdater.checkForUpdates().catch(() => {}); // immediate — no delay
+    } catch (e) { console.error("[Updater] setup failed:", e.message); }
+  }
+
   createWindow();
 
   // Notify the renderer if the backend never came up (delay so the renderer can load first)
@@ -605,16 +615,6 @@ app.whenReady().then(async () => {
 
   // Background competition monitor (webhook fire when undercut / new listings)
   startCompetitionMonitor();
-
-  // Auto-updater — only in packaged production builds
-  if (IS_PROD && autoUpdater) {
-    try {
-      autoUpdater.on("update-available",  info => mainWindow?.webContents.send("updater:available",  info));
-      autoUpdater.on("update-downloaded", info => mainWindow?.webContents.send("updater:downloaded", info));
-      autoUpdater.on("error", err => console.error("[Updater]", err.message));
-      setTimeout(() => autoUpdater.checkForUpdatesAndNotify().catch(() => {}), 5000);
-    } catch (e) { console.error("[Updater] setup failed:", e.message); }
-  }
 });
 
 app.on("window-all-closed", () => {
@@ -1154,5 +1154,38 @@ ipcMain.handle("updater:check", async () => {
 
 ipcMain.handle("updater:install", () => {
   if (autoUpdater) try { autoUpdater.quitAndInstall(); } catch {}
+});
+
+// ─── IPC: QuickLinks ─────────────────────────────────────────────────────────
+const QUICKLINKS_FILE = path.join(app.getPath("userData"), "quicklinks.json");
+
+function readQuicklinks() {
+  try {
+    if (!fs.existsSync(QUICKLINKS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(QUICKLINKS_FILE, "utf8") || "[]") || [];
+  } catch { return []; }
+}
+function writeQuicklinks(list) {
+  try { fs.writeFileSync(QUICKLINKS_FILE, JSON.stringify(list, null, 2), "utf8"); } catch {}
+}
+
+ipcMain.handle("quicklinks:list", () => readQuicklinks());
+
+ipcMain.handle("quicklinks:save", (_e, link) => {
+  const list = readQuicklinks();
+  // Deduplicate by EAN + market (update existing if same)
+  const idx = list.findIndex(q => q.ean === link.ean && q.market === link.market);
+  const entry = { ...link, id: link.id || `${link.ean}_${link.market}_${Date.now()}`, saved_at: new Date().toISOString() };
+  if (idx >= 0) list[idx] = entry;
+  else list.unshift(entry);
+  if (list.length > 20) list.splice(20);
+  writeQuicklinks(list);
+  return list;
+});
+
+ipcMain.handle("quicklinks:delete", (_e, id) => {
+  const list = readQuicklinks().filter(q => q.id !== id);
+  writeQuicklinks(list);
+  return list;
 });
 

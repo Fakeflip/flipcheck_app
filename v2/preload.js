@@ -270,6 +270,21 @@ contextBridge.exposeInMainWorld("fc", {
    */
   priceHistoryVacuum: () => ipcRenderer.invoke("priceHistory:vacuum"),
 
+  // ── QuickLinks ────────────────────────────────────────────────────────────
+
+  /** @returns {Promise<Array>} All saved QuickLinks */
+  quicklinksList:   () => ipcRenderer.invoke("quicklinks:list"),
+  /**
+   * @param {{ ean: string, title?: string, ek?: number, market?: string, mode?: string, cat_id?: string }} link
+   * @returns {Promise<Array>} Updated list
+   */
+  quicklinksSave:   (link) => ipcRenderer.invoke("quicklinks:save", link),
+  /**
+   * @param {string} id
+   * @returns {Promise<Array>} Updated list
+   */
+  quicklinksDelete: (id)  => ipcRenderer.invoke("quicklinks:delete", id),
+
   // ── Backend health ────────────────────────────────────────────────────────
 
   /**

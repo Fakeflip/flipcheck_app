@@ -122,6 +122,30 @@ const FlipcheckView = (() => {
   let lastEan    = null;
   let lastEk     = null;
   let _miniChart = null;   // Chart.js instance for the inline price sparkline
+  let _quicklinks = [];    // Saved QuickLinks (loaded from IPC on mount)
+
+  // ─── QuickLinks helpers ───────────────────────────────────────────────────
+  async function _loadQuicklinks() {
+    try { _quicklinks = (await window.fc?.quicklinksList?.()) || []; }
+    catch { _quicklinks = []; }
+  }
+
+  function _renderQlBar() {
+    if (_quicklinks.length === 0) return "";
+    const mktIcon = { ebay: "🛒", amazon: "📦", kaufland: "🏬" };
+    const chips = _quicklinks.map(q => `
+      <div class="ql-chip" data-ql="${esc(JSON.stringify(q))}" title="${esc((q.title || q.ean || "").slice(0, 40))} · EK €${(q.ek || 0).toFixed(2)}">
+        <span>${mktIcon[q.market] || "🛒"}</span>
+        <span class="ql-chip-label">${esc((q.title || q.ean || "").slice(0, 18))}</span>
+        <span class="ql-chip-ek">€${(q.ek || 0).toFixed(2)}</span>
+        <button class="ql-chip-del" data-ql-del="${esc(q.id)}" title="Entfernen">×</button>
+      </div>`).join("");
+    return `
+      <div class="panel mb-16" id="fcQlBar">
+        <div class="kpi-label mb-10">Quicklinks</div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">${chips}</div>
+      </div>`;
+  }
 
   // ─── Scanner IPC callback (stable ref for add/remove) ─────────────────────
   function _onScannerEan(ean) {
@@ -144,6 +168,9 @@ const FlipcheckView = (() => {
       _vatMode = s?.tax?.vat_mode  || "no_vat";
       _ekMode  = s?.tax?.ek_mode   || "gross";
     } catch {}
+
+    // Load quicklinks in parallel with settings
+    await _loadQuicklinks();
 
     // Guard: user may have navigated away during async load
     if (navId !== undefined && navId !== null && typeof App !== "undefined" && App._navId !== navId) return;
@@ -215,6 +242,8 @@ const FlipcheckView = (() => {
           <p>Produkt analysieren — BUY / HOLD / SKIP auf eBay, Amazon &amp; Kaufland</p>
         </div>
       </div>
+
+      ${_renderQlBar()}
 
       <div class="fc-split-420">
         <!-- Form -->
@@ -340,10 +369,15 @@ const FlipcheckView = (() => {
               </div>
             </div>
 
-            <button class="btn btn-primary" id="btnCheck" style="width:100%;justify-content:center;margin-top:4px">
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-              Jetzt prüfen
-            </button>
+            <div style="display:flex;gap:6px;margin-top:4px">
+              <button class="btn btn-primary" id="btnCheck" style="flex:1;justify-content:center">
+                <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+                Jetzt prüfen
+              </button>
+              <button class="btn btn-ghost btn-sm" id="btnSaveQuicklink" title="Als Quicklink merken" style="flex-shrink:0;white-space:nowrap;padding:0 10px">
+                📌 Merken
+              </button>
+            </div>
           </div>
         </div>
 
@@ -1224,6 +1258,59 @@ const FlipcheckView = (() => {
       } else if (hint) {
         hint.remove();
       }
+    });
+
+    // ── QuickLinks ────────────────────────────────────────────────────────
+    // Save button: stores current EAN + EK + market + category as QuickLink
+    container.querySelector("#btnSaveQuicklink")?.addEventListener("click", async () => {
+      const ean = container.querySelector("#fcEan")?.value.trim();
+      const ek  = parseFloat(container.querySelector("#fcEk")?.value) || 0;
+      const cat = container.querySelector("#fcCategory")?.value || "sonstiges";
+      if (!ean) { Toast.error("EAN fehlt", "Bitte EAN eingeben bevor du speicherst."); return; }
+      try {
+        const title = lastResult?.title || lastResult?.product_name || ean;
+        _quicklinks = (await window.fc?.quicklinksSave?.({ ean, ek, market: selectedMarket, cat_id: cat, title })) || _quicklinks;
+        const bar = container.querySelector("#fcQlBar");
+        const newBarHtml = _renderQlBar();
+        if (bar) {
+          if (newBarHtml) bar.outerHTML = newBarHtml;
+          else bar.remove();
+        } else {
+          const split = container.querySelector(".fc-split-420");
+          if (split && newBarHtml) split.insertAdjacentHTML("beforebegin", newBarHtml);
+        }
+        Toast.success("Gespeichert", `${(title || ean).slice(0, 20)} als Quicklink gespeichert.`);
+      } catch (err) {
+        Toast.error("Speichern fehlgeschlagen", err.message);
+      }
+    });
+
+    // Chip click: fill form with QuickLink data and run check
+    container.addEventListener("click", async e => {
+      const delBtn = e.target.closest(".ql-chip-del");
+      if (delBtn) {
+        e.stopPropagation();
+        const id = delBtn.dataset.qlDel;
+        try {
+          _quicklinks = (await window.fc?.quicklinksDelete?.(id)) || _quicklinks.filter(q => q.id !== id);
+          const bar = container.querySelector("#fcQlBar");
+          const newBarHtml = _renderQlBar();
+          if (bar) {
+            if (newBarHtml) bar.outerHTML = newBarHtml;
+            else bar.remove();
+          }
+        } catch {}
+        return;
+      }
+      const chip = e.target.closest(".ql-chip");
+      if (!chip) return;
+      try {
+        const q = JSON.parse(chip.dataset.ql);
+        selectedMarket = q.market || "ebay";
+        container.innerHTML = renderForm({ ean: q.ean, ek: q.ek, category: q.cat_id });
+        attachEvents(container);
+        runCheck(container);
+      } catch {}
     });
 
     // Amazon mode: auto-resolve EAN↔ASIN in converter box (debounced)

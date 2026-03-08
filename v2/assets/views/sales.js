@@ -38,13 +38,9 @@ const SalesView = (() => {
 
   function netProfit(item) {
     if (item.sell_price == null || item.ek == null) return 0;
-    const vk     = Number(item.sell_price) || 0;
-    const qty    = item.qty || 1;
-    const market = item.market || "ebay";
-    const feeAmt = market === "ebay"
-      ? calcEbayFee(vk, item.cat_id || "sonstiges")
-      : vk * (FLAT_FEES[market] ?? 0);
-    return (vk - feeAmt - item.ek) * qty;
+    // Use the same formula as calcRealProfit in app.js (includes ship_in/ship_out + calcMarketFee)
+    const single = (typeof calcRealProfit === "function" ? calcRealProfit(item) : null) ?? 0;
+    return single * (item.qty || 1);
   }
   function itemRoi(item) {
     const cost = (item.ek || 0) * (item.qty || 1);
@@ -119,11 +115,13 @@ const SalesView = (() => {
       ["Produkt","EAN","EK","VK","Plattform","Fee %","Gewinn (netto)","ROI %","Datum"],
     ];
     sold.forEach(i => {
-      const _mkt     = i.market || "ebay";
-      const _feeAmt  = _mkt === "ebay" && i.sell_price
-        ? calcEbayFee(i.sell_price, i.cat_id || "sonstiges")
-        : (i.sell_price || 0) * (FLAT_FEES[_mkt] ?? 0);
-      const fee = i.sell_price > 0 ? ((_feeAmt / i.sell_price) * 100).toFixed(1) : "0.0";
+      const _vk2    = i.sell_price || 0;
+      const _feeAmt = typeof calcMarketFee === "function"
+        ? calcMarketFee(_vk2, i.market || "ebay", i.cat_id)
+        : (i.market === "ebay" || !i.market)
+          ? calcEbayFee(_vk2, i.cat_id || "sonstiges")
+          : _vk2 * (FLAT_FEES[i.market || "other"] ?? 0);
+      const fee = _vk2 > 0 ? ((_feeAmt / _vk2) * 100).toFixed(1) : "0.0";
       const prof = netProfit(i).toFixed(2).replace(".",",");
       const r    = (itemRoi(i) ?? 0).toFixed(1).replace(".",",");
       rows.push([
@@ -333,11 +331,13 @@ const SalesView = (() => {
         ${rows.map(i => {
           const profit  = netProfit(i);
           const roi     = itemRoi(i);
-          const _market = i.market || "ebay";
-          const _feeAmt = _market === "ebay" && i.sell_price
-            ? calcEbayFee(i.sell_price, i.cat_id || "sonstiges")
-            : (i.sell_price || 0) * (FLAT_FEES[_market] ?? 0);
-          const fee     = i.sell_price > 0 ? _feeAmt / i.sell_price : 0;
+          const _vk     = i.sell_price || 0;
+          const _feeAmt = typeof calcMarketFee === "function"
+            ? calcMarketFee(_vk, i.market || "ebay", i.cat_id)
+            : (i.market === "ebay" || !i.market)
+              ? calcEbayFee(_vk, i.cat_id || "sonstiges")
+              : _vk * (FLAT_FEES[i.market || "other"] ?? 0);
+          const fee     = _vk > 0 ? _feeAmt / _vk : 0;
           const plat    = PLATFORM_LABELS[i.market] || i.market || "—";
           return `<tr>
             <td style="max-width:200px">
