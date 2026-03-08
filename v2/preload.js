@@ -270,20 +270,13 @@ contextBridge.exposeInMainWorld("fc", {
    */
   priceHistoryVacuum: () => ipcRenderer.invoke("priceHistory:vacuum"),
 
-  // ── QuickLinks ────────────────────────────────────────────────────────────
+  // ── Check Deep-Link ───────────────────────────────────────────────────────
 
-  /** @returns {Promise<Array>} All saved QuickLinks */
-  quicklinksList:   () => ipcRenderer.invoke("quicklinks:list"),
   /**
-   * @param {{ ean: string, title?: string, ek?: number, market?: string, mode?: string, cat_id?: string }} link
-   * @returns {Promise<Array>} Updated list
+   * Fired when a flipcheck://check?ean=...&ek=...&market=...&cat=... deep link is clicked.
+   * @param {(p: {ean:string, ek:number, market:string, cat:string, autoRun:boolean}) => void} cb
    */
-  quicklinksSave:   (link) => ipcRenderer.invoke("quicklinks:save", link),
-  /**
-   * @param {string} id
-   * @returns {Promise<Array>} Updated list
-   */
-  quicklinksDelete: (id)  => ipcRenderer.invoke("quicklinks:delete", id),
+  onCheckLink: (cb) => ipcRenderer.on("flipcheck:check", (_e, p) => cb(p)),
 
   // ── Backend health ────────────────────────────────────────────────────────
 

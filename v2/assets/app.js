@@ -516,7 +516,7 @@ function showGate(message) {
  * @param {string} version
  * @param {string|null} releaseNotesRaw
  */
-async function _showUpdateChangelog(version, releaseNotesRaw) {
+async function _showUpdateChangelog(version, releaseNotesRaw, alreadyInstalled = false) {
   let notes = "";
   let notesAreHtml = false; // electron-updater sends HTML; GitHub API sends Markdown
 
@@ -562,19 +562,24 @@ async function _showUpdateChangelog(version, releaseNotesRaw) {
   }
 
   Modal.open({
-    title: `🚀 Flipcheck v${version}`,
+    title: alreadyInstalled ? `✅ Flipcheck v${version}` : `🚀 Flipcheck v${version}`,
     body: `
       <div class="col gap-12">
-        <p class="text-secondary text-sm">Eine neue Version wurde heruntergeladen und ist bereit zum Installieren.</p>
+        <p class="text-secondary text-sm">${alreadyInstalled
+          ? `Flipcheck wurde erfolgreich auf v${version} aktualisiert.`
+          : "Eine neue Version wurde heruntergeladen und ist bereit zum Installieren."
+        }</p>
         <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;font-size:12px;line-height:1.7;color:var(--text-secondary);max-height:260px;overflow-y:auto">
           ${notesHtml}
         </div>
-        <p class="text-muted" style="font-size:11px">Die App wird nach der Installation neu gestartet.</p>
+        ${alreadyInstalled ? "" : `<p class="text-muted" style="font-size:11px">Die App wird nach der Installation neu gestartet.</p>`}
       </div>`,
-    buttons: [
-      { label: "Später", variant: "btn-ghost", value: false },
-      { label: "Jetzt installieren & neu starten", variant: "btn-primary", action: () => window.fc?.installUpdate?.() },
-    ],
+    buttons: alreadyInstalled
+      ? [{ label: "Super, danke! 🎉", variant: "btn-primary", value: true }]
+      : [
+          { label: "Später", variant: "btn-ghost", value: false },
+          { label: "Jetzt installieren & neu starten", variant: "btn-primary", action: () => window.fc?.installUpdate?.() },
+        ],
   });
 }
 
@@ -723,10 +728,18 @@ async function initApp() {
       const settings = await Storage.getSettings();
       if (currentVersion && currentVersion !== settings.lastChangelogVersion) {
         await Storage.saveSettings({ lastChangelogVersion: currentVersion });
-        _showUpdateChangelog(currentVersion, null);
+        _showUpdateChangelog(currentVersion, null, true); // already installed — no install button
       }
     } catch { /* non-critical — skip silently */ }
   }, 1500);
+
+  // ── Deep-link check handler — navigate to Flipcheck + auto-run ───────────────
+  if (window.fc?.onCheckLink) {
+    window.fc.onCheckLink((p) => {
+      App._navPayload = p; // { ean, ek, market, cat, autoRun: true }
+      navigateTo("flipcheck");
+    });
+  }
 
   // ── Global auto-update listeners — shown immediately, no matter which view is active
   if (window.fc?.onUpdateAvailable) {

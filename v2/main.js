@@ -522,6 +522,13 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow.show());
+  // Dispatch any pending check deep-link that arrived before the window was ready
+  mainWindow.webContents.once("did-finish-load", () => {
+    if (_pendingCheck) {
+      mainWindow.webContents.send("flipcheck:check", _pendingCheck);
+      _pendingCheck = null;
+    }
+  });
   mainWindow.loadFile(APP_HTML);
 }
 
@@ -532,6 +539,26 @@ function parseToken(url) {
     return u.protocol === "flipcheck:" ? u.searchParams.get("token") : null;
   } catch { return null; }
 }
+
+// Parse flipcheck://check?ean=...&ek=...&market=...&cat=... deep links
+function parseCheckLink(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "flipcheck:" || u.hostname !== "check") return null;
+    const ean = u.searchParams.get("ean");
+    if (!ean) return null;
+    return {
+      ean,
+      ek:     parseFloat(u.searchParams.get("ek")) || 0,
+      market: u.searchParams.get("market") || "ebay",
+      cat:    u.searchParams.get("cat")    || "sonstiges",
+      title:  u.searchParams.get("title")  || "",
+      autoRun: true,
+    };
+  } catch { return null; }
+}
+
+let _pendingCheck = null; // queued when window not yet ready
 
 if (process.defaultApp) {
   app.setAsDefaultProtocolClient("flipcheck", process.execPath, [path.resolve(process.argv[1])]);
@@ -546,19 +573,30 @@ if (!gotLock) {
   app.on("second-instance", async (_e, argv) => {
     const deep = argv.find(a => typeof a === "string" && a.startsWith("flipcheck://"));
     if (!deep) return;
+    if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
     const token = parseToken(deep);
-    if (!token) return;
-    await saveToken(token);
-    if (mainWindow) { mainWindow.webContents.send("auth:token", token); mainWindow.show(); mainWindow.focus(); }
+    if (token) { await saveToken(token); if (mainWindow) mainWindow.webContents.send("auth:token", token); return; }
+    const check = parseCheckLink(deep);
+    if (check && mainWindow) mainWindow.webContents.send("flipcheck:check", check);
   });
 }
 
 app.on("open-url", async (e, url) => {
   e.preventDefault();
   const token = parseToken(url);
-  if (!token) return;
-  await saveToken(token);
-  if (mainWindow) { mainWindow.webContents.send("auth:token", token); mainWindow.show(); mainWindow.focus(); }
+  if (token) {
+    await saveToken(token);
+    if (mainWindow) { mainWindow.webContents.send("auth:token", token); mainWindow.show(); mainWindow.focus(); }
+    return;
+  }
+  const check = parseCheckLink(url);
+  if (!check) return;
+  if (mainWindow) {
+    mainWindow.webContents.send("flipcheck:check", check);
+    mainWindow.show(); mainWindow.focus();
+  } else {
+    _pendingCheck = check; // app not open yet — dispatch after window loads
+  }
 });
 
 // ─── App lifecycle ────────────────────────────────────────────────────────────
@@ -1156,36 +1194,4 @@ ipcMain.handle("updater:install", () => {
   if (autoUpdater) try { autoUpdater.quitAndInstall(); } catch {}
 });
 
-// ─── IPC: QuickLinks ─────────────────────────────────────────────────────────
-const QUICKLINKS_FILE = path.join(app.getPath("userData"), "quicklinks.json");
-
-function readQuicklinks() {
-  try {
-    if (!fs.existsSync(QUICKLINKS_FILE)) return [];
-    return JSON.parse(fs.readFileSync(QUICKLINKS_FILE, "utf8") || "[]") || [];
-  } catch { return []; }
-}
-function writeQuicklinks(list) {
-  try { fs.writeFileSync(QUICKLINKS_FILE, JSON.stringify(list, null, 2), "utf8"); } catch {}
-}
-
-ipcMain.handle("quicklinks:list", () => readQuicklinks());
-
-ipcMain.handle("quicklinks:save", (_e, link) => {
-  const list = readQuicklinks();
-  // Deduplicate by EAN + market (update existing if same)
-  const idx = list.findIndex(q => q.ean === link.ean && q.market === link.market);
-  const entry = { ...link, id: link.id || `${link.ean}_${link.market}_${Date.now()}`, saved_at: new Date().toISOString() };
-  if (idx >= 0) list[idx] = entry;
-  else list.unshift(entry);
-  if (list.length > 20) list.splice(20);
-  writeQuicklinks(list);
-  return list;
-});
-
-ipcMain.handle("quicklinks:delete", (_e, id) => {
-  const list = readQuicklinks().filter(q => q.id !== id);
-  writeQuicklinks(list);
-  return list;
-});
 
