@@ -45,9 +45,9 @@ const FlipcheckView = (() => {
 
   // ─── Full profit calc (frontend-side, tiered fees + VAT) ─────────────────
   // Returns { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, profit, margin }
-  function calcProfit(vkGross, ekGross, catId, vatMode, ekMode, shipInGross, shipOutGross, packagingPerUnit = 0, qty = 1) {
+  function calcProfit(vkGross, ekGross, catId, vatMode, ekMode, shipInGross, shipOutGross, packagingPerUnit = 0, qty = 1, market = "ebay") {
     const vat      = vatMode === "ust_19" ? 1.19 : 1.0;
-    const feeGross = calcEbayFee(vkGross, catId);
+    const feeGross = calcMarketFee(vkGross, market, catId);
     const feeNet   = feeGross / vat;
     const vkNet    = vkGross  / vat;
     const ekNet    = (vatMode === "ust_19" && ekMode === "gross") ? ekGross / vat : ekGross;
@@ -74,6 +74,25 @@ const FlipcheckView = (() => {
     ).join("");
   }
 
+  function _buildKlCatOptions(selectedId) {
+    const cats = [
+      ["kl_elektronik",  "Elektronik / Computer (8,5 %)"],
+      ["kl_handys",      "Handys / Smartphones (8,5 %)"],
+      ["kl_gaming",      "Gaming / Konsolen (8,5 %)"],
+      ["kl_foto",        "Foto & Camcorder (8,5 %)"],
+      ["kl_haushalt_el", "Haushaltsgeräte (8,5 %)"],
+      ["kl_buecher",     "Bücher & Medien (8,5 %)"],
+      ["kl_sport",       "Sport & Freizeit (10,5 %)"],
+      ["kl_spielzeug",   "Spielzeug (10,5 %)"],
+      ["kl_haushalt",    "Haushalt & Küche (10,5 %)"],
+      ["kl_garten",      "Garten & DIY (10,5 %)"],
+      ["kl_mode",        "Kleidung & Schuhe (17,5 %)"],
+      ["kl_sonstiges",   "Sonstiges (10,5 %)"],
+    ];
+    const sel = selectedId || "kl_sonstiges";
+    return cats.map(([v, l]) => `<option value="${v}"${v === sel ? " selected" : ""}>${esc(l)}</option>`).join("");
+  }
+
   // ─── FBA tier table (DE, 2024) ────────────────────────────────────────────
   const FBA_TIERS = [
     { label: "Klein Standard",   maxW: 0.20, maxSide: 20, fee: 2.70 },
@@ -96,7 +115,7 @@ const FlipcheckView = (() => {
   };
 
   // ─── State ────────────────────────────────────────────────────────────────
-  let selectedMarket = "ebay";   // "ebay" | "amazon"
+  let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland"
   let _vatMode   = "no_vat";
   let _ekMode    = "gross";
   let lastResult = null;
@@ -157,7 +176,7 @@ const FlipcheckView = (() => {
   // ─── Market toggle HTML ───────────────────────────────────────────────────
   function renderMarketToggle() {
     return `
-      <div style="display:flex;gap:6px;margin-bottom:4px">
+      <div style="display:flex;gap:6px;margin-bottom:4px;flex-wrap:wrap">
         <button class="btn btn-sm ${selectedMarket==="ebay"?"btn-primary":"btn-ghost"}" id="mktEbay" style="gap:6px">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="3" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/><path d="M1 6h14" stroke="currentColor" stroke-width="1.5"/></svg>
           eBay
@@ -165,6 +184,10 @@ const FlipcheckView = (() => {
         <button class="btn btn-sm ${selectedMarket==="amazon"?"btn-primary":"btn-ghost"}" id="mktAmazon" style="gap:6px">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 12c3-1 6.5-.5 9 1.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="6" r="4" stroke="currentColor" stroke-width="1.5"/></svg>
           Amazon
+        </button>
+        <button class="btn btn-sm ${selectedMarket==="kaufland"?"btn-primary":"btn-ghost"}" id="mktKaufland" style="gap:6px">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 13V7l5-4 5 4v6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="6" y="9" width="4" height="4" rx=".5" stroke="currentColor" stroke-width="1.3"/></svg>
+          Kaufland
         </button>
       </div>
     `;
@@ -184,11 +207,12 @@ const FlipcheckView = (() => {
          </div>`;
 
     const isAmz = selectedMarket === "amazon";
+    const isKl  = selectedMarket === "kaufland";
     return `
       <div class="page-header">
         <div class="page-header-left">
           <h1>Flipcheck</h1>
-          <p>Produkt analysieren — BUY / HOLD / SKIP auf eBay &amp; Amazon</p>
+          <p>Produkt analysieren — BUY / HOLD / SKIP auf eBay, Amazon &amp; Kaufland</p>
         </div>
       </div>
 
@@ -202,7 +226,7 @@ const FlipcheckView = (() => {
 
           <div class="col gap-12">
             <div class="input-group">
-              <label class="input-label">${isAmz ? "ASIN / EAN" : "EAN / ASIN"}</label>
+              <label class="input-label">${isAmz ? "ASIN / EAN" : "EAN"}</label>
               <div style="display:flex;gap:6px">
                 <input id="fcEan" class="input" type="text"
                   placeholder="${isAmz ? "z.B. B09XXXX oder EAN" : "z.B. 4010355360205"}"
@@ -236,12 +260,14 @@ const FlipcheckView = (() => {
               </div>
             </div>
 
-            <!-- eBay-only fields -->
+            <!-- eBay / Kaufland category field (hidden for Amazon) -->
             <div id="fcEbayFields" style="display:${isAmz?"none":"contents"}">
               <div class="input-group">
-                <label class="input-label">eBay Kategorie</label>
-                <select id="fcCategory" class="select">${buildCatOptions(catId)}</select>
-                ${vatBadge}
+                <label class="input-label">${isKl ? "Kaufland Kategorie" : "eBay Kategorie"}</label>
+                <select id="fcCategory" class="select">
+                  ${isKl ? _buildKlCatOptions(catId) : buildCatOptions(catId)}
+                </select>
+                ${isKl ? "" : vatBadge}
               </div>
 
               <div class="input-group">
@@ -370,7 +396,7 @@ const FlipcheckView = (() => {
     let calc = null;
     if (vk != null) {
       calc = calcProfit(vk, ekNum, catId, _vatMode, _ekMode,
-        parseFloat(shipIn) || 0, parseFloat(shipOut) || 0, packagingCost);
+        parseFloat(shipIn) || 0, parseFloat(shipOut) || 0, packagingCost, 1, selectedMarket);
     }
 
     const dispProfit = calc?.profit ?? (data.profit_median ?? data.profit_avg ?? null);
@@ -447,8 +473,8 @@ const FlipcheckView = (() => {
         <!-- ── Market Signals ── -->
         <div class="fc-market-row mb-16">
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Ø VK</span>
-            <span class="fc-market-chip-v">${fmtEur(dispVkNet)}</span>
+            <span class="fc-market-chip-l">Ø VK${isVAT ? " (brutto)" : ""}</span>
+            <span class="fc-market-chip-v">${fmtEur(vk)}</span>
           </div>
           ${offers != null ? `
           <div class="fc-market-chip">
@@ -1155,6 +1181,9 @@ const FlipcheckView = (() => {
     });
     container.querySelector("#mktAmazon")?.addEventListener("click", () => {
       if (selectedMarket !== "amazon") { selectedMarket = "amazon"; container.innerHTML = renderForm(); attachEvents(container); }
+    });
+    container.querySelector("#mktKaufland")?.addEventListener("click", () => {
+      if (selectedMarket !== "kaufland") { selectedMarket = "kaufland"; container.innerHTML = renderForm(); attachEvents(container); }
     });
 
     // Amazon method toggle

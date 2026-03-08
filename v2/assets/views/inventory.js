@@ -91,6 +91,16 @@ const InventoryView = (() => {
    * @param {HTMLElement} container - The view root element.
    * @returns {Promise<void>}
    */
+  // Scanner IPC callback — fills EAN field in whichever modal is currently open
+  function _onInvScannerEan(ean) {
+    const inp = document.getElementById("mEan") || document.getElementById("invScanEan");
+    if (!inp) return;
+    inp.value = ean;
+    inp.dispatchEvent(new Event("input"));
+    inp.focus();
+    if (typeof Toast !== "undefined") Toast.success("EAN gescannt", ean);
+  }
+
   async function mount(container) {
     // Reset state fresh on every mount
     _state.container = container;
@@ -104,6 +114,9 @@ const InventoryView = (() => {
     attachTableDelegation(container); // delegated once on stable parent — survives re-renders
 
     await loadItems(container);
+
+    // Barcode scanner IPC listener
+    window.fc?.onScannerEan(_onInvScannerEan);
 
     // Extension Bridge — live push from browser extension via POST /inventory
     window.fc?.onInventoryUpsertExt?.((item) => {
@@ -119,6 +132,7 @@ const InventoryView = (() => {
    * Tear down the view — drop the container reference so async callbacks stop.
    */
   function unmount() {
+    window.fc?.offScannerEan(_onInvScannerEan);
     _state.container = null;
     _state.vs.wrap   = null;
   }
@@ -627,7 +641,10 @@ const InventoryView = (() => {
       <div class="col gap-12">
         <div class="input-group">
           <label class="input-label">EAN *</label>
-          <input id="mEan" class="input" type="text" placeholder="Barcode" autocomplete="off" />
+          <div style="display:flex;gap:6px">
+            <input id="mEan" class="input" type="text" placeholder="Barcode / EAN" autocomplete="off" style="flex:1" />
+            <button type="button" class="btn btn-ghost btn-sm" id="invScanBtn" title="Handy-Scanner öffnen" style="flex-shrink:0;font-size:16px;padding:0 10px">📷</button>
+          </div>
         </div>
         <div class="input-group">
           <label class="input-label">Titel</label>
@@ -694,7 +711,12 @@ const InventoryView = (() => {
         }},
       ],
     });
-    setTimeout(() => _bindCatRowUpdater("mMarket"), 0);
+    setTimeout(() => {
+      _bindCatRowUpdater("mMarket");
+      document.getElementById("invScanBtn")?.addEventListener("click", () => {
+        window.fc?.openScanner?.();
+      });
+    }, 0);
   }
 
   function openEditModal(id, container) {
@@ -791,9 +813,10 @@ const InventoryView = (() => {
 
   function _buildCatOptions(selectedId) {
     const GROUPS = {
-      "Geräte (6,5% + 3%)":  ["computer_tablets","drucker","foto_camcorder","handys","haushaltsgeraete","konsolen","scanner","speicherkarten","tv_video_audio","koerperpflege"],
-      "Zubehör (11% + 3%)":  ["drucker_zubehoer","handy_zubehoer","batterien","kabel","kameras_zubehoer","notebook_zubehoer","objektive","stative","tablet_zubehoer","tastaturen_maeuse","tv_zubehoer","pc_zubehoer","audio_zubehoer"],
-      "Sonstiges (Flat)":    ["mode","sport_freizeit","spielzeug","haushalt_garten","buecher","sonstiges"],
+      "Geräte (6,5% + 3%)":        ["computer_tablets","drucker","foto_camcorder","handys","haushaltsgeraete","konsolen","scanner","speicherkarten","tv_video_audio","koerperpflege"],
+      "Zubehör (11% + 3%)":        ["drucker_zubehoer","handy_zubehoer","batterien","kabel","kameras_zubehoer","notebook_zubehoer","objektive","stative","tablet_zubehoer","tastaturen_maeuse","tv_zubehoer","pc_zubehoer","audio_zubehoer"],
+      "Sonstiges (Flat)":          ["mode","sport_freizeit","spielzeug","haushalt_garten","buecher","sonstiges"],
+      "Sonderkonditionen (0 %)":   ["durchstarter"],
     };
     const sel = selectedId || "sonstiges";
     return Object.entries(GROUPS).map(([grp, ids]) =>
