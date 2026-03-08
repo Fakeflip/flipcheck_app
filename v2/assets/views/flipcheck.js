@@ -1410,6 +1410,12 @@ const FlipcheckView = (() => {
       lastResult = data; lastEan = ean; lastEk = ek;
       resultEl.innerHTML = renderResult(data, ean, ek, cat, shipIn, shipOut);
 
+      // Update Discord Rich Presence with result
+      try {
+        const _rpcCalc = calcProfit(data.sell_price_median || 0, parseFloat(ek) || 0, cat, _vatMode, _ekMode, parseFloat(shipIn) || 0, parseFloat(shipOut) || 0, 0, 1, selectedMarket);
+        window.fc?.setRpcActivity?.({ view: "flipcheck", ean, verdict: data.verdict || "?", profit: _rpcCalc.profit }).catch?.(() => {});
+      } catch {}
+
       // Auto-save price history
       try {
         await Storage.savePrice({ ean, title: data.title || ean, browse_avg: data.browse_avg, browse_median: data.sell_price_median, research_avg: data.sell_price_avg, sales_30d: data.sales_30d });

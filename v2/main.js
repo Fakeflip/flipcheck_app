@@ -7,6 +7,8 @@ const keytar = require("keytar");
 const os = require("os");
 const crypto = require("crypto");
 const { app, BrowserWindow, ipcMain, shell } = require("electron");
+let DiscordRPC = null;
+try { DiscordRPC = require("discord-rpc"); } catch {}
 const { loadSettings, saveSettings } = require("./settingsStore.js");
 const {
   SCHEMA_VERSION, VALID_MARKETS, VALID_STATUSES,
@@ -37,6 +39,7 @@ const MODE = IS_PROD ? "remote" : (process.env.FLIPCHECK_MODE || "local").toLowe
 const REMOTE_BASE = (process.env.FLIPCHECK_BACKEND_BASE || "https://api.joinflipcheck.app").replace(/\/+$/, "");
 const AUTH_URL = process.env.FLIPCHECK_AUTH_URL || "https://gate.joinflipcheck.app/auth/discord/login";
 const APP_VERSION = process.env.FLIPCHECK_VERSION || app.getVersion() || "2.0.0";
+const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "1453059455641063645";
 const HOST = "127.0.0.1";
 const PORT_FROM = 9000;
 const PORT_TO = 9099;
@@ -45,6 +48,51 @@ let mainWindow = null;
 let backendProc = null;
 let BACKEND_PORT = null;
 let _backendRestarting = false; // prevents restart loops on intentional shutdown
+
+// ─── Discord RPC ──────────────────────────────────────────────────────────────
+let _rpc      = null;
+let _rpcReady = false;
+const _rpcStartTs = Math.floor(Date.now() / 1000);
+
+const _RPC_VIEW_DETAILS = {
+  flipcheck:   "Analysiert EAN auf eBay",
+  batch:       "Batch Flipcheck",
+  inventory:   "Inventar verwalten",
+  analytics:   "Portfolio Analytics",
+  history:     "Preisverlauf",
+  alerts:      "Preisalarme",
+  settings:    "Einstellungen",
+  competition: "Konkurrenz-Tracker",
+  scanner:     "Barcode Scanner",
+};
+
+async function initDiscordRPC() {
+  if (!DiscordRPC || !DISCORD_CLIENT_ID) return;
+  try {
+    DiscordRPC.register(DISCORD_CLIENT_ID);
+    _rpc = new DiscordRPC.Client({ transport: "ipc" });
+    _rpc.on("ready", () => {
+      _rpcReady = true;
+      _setRpcActivity("FLIPCHECK", `v${APP_VERSION}`);
+      console.log("[RPC] ready");
+    });
+    await _rpc.login({ clientId: DISCORD_CLIENT_ID });
+  } catch (e) {
+    console.log("[RPC] not available:", e?.message || e);
+  }
+}
+
+function _setRpcActivity(details, state) {
+  if (!_rpc || !_rpcReady) return;
+  _rpc.setActivity({
+    details,
+    state,
+    startTimestamp:  _rpcStartTs,
+    largeImageKey:   "logo",
+    largeImageText:  "FLIPCHECK",
+    buttons: [{ label: "flipcheck.app", url: "https://joinflipcheck.app" }],
+  }).catch(() => {});
+}
 
 // ─── Keytar ──────────────────────────────────────────────────────────────────
 const SVC = "flipcheck";
@@ -574,6 +622,9 @@ app.whenReady().then(async () => {
     }, 3000);
   }
 
+  // Discord Rich Presence — graceful if Discord not running
+  initDiscordRPC();
+
   // Barcode scanner servers — HTTP :8766 (bridge) + HTTPS :8767 (camera)
   startScannerServer();
   startHttpsScannerServer();
@@ -595,6 +646,7 @@ app.whenReady().then(async () => {
 app.on("window-all-closed", () => {
   _backendRestarting = true; // prevent the exit handler from re-spawning
   if (backendProc) { try { backendProc.kill(); } catch {} }
+  if (_rpc) { try { _rpc.destroy(); } catch {} }
   app.quit();
 });
 
@@ -1128,4 +1180,20 @@ ipcMain.handle("updater:check", async () => {
 
 ipcMain.handle("updater:install", () => {
   if (autoUpdater) try { autoUpdater.quitAndInstall(); } catch {}
+});
+
+// ─── IPC: Discord RPC ─────────────────────────────────────────────────────────
+ipcMain.handle("rpc:setActivity", (_e, { view, ean, verdict, profit, invCount } = {}) => {
+  if (!_rpc || !_rpcReady) return { ok: false };
+  const details = _RPC_VIEW_DETAILS[view] || "FLIPCHECK";
+  let state = `v${APP_VERSION}`;
+  if (view === "flipcheck" && ean) {
+    state = verdict && profit != null
+      ? `${verdict} · ${profit >= 0 ? "+" : ""}€${profit.toFixed(2)}`
+      : ean;
+  } else if (view === "inventory" && invCount != null) {
+    state = `${invCount} Artikel`;
+  }
+  _setRpcActivity(details, state);
+  return { ok: true };
 });
