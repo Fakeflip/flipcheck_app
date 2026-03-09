@@ -172,7 +172,7 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await _fetchWithRetry('https://api.joinflipcheck.app/flipcheck', {
+    const res = await _fetchWithRetry('https://gate.joinflipcheck.app/flipcheck', {
       method: 'POST',
       headers,
       body: JSON.stringify({ ean, ek: ekNum, mode, category: catId, shipping_in: shipInNum, shipping_out: shipOutNum }),
@@ -229,7 +229,7 @@ async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba',
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await _fetchWithRetry('https://api.joinflipcheck.app/amazon-check', {
+    const res = await _fetchWithRetry('https://gate.joinflipcheck.app/amazon-check', {
       method:  'POST',
       headers,
       body:    JSON.stringify({ asin, ean, ek: ekNum, mode, method, ship_in: shipIn, category: catId, prep_fee: prepNum }),
@@ -496,7 +496,7 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           const tok = await getToken();
           if (!tok) { reply({ ok: false, data: null }); break; }
           try {
-            const r = await fetch('https://api.joinflipcheck.app/auth/me', {
+            const r = await fetch('https://gate.joinflipcheck.app/auth/me', {
               headers: { 'Authorization': `Bearer ${tok}` },
               signal: AbortSignal.timeout(8000),
             });
@@ -524,7 +524,7 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
         case 'LOGIN': {
           // Chrome identity OAuth flow (no Electron required)
           try {
-            const redirectBase = 'https://api.joinflipcheck.app/auth/discord/login';
+            const redirectBase = 'https://gate.joinflipcheck.app/auth/discord/login';
             const authUrl = redirectBase;
             _cr.tabs.create({ url: authUrl });
             reply({ ok: true });

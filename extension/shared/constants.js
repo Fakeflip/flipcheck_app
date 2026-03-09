@@ -1,6 +1,6 @@
 /* Flipcheck Extension — Shared Constants */
 
-const REMOTE_BASE  = 'https://api.joinflipcheck.app';
+const REMOTE_BASE  = 'https://gate.joinflipcheck.app';
 const BRIDGE_BASE  = 'http://127.0.0.1:8766';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 

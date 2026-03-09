@@ -120,7 +120,7 @@ async function loadProfile() {
     }
 
     try {
-      const r = await fetch('https://api.joinflipcheck.app/auth/me', {
+      const r = await fetch('https://gate.joinflipcheck.app/auth/me', {
         headers: { 'Authorization': `Bearer ${token}` },
         signal: AbortSignal.timeout(5000),
       });

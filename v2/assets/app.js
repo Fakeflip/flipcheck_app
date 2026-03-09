@@ -319,7 +319,7 @@ const API = {
   async sellerListings(sellerId, limit = 50, q = "") {
     const p = new URLSearchParams({ seller_id: sellerId, limit: String(limit) });
     if (q && q.trim()) p.set("q", q.trim());
-    return this.call(`/seller/listings?${p}`);
+    return this._competitionCall(`/seller/listings?${p}`);
   },
 
   /**
@@ -328,7 +328,28 @@ const API = {
    * @returns {Promise<FC_ApiResponse>}
    */
   async eanCompetition(ean, limit = 50) {
-    return this.call(`/ean/competition?ean=${encodeURIComponent(ean)}&limit=${limit}`);
+    return this._competitionCall(`/ean/competition?ean=${encodeURIComponent(ean)}&limit=${limit}`);
+  },
+
+  /**
+   * Competition calls always go to api.joinflipcheck.app (not gate).
+   * In local dev mode, the local backend is used instead.
+   * @param {string} path
+   * @returns {Promise<FC_ApiResponse>}
+   */
+  async _competitionCall(path) {
+    const isLocal = App.backendBase && App.backendBase.startsWith("http://127.0.0.1");
+    const base    = isLocal ? App.backendBase : "https://api.joinflipcheck.app";
+    const headers = /** @type {Record<string,string>} */ ({ "Content-Type": "application/json" });
+    if (App.token) headers["Authorization"] = `Bearer ${App.token}`;
+    try {
+      const res  = await fetch(`${base}${path}`, { method: "GET", headers });
+      let   data = null;
+      try { data = await res.json(); } catch {}
+      return { ok: res.ok, status: res.status, data };
+    } catch (e) {
+      return { ok: false, status: 0, data: null };
+    }
   },
 
   /**
