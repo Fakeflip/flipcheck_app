@@ -175,6 +175,7 @@ app.add_middleware(
         "http://127.0.0.1:8000",
         "http://localhost:8000",
         "https://joinflipcheck.app",
+        "https://www.joinflipcheck.app",
         "https://gate.joinflipcheck.app",
         "https://api.joinflipcheck.app",
         "https://app.joinflipcheck.app",
