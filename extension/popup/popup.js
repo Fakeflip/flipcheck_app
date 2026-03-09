@@ -83,15 +83,18 @@ async function checkToken() {
 
       if (!_hasToken) { resolve(); return; }
 
-      // License check — hide main UI if no active plan
+      // License check — only block on explicit license_ok: false
+      // On network error / timeout → fail open (let user through)
       chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
-        const licenseOk = meRes?.data?.license_ok;
-        const gate = $('licenseGate');
-        const tabs = document.querySelector('.fc-tabs');
+        console.log('[FC] AUTH_ME response:', JSON.stringify(meRes));
+        const gotResponse = meRes?.ok === true || meRes?.ok === false;
+        const licenseOk   = !gotResponse || meRes?.data?.license_ok;
+        const gate   = $('licenseGate');
+        const tabs   = document.querySelector('.fc-tabs');
         const panels = document.querySelectorAll('.fc-panel');
-        if (!licenseOk) {
-          if (gate)   gate.style.display   = 'flex';
-          if (tabs)   tabs.style.display   = 'none';
+        if (gotResponse && !licenseOk) {
+          if (gate)  gate.style.display  = 'flex';
+          if (tabs)  tabs.style.display  = 'none';
           panels.forEach(p => p.style.display = 'none');
         } else {
           if (gate) gate.style.display = 'none';
