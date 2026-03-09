@@ -26,7 +26,10 @@
         <a href="#pricing">Preise</a>
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
       </nav>
-      <a href="#download" class="btn btn-sm">Download</a>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="/dashboard" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)" id="btnDashboard">Dashboard</a>
+        <a href="#download" class="btn btn-sm">Download</a>
+      </div>
       <button class="hamburger" id="hamburger" aria-label="Menü öffnen" aria-expanded="false">
         <span></span><span></span><span></span>
       </button>
@@ -43,7 +46,7 @@
   <!-- ── Hero ───────────────────────────────────────────────────────────── -->
   <section class="hero">
     <div class="container">
-      <div class="badge">Jetzt verfügbar — v2.0</div>
+      <div class="badge">Jetzt verfügbar — v2.2</div>
       <h1>Mehr Profit.<br />Weniger Risiko.</h1>
       <p class="hero-sub">
         Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden.
@@ -62,7 +65,7 @@
           <span class="btn-sub">Windows 10/11 · x64</span>
         </a>
       </div>
-      <p class="hero-note">Pro-Abo via Discord · Kein Account erforderlich für den Download</p>
+      <p class="hero-note">7 Tage kostenlos testen · Kein Risiko · Jederzeit kündbar</p>
     </div>
   </section>
 
@@ -181,7 +184,7 @@
     <div class="container">
       <h2>Einfache Preise.</h2>
       <p class="section-sub">Ein Plan. Alles drin. Keine versteckten Kosten.</p>
-      <div class="pricing-grid" style="grid-template-columns: 1fr; max-width: 400px;">
+      <div class="pricing-grid" style="grid-template-columns: 1fr; max-width: 420px;">
         <div class="price-card featured">
           <div class="price-name">Pro</div>
           <div class="price-amount">€19<span>/Monat</span></div>
@@ -195,7 +198,12 @@
             <li>✓ Preisalarme</li>
             <li>✓ Deal Scanner</li>
           </ul>
-          <a href="https://discord.gg/AUYvAsebA3" class="btn btn-primary btn-full" target="_blank" rel="noopener">Via Discord starten</a>
+          <a href="/dashboard" class="btn btn-primary btn-full" id="btnTrial">
+            7 Tage kostenlos testen
+          </a>
+          <p style="font-size:12px;color:var(--dim,#555);text-align:center;margin-top:10px">
+            Danach € 19/Monat · Jederzeit kündbar · Kein Risiko
+          </p>
         </div>
       </div>
     </div>

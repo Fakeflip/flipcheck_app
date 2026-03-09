@@ -41,7 +41,7 @@
   <div class="legal-wrap">
     <a href="/" class="back-link">← Zurück zur Startseite</a>
     <h1>Datenschutzerklärung</h1>
-    <p class="subtitle">Stand: 5. März 2026</p>
+    <p class="subtitle">Stand: 9. März 2026</p>
 
     <div class="toc">
       <h3>Inhaltsübersicht</h3>
@@ -56,6 +56,8 @@
         <li><a href="#speicherung">Allgemeine Informationen zur Datenspeicherung und Löschung</a></li>
         <li><a href="#rechte">Rechte der betroffenen Personen</a></li>
         <li><a href="#webhosting">Bereitstellung des Onlineangebots und Webhosting</a></li>
+        <li><a href="#discord">Authentifizierung über Discord</a></li>
+        <li><a href="#stripe">Zahlungsabwicklung über Stripe</a></li>
         <li><a href="#kontakt">Kontaktaufnahme</a></li>
         <li><a href="#aenderung">Änderung und Aktualisierung</a></li>
       </ol>
@@ -84,26 +86,34 @@
       <li>Nutzungsdaten (z. B. aufgerufene Webseiten, Zugriffszeiten)</li>
       <li>Meta-, Kommunikations- und Verfahrensdaten (z. B. IP-Adressen, Zeitstempel)</li>
       <li>Kontaktdaten (z. B. E-Mail-Adresse, sofern Sie uns per E-Mail kontaktieren)</li>
+      <li>Authentifizierungsdaten (Discord-ID, Discord-Benutzername, Discord-Avatar)</li>
+      <li>Zahlungsdaten (verarbeitet ausschließlich durch Stripe; wir erhalten keine vollständigen Zahlungsdaten)</li>
+      <li>Vertragsdaten (Abonnementstatus, Lizenzdaten, Nutzungszähler)</li>
     </ul>
 
     <h3>Kategorien betroffener Personen</h3>
     <ul>
-      <li>Nutzer unserer Website</li>
+      <li>Nutzer unserer Website und der Desktop-Applikation</li>
+      <li>Abonnenten des Pro-Tarifs</li>
       <li>Kommunikationspartner (bei E-Mail-Kontakt)</li>
     </ul>
 
     <h3>Zwecke der Verarbeitung</h3>
     <ul>
       <li>Bereitstellung unseres Onlineangebots und Nutzerfreundlichkeit</li>
-      <li>Sicherheitsmaßnahmen</li>
+      <li>Authentifizierung und Kontoverwaltung (Discord OAuth)</li>
+      <li>Abwicklung von Zahlungen und Abonnementverwaltung (Stripe)</li>
+      <li>Vertragsdurchführung und Lizenzaktivierung</li>
+      <li>Sicherheitsmaßnahmen und Fehleranalyse</li>
       <li>Verwaltung und Beantwortung von Anfragen</li>
-      <li>Beurteilung der Betriebssicherheit und Fehleranalyse</li>
     </ul>
 
     <h2 id="rechtsgrundlagen">Maßgebliche Rechtsgrundlagen</h2>
-    <p>Im Folgenden erhalten Sie eine Übersicht der Rechtsgrundlagen der DSGVO, auf deren Basis wir personenbezogene Daten verarbeiten. Bitte nehmen Sie zur Kenntnis, dass neben den Regelungen der DSGVO nationale Datenschutzvorgaben in Ihrem bzw. unserem Wohn- oder Sitzland gelten können.</p>
+    <p>Im Folgenden erhalten Sie eine Übersicht der Rechtsgrundlagen der DSGVO, auf deren Basis wir personenbezogene Daten verarbeiten.</p>
     <ul>
-      <li><strong>Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO)</strong> – Die Verarbeitung ist zur Wahrung der berechtigten Interessen des Verantwortlichen oder eines Dritten erforderlich, sofern nicht die Interessen oder Grundrechte und Grundfreiheiten der betroffenen Person überwiegen. Dazu gehört insbesondere die Bereitstellung unserer Website sowie der Betrieb des Hostings.</li>
+      <li><strong>Vertragserfüllung und vorvertragliche Anfragen (Art. 6 Abs. 1 S. 1 lit. b) DSGVO)</strong> – Verarbeitung im Rahmen des Abonnements (Authentifizierung, Lizenzaktivierung, Zahlungsabwicklung).</li>
+      <li><strong>Rechtliche Verpflichtung (Art. 6 Abs. 1 S. 1 lit. c) DSGVO)</strong> – Verarbeitung zur Erfüllung gesetzlicher Pflichten (z. B. Buchführung, steuerrechtliche Aufbewahrungspflichten).</li>
+      <li><strong>Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO)</strong> – Bereitstellung und Betrieb der Website, Sicherheitsmaßnahmen, Betrugsverhinderung.</li>
     </ul>
     <p>Zusätzlich zu den Datenschutzregelungen der DSGVO gelten nationale Regelungen zum Datenschutz in Deutschland. Hierzu gehört insbesondere das Bundesdatenschutzgesetz (BDSG).</p>
 
@@ -151,6 +161,27 @@
     <p>Wenn Sie unsere Website besuchen, erfasst Vercel verschiedene Logdaten einschließlich Ihrer IP-Adresse. Details finden Sie in der Datenschutzerklärung von Vercel: <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener">https://vercel.com/legal/privacy-policy</a>.</p>
     <p>Die Nutzung von Vercel erfolgt auf Grundlage von Art. 6 Abs. 1 lit. f DSGVO. Wir haben ein berechtigtes Interesse an einer möglichst zuverlässigen Darstellung unserer Website. Sofern eine entsprechende Einwilligung abgefragt wurde, erfolgt die Verarbeitung ausschließlich auf Grundlage von Art. 6 Abs. 1 lit. a DSGVO. Die Einwilligung ist jederzeit widerrufbar.</p>
     <p>Die Übermittlung in die USA erfolgt auf Grundlage der EU-Standardvertragsklauseln. Details finden Sie unter: <a href="https://vercel.com/legal/data-processing-addendum" target="_blank" rel="noopener">https://vercel.com/legal/data-processing-addendum</a>.</p>
+
+    <h2 id="discord">Authentifizierung über Discord</h2>
+    <p>Zur Anmeldung bei FLIPCHECK nutzen wir den Authentifizierungsdienst Discord der Discord Inc. (444 De Haro Street, Suite 200, San Francisco, CA 94107, USA). Beim Login über Discord werden folgende Daten übermittelt und bei uns gespeichert:</p>
+    <ul>
+      <li>Discord-Benutzer-ID (interne Kennung)</li>
+      <li>Discord-Benutzername</li>
+      <li>Discord-Avatar-Hash (zur Anzeige des Profilbilds)</li>
+    </ul>
+    <p>Wir erhalten keine Discord-E-Mail-Adresse und kein Passwort. Die Authentifizierung erfolgt über OAuth 2.0. Die Übermittlung von Daten an Discord Inc. in die USA erfolgt auf Grundlage der EU-Standardvertragsklauseln. Weitere Informationen zum Datenschutz bei Discord finden Sie unter: <a href="https://discord.com/privacy" target="_blank" rel="noopener">discord.com/privacy</a>.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung) sowie Art. 6 Abs. 1 S. 1 lit. f) DSGVO (berechtigte Interessen an einer sicheren Authentifizierung).</p>
+
+    <h2 id="stripe">Zahlungsabwicklung über Stripe</h2>
+    <p>Für die Zahlungsabwicklung nutzen wir den Dienst Stripe der Stripe, Inc. (354 Oyster Point Blvd, South San Francisco, CA 94080, USA) bzw. der Stripe Payments Europe, Ltd. (1 Grand Canal Street Lower, Grand Canal Dock, Dublin, D02 H210, Ireland) für Kunden in der EU.</p>
+    <p>Beim Abschluss eines Abonnements werden Ihre Zahlungsdaten direkt an Stripe übermittelt. Wir speichern keine vollständigen Zahlungsdaten (Kreditkartennummern, IBAN etc.) auf unseren Servern. Stripe stellt uns lediglich eine Kunden-ID und Abonnementstatus zur Verfügung.</p>
+    <p>Von Stripe verarbeitete Daten umfassen insbesondere: Name, E-Mail-Adresse, Zahlungsmitteldetails, IP-Adresse, Transaktionsdaten.</p>
+    <p>Die Übermittlung von Daten an Stripe Inc. in die USA erfolgt auf Grundlage des EU-U.S. Data Privacy Framework und der EU-Standardvertragsklauseln. Weitere Informationen finden Sie in der Datenschutzerklärung von Stripe: <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">stripe.com/de/privacy</a>.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
+
+    <h2 id="supabase">Datenspeicherung (Supabase)</h2>
+    <p>Nutzerprofildaten (Discord-ID, Benutzername, Abonnementstatus, Gerätepaarungen) werden in einer PostgreSQL-Datenbank gespeichert, die über den Dienst Supabase (Supabase Inc., 970 Toa Payoh North, #07-04, Toa Payoh Industrial Park, Singapore 318992) betrieben wird. Die Datenbank befindet sich in der EU (Frankfurt, AWS eu-central-1). Details: <a href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a>.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
 
     <h2 id="kontakt">Kontaktaufnahme</h2>
     <p>Bei der Kontaktaufnahme mit uns (z. B. per E-Mail) werden die Angaben der anfragenden Personen verarbeitet, soweit dies zur Beantwortung der Kontaktanfragen und etwaiger angefragter Maßnahmen erforderlich ist.</p>

@@ -492,14 +492,38 @@ async def auth_me(user=Depends(require_auth)):
 # =========================================================
 # WEB APP AUTH (Browser SPA — no deep-link, redirects to hash)
 # =========================================================
+
+# Allowlist of valid return URLs after web OAuth — prevents open-redirect abuse
+ALLOWED_WEB_RETURN_URLS = [
+    "https://app.joinflipcheck.app",
+    "https://joinflipcheck.app",
+    "https://joinflipcheck.app/dashboard",
+    "http://localhost",       # local dev
+    "http://127.0.0.1",
+]
+
+def _safe_return_url(candidate: str) -> str:
+    """Return candidate if it starts with an allowed prefix, else WEB_APP_URL."""
+    if candidate:
+        for allowed in ALLOWED_WEB_RETURN_URLS:
+            if candidate.startswith(allowed):
+                return candidate
+    return WEB_APP_URL
+
+
 @app.get("/auth/web/login")
-def web_login():
-    """Start Discord OAuth flow for the web app."""
+def web_login(return_url: str = ""):
+    """Start Discord OAuth flow for the web app.
+    Pass ?return_url=https://joinflipcheck.app/dashboard to redirect there after auth.
+    The return_url is encoded as OAuth state and validated on callback.
+    """
+    safe = _safe_return_url(return_url)
     params = {
         "client_id":     DISCORD_CLIENT_ID,
         "redirect_uri":  DISCORD_WEB_REDIRECT_URI,
         "response_type": "code",
         "scope":         "identify",
+        "state":         safe,   # carry return URL through OAuth
     }
     url = "https://discord.com/oauth2/authorize?" + urlencode(params)
     return RedirectResponse(url=url, status_code=302)
@@ -567,8 +591,11 @@ async def web_callback(code: str, state: Optional[str] = None):
         algorithm=APP_JWT_ALGO,
     )
 
-    # Redirect browser back to the SPA with token in URL hash (no server log exposure)
-    redirect_url = f"{WEB_APP_URL}/#token={quote(gate_token)}"
+    # Redirect browser back to the SPA with token in URL hash (no server log exposure).
+    # Use state as return URL if it was passed through OAuth (validated in web_login).
+    return_to = _safe_return_url(state or "")
+    # Ensure the hash anchor is appended correctly whether the URL has a trailing slash or not
+    redirect_url = return_to.rstrip("/") + "/#token=" + quote(gate_token)
     return RedirectResponse(url=redirect_url, status_code=302)
 
 
