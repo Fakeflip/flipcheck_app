@@ -1549,7 +1549,17 @@ tr:last-child td { border-bottom: none; }
 }
 .st-plan-free     { background: var(--bg-elevated); color: var(--text-muted); border: 1px solid var(--border-strong); }
 .st-plan-pro      { background: var(--accent-subtle); color: var(--accent-text); border: 1px solid var(--accent-border); }
+.st-plan-trial    { background: rgba(245,158,11,.12); color: #f59e0b; border: 1px solid rgba(245,158,11,.28); }
 .st-plan-lifetime { background: var(--yellow-subtle); color: var(--yellow); border: 1px solid var(--yellow-border); }
+
+/* Abo card */
+.st-abo-card {
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 4px;
+}
+.st-abo-active   { background: rgba(99,102,241,.07); border: 1px solid rgba(99,102,241,.2); }
+.st-abo-inactive { background: var(--bg-elevated); border: 1px solid var(--border-strong); }
 
 /* Feature grid (settings profile card) */
 .st-feature-grid {

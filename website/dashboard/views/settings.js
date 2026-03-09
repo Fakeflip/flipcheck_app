@@ -33,31 +33,98 @@ const SettingsView = (() => {
   /* ── Render ──────────────────────────────────────────────────────── */
   function render() {
     const payload  = Auth.getPayload();
-    const username = payload?.discord_username || _me?.discord_username || _me?.discord_id || "—";
-    const plan     = _me?.plan || "free";
+    const username = _me?.username || payload?.discord_username || _me?.discord_id || "—";
     const isPaid   = _me?.license_ok;
-    const initial  = username && username !== "—" ? username[0].toUpperCase() : "F";
-
-    const discordId   = payload?.discord_id;
-    const avatarHash  = _me?.avatar_hash || null;
-    const avatarUrl   = discordId && avatarHash
-      ? `https://cdn.discordapp.com/avatars/${discordId}/${avatarHash}.png?size=96`
-      : null;
-
-    const dailyChecks = _me?.daily_checks ?? null;
-    const dailyLimit  = _me?.daily_limit ?? null;
-    const usagePct    = dailyLimit > 0 ? Math.min(100, Math.round((dailyChecks / dailyLimit) * 100)) : 0;
-    const usageColor  = usagePct >= 90 ? "var(--red)" : usagePct >= 70 ? "var(--yellow)" : "var(--green)";
+    const licStatus = (_me?.license_status || "").toLowerCase();  // "active","trialing","past_due",""
+    const avatarUrl = _me?.avatar_url || null;
+    const initial   = username && username !== "—" ? username[0].toUpperCase() : "F";
 
     const vatMode = _settings?.tax?.vat_mode || "no_vat";
     const ekMode  = _settings?.tax?.ek_mode  || "gross";
 
+    // ── Abo block ──────────────────────────────────────────────────
+    const arrowSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+    const extSvg   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+
+    let aboBlock;
+    if (isPaid && (licStatus === "active" || licStatus === "trialing")) {
+      const badgeLabel = licStatus === "trialing" ? "✦ Trial aktiv" : "✦ Pro aktiv";
+      const badgeColor = licStatus === "trialing" ? "st-plan-trial" : "st-plan-pro";
+      aboBlock = `
+        <div class="st-abo-card st-abo-active">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="st-plan-badge ${badgeColor}" style="font-size:13px;padding:5px 12px">${badgeLabel}</span>
+            <span style="font-size:13px;color:var(--text-secondary)">
+              ${licStatus === "trialing" ? "Dein Probeabo läuft — nach dem Trial € 19,99/Monat." : "Dein Flipcheck Pro-Abo ist aktiv."}
+            </span>
+          </div>
+          <button id="sManageSub" class="btn btn-ghost btn-sm" style="margin-top:12px;display:inline-flex;align-items:center;gap:6px">
+            Abo verwalten ${extSvg}
+          </button>
+        </div>`;
+    } else if (isPaid) {
+      // license_ok but status unknown — treat as active
+      aboBlock = `
+        <div class="st-abo-card st-abo-active">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="st-plan-badge st-plan-pro" style="font-size:13px;padding:5px 12px">✦ Pro aktiv</span>
+            <span style="font-size:13px;color:var(--text-secondary)">Dein Flipcheck Pro-Abo ist aktiv.</span>
+          </div>
+          <button id="sManageSub" class="btn btn-ghost btn-sm" style="margin-top:12px;display:inline-flex;align-items:center;gap:6px">
+            Abo verwalten ${extSvg}
+          </button>
+        </div>`;
+    } else if (licStatus === "past_due") {
+      aboBlock = `
+        <div class="st-abo-card st-abo-inactive">
+          <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+            <span class="st-plan-badge" style="background:rgba(239,68,68,.12);color:#ef4444;border:1px solid rgba(239,68,68,.25);font-size:13px;padding:5px 12px">⚠ Zahlung ausstehend</span>
+            <span style="font-size:13px;color:var(--text-secondary)">Bitte aktualisiere deine Zahlungsmethode.</span>
+          </div>
+          <button id="sManageSub" class="btn btn-primary btn-sm" style="margin-top:12px;display:inline-flex;align-items:center;gap:6px">
+            Zahlung aktualisieren ${extSvg}
+          </button>
+        </div>`;
+    } else {
+      aboBlock = `
+        <div class="st-abo-card st-abo-inactive">
+          <div style="display:flex;align-items:flex-start;gap:14px">
+            <div style="width:40px;height:40px;border-radius:10px;background:rgba(99,102,241,.1);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+              </svg>
+            </div>
+            <div>
+              <div style="font-size:15px;font-weight:700;color:var(--text);margin-bottom:4px">Kein aktiver Plan</div>
+              <div style="font-size:13px;color:var(--text-secondary);line-height:1.6;max-width:360px">
+                Wähle einen Plan um unbegrenzte Flipchecks, Inventar, Preisverlauf und alle Pro-Features freizuschalten.
+              </div>
+            </div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
+            <button id="sBtnTrial" class="btn btn-primary btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px">
+              7 Tage kostenlos testen ${arrowSvg}
+            </button>
+            <button id="sBtnBuy" class="btn btn-ghost btn-sm" style="display:inline-flex;align-items:center;gap:6px;padding:8px 18px">
+              Direkt kaufen · € 19,99/Mo ${arrowSvg}
+            </button>
+          </div>
+          <p style="font-size:11px;color:var(--text-muted);margin-top:10px">Kein Risiko · Jederzeit kündbar</p>
+        </div>`;
+    }
+
     _el.innerHTML = `
       <div class="page-header">
-        <div class="page-header-left"><h1>Einstellungen</h1><p>Konto, Kalkulation &amp; Präferenzen</p></div>
+        <div class="page-header-left"><h1>Einstellungen</h1><p>Abo, Konto &amp; Kalkulation</p></div>
       </div>
 
       <div class="st-wrapper">
+
+        <!-- ── Abonnement ────────────────────────────────── -->
+        <div class="st-section">
+          <div class="st-section-head">Abonnement</div>
+          ${aboBlock}
+        </div>
 
         <!-- ── Profil ───────────────────────────────────── -->
         <div class="st-section">
@@ -70,25 +137,9 @@ const SettingsView = (() => {
               <div class="st-username">${esc(username)}</div>
               <div class="st-plan-row">
                 <span class="st-plan-badge ${isPaid ? "st-plan-pro" : "st-plan-free"}">${isPaid ? "✦ Pro" : "Free"}</span>
-                ${!isPaid ? `<button onclick="(async()=>{const r=await createCheckoutSession(7);if(r?.checkout_url)window.open(r.checkout_url,'_blank');})()" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:11px">7 Tage gratis →</button>` : ""}
               </div>
             </div>
           </div>
-
-          <!-- Usage bar (free plan) -->
-          ${dailyLimit != null ? `
-          <div class="st-row">
-            <div class="st-row-left">
-              <div class="st-row-label">Tagesquota</div>
-              <div class="st-row-sub">Free-Plan Limit (täglich)</div>
-            </div>
-            <div class="st-row-right" style="min-width:140px">
-              <div style="font-size:12px;color:var(--text-secondary);margin-bottom:4px;text-align:right">${dailyChecks ?? 0} / ${dailyLimit}</div>
-              <div class="usage-bar-wrap">
-                <div class="usage-bar-fill" style="width:${usagePct}%;background:${usageColor}"></div>
-              </div>
-            </div>
-          </div>` : ""}
 
           <!-- Token exp -->
           <div class="st-row">
@@ -301,6 +352,37 @@ const SettingsView = (() => {
     // Auto-save on change
     ["#sVatMode", "#sEkMode", "#sDefaultCat", "#sDefaultMode"].forEach(sel => {
       _el?.querySelector(sel)?.addEventListener("change", triggerAutoSave);
+    });
+
+    // Abo buttons
+    async function handleCheckout(btn, trialDays, resetHtml) {
+      if (!btn) return;
+      btn.disabled = true; btn.textContent = "Lade…";
+      try {
+        const data = await createCheckoutSession(trialDays);
+        if (data?.checkout_url) window.open(data.checkout_url, "_blank");
+        else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+      } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+      btn.disabled = false; btn.innerHTML = resetHtml;
+    }
+
+    const arrowSvg = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+    const extSvg   = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>`;
+
+    _el?.querySelector("#sBtnTrial")?.addEventListener("click", function() {
+      handleCheckout(this, 7, `7 Tage kostenlos testen ${arrowSvg}`);
+    });
+    _el?.querySelector("#sBtnBuy")?.addEventListener("click", function() {
+      handleCheckout(this, 0, `Direkt kaufen · € 19,99/Mo ${arrowSvg}`);
+    });
+    _el?.querySelector("#sManageSub")?.addEventListener("click", async function() {
+      this.disabled = true; this.textContent = "Lade…";
+      try {
+        const data = await createPortalSession();
+        if (data?.portal_url) window.open(data.portal_url, "_blank");
+        else Toast.error("Fehler", "Stripe-Portal konnte nicht geöffnet werden.");
+      } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+      this.disabled = false; this.innerHTML = `Abo verwalten ${extSvg}`;
     });
 
     // Logout
