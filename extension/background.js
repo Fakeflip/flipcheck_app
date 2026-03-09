@@ -496,7 +496,7 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           const tok = await getToken();
           if (!tok) { reply({ ok: false, data: null }); break; }
           try {
-            const r = await fetch('https://api.joinflipcheck.app/auth/me', {
+            const r = await fetch('https://gate.joinflipcheck.app/auth/me', {
               headers: { 'Authorization': `Bearer ${tok}` },
               signal: AbortSignal.timeout(8000),
             });
