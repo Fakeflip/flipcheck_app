@@ -617,8 +617,35 @@ async function boot() {
     window.fc.onAuthToken(async (token) => {
       App.token = token;
       const gate = document.getElementById("auth-gate");
-      const appEl = document.getElementById("app");
       if (gate) gate.style.display = "none";
+
+      // Check license before showing app
+      try {
+        const { ok, data } = await API.call("/auth/me");
+        if (ok && data && !data.license_ok) {
+          const licGate = document.getElementById("license-gate");
+          if (licGate) licGate.style.display = "flex";
+          document.getElementById("app").style.display = "none";
+          document.getElementById("btnLicenseUpgrade")?.addEventListener("click", async () => {
+            const btn = document.getElementById("btnLicenseUpgrade");
+            if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
+            try {
+              const r = await API.createCheckoutSession();
+              if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
+              else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+            } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+            if (btn) { btn.disabled = false; btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`; }
+          });
+          document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
+            window.fc?.logout?.();
+            showGate();
+            if (licGate) licGate.style.display = "none";
+          });
+          return;
+        }
+      } catch {}
+
+      const appEl = document.getElementById("app");
       if (appEl) appEl.style.display = "flex";
       Toast.success("Angemeldet", "Willkommen bei Flipcheck!");
       initApp();
