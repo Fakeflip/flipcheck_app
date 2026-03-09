@@ -76,8 +76,8 @@ const MarketplaceView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Marktplatz</h1>
-          <p>Live-Preisvergleich — eBay, Kaufland & Amazon in einer Ansicht</p>
+          <h1>${I18N.t('mp.title')}</h1>
+          <p>${I18N.t('mp.subtitle')}</p>
           <div class="mp-stats-bar" id="mpStatsBar" style="display:none"></div>
         </div>
         <div class="page-header-right" style="align-items:flex-end;flex-direction:column;gap:8px">
@@ -112,7 +112,7 @@ const MarketplaceView = (() => {
             <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
             <path d="M10.5 10.5L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          Vergleichen
+          ${I18N.t('mp.btn.compare')}
         </button>
       </div>
 
@@ -122,8 +122,8 @@ const MarketplaceView = (() => {
           <rect x="9" y="3" width="6" height="18" rx="1.5"/>
           <rect x="16" y="3" width="6" height="18" rx="1.5"/>
         </svg>
-        <p class="empty-title">Marktplatz-Vergleich</p>
-        <p class="empty-sub">EAN + Einkaufspreis eingeben — Live-Preise der ausgewählten Plattformen werden geladen</p>
+        <p class="empty-title">${I18N.t('mp.empty.title')}</p>
+        <p class="empty-sub">${I18N.t('mp.empty.sub')}</p>
       </div>
 
       <div id="mpResults" style="display:none">
@@ -178,8 +178,8 @@ const MarketplaceView = (() => {
     bar.style.display = "flex";
     bar.innerHTML = `
       <span class="sales-stat-pill ${best.profit >= 5 ? "sales-stat-pill-green" : "sales-stat-pill-yellow"}">⭐ <b>${best.p.short}</b> (${fmtP(best.profit)})</span>
-      ${spread ? `<span class="sales-stat-pill"><b>${fmt(spread)}</b> Preisspanne</span>` : ""}
-      <span class="sales-stat-pill"><b>${rows.length}</b> Plattformen</span>
+      ${spread ? `<span class="sales-stat-pill"><b>${fmt(spread)}</b> ${I18N.t('mp.stats.price_range')}</span>` : ""}
+      <span class="sales-stat-pill"><b>${rows.length}</b> ${I18N.t('mp.stats.platforms')}</span>
       ${asin ? `<span class="sales-stat-pill" style="font-family:monospace;font-size:10px">ASIN: ${esc(asin)}</span>` : ""}
       ${ean  ? `<span class="sales-stat-pill" style="font-family:monospace;font-size:10px">EAN: ${esc(ean)}</span>` : ""}
     `;
@@ -216,13 +216,13 @@ const MarketplaceView = (() => {
     const ek       = parseFloat(_el.querySelector("#mpEk")?.value) || 0;
 
     if (!rawInput) {
-      Toast.error("EAN / ASIN fehlt", "Bitte EAN oder ASIN eingeben.");
+      Toast.error(I18N.t('mp.toast.ean_missing'), "Bitte EAN oder ASIN eingeben.");
       return;
     }
     const asinDetected = _isAsin(rawInput);
     const eanDetected  = _isEan(rawInput);
     if (!asinDetected && !eanDetected) {
-      Toast.error("Ungültige Eingabe", "Bitte eine gültige EAN (8–14 Ziffern) oder ASIN (z.B. B0CX4F5P1S) eingeben.");
+      Toast.error(I18N.t('mp.toast.invalid'), "Bitte eine gültige EAN (8–14 Ziffern) oder ASIN (z.B. B0CX4F5P1S) eingeben.");
       return;
     }
 
@@ -235,7 +235,7 @@ const MarketplaceView = (() => {
 
     // ── ASIN → EAN Resolution ───────────────────────────────────────────────
     if (asinDetected) {
-      btn.innerHTML = `<span class="mp-spinner"></span> ASIN auflösen…`;
+      btn.innerHTML = `<span class="mp-spinner"></span> ${I18N.t('mp.btn.resolving')}`;
       try {
         const { ok: aok, data: adata } = await API.amazonCheck(rawInput.toUpperCase(), null, 0, "mid", "fba", 0, "sonstiges", 0);
         if (aok && adata?.ean) {
@@ -244,23 +244,23 @@ const MarketplaceView = (() => {
           const prefix = _el.querySelector("#mpTypePrefix");
           if (inp) inp.value = ean;
           if (prefix) { prefix.textContent = "EAN"; prefix.style.color = ""; }
-          Toast.info("ASIN aufgelöst", `${rawInput.toUpperCase()} → EAN ${ean}`);
+          Toast.info(I18N.t('mp.toast.asin_resolved'), `${rawInput.toUpperCase()} → EAN ${ean}`);
         } else {
-          Toast.error("EAN nicht gefunden", `ASIN ${rawInput.toUpperCase()} hat keine EAN. Amazon-Karte zeigt ASIN-Daten.`);
+          Toast.error(I18N.t('mp.toast.ean_not_found'), `ASIN ${rawInput.toUpperCase()} hat keine EAN. Amazon-Karte zeigt ASIN-Daten.`);
           btn.disabled = false;
           btn.innerHTML = btnOrigHTML;
           return;
         }
       } catch {
         ErrorReporter.report(new Error("ASIN-Auflösung fehlgeschlagen"), "marketplace:doSearch:asinResolve");
-        Toast.error("ASIN-Auflösung fehlgeschlagen", "Backend nicht erreichbar oder ASIN unbekannt.");
+        Toast.error(I18N.t('mp.toast.asin_failed'), "Backend nicht erreichbar oder ASIN unbekannt.");
         btn.disabled = false;
         btn.innerHTML = btnOrigHTML;
         return;
       }
     }
 
-    btn.innerHTML = `<span class="mp-spinner"></span> Lädt alle Märkte…`;
+    btn.innerHTML = `<span class="mp-spinner"></span> ${I18N.t('mp.btn.loading')}`;
 
     let ok, data;
     try {
@@ -277,7 +277,7 @@ const MarketplaceView = (() => {
 
     if (!ok || !data) {
       ErrorReporter.report(new Error("Vergleich fehlgeschlagen"), "marketplace:doSearch:compare");
-      Toast.error("Vergleich fehlgeschlagen", "Marktdaten konnten nicht geladen werden. Backend erreichbar?");
+      Toast.error(I18N.t('mp.toast.failed'), "Marktdaten konnten nicht geladen werden. Backend erreichbar?");
       return;
     }
 
@@ -321,14 +321,14 @@ const MarketplaceView = (() => {
             ${_ek > 0 ? `&nbsp;·&nbsp;<span style="font-size:11px;color:var(--text-muted)">EK: <strong style="color:var(--text-secondary)">${fmtEur(_ek)}</strong></span>` : ""}
           </div>
           <div class="mp-prod-stats">
-            ${d.ebay?.sales_30d   != null ? `<span>📦 <strong>${d.ebay.sales_30d}</strong> eBay Verk./30d</span>` : ""}
-            ${d.ebay?.days_to_cash != null ? `<span>⏱ <strong>${d.ebay.days_to_cash}d</strong> Ø Cashflow</span>` : ""}
+            ${d.ebay?.sales_30d   != null ? `<span>📦 <strong>${d.ebay.sales_30d}</strong> ${I18N.t('mp.strip.sales30')}</span>` : ""}
+            ${d.ebay?.days_to_cash != null ? `<span>⏱ <strong>${d.ebay.days_to_cash}d</strong> ${I18N.t('mp.strip.cashflow')}</span>` : ""}
             ${["HOT","OK","RISK"].includes(d.kaufland?.demand_label)
               ? `<span>🏪 Kaufland: <strong style="color:${d.kaufland.demand_label === "HOT" ? "var(--green)" : d.kaufland.demand_label === "OK" ? "var(--yellow)" : "var(--red)"}">${d.kaufland.demand_label}</strong> (${d.kaufland.demand_score})</span>`
               : ""}
             ${d.amazon?.asin
               ? `<a href="https://www.amazon.de/dp/${esc(d.amazon.asin)}" target="_blank" style="font-size:10px;color:var(--text-muted);text-decoration:none" title="Amazon Produktseite">🔗 ASIN: <span class="text-mono">${esc(d.amazon.asin)}</span></a>`
-              : `<a href="https://www.amazon.de/s?k=${encodeURIComponent(d.ean)}" target="_blank" style="font-size:10px;color:var(--text-muted);text-decoration:none" title="Amazon nach EAN suchen">🔍 Amazon suchen →</a>`
+              : `<a href="https://www.amazon.de/s?k=${encodeURIComponent(d.ean)}" target="_blank" style="font-size:10px;color:var(--text-muted);text-decoration:none" title="Amazon nach EAN suchen">🔍 ${I18N.t('mp.amazon.search')}</a>`
             }
           </div>
         </div>
@@ -367,9 +367,9 @@ const MarketplaceView = (() => {
       const kd = d.kaufland;
       extraInfo = `
         <div class="mp-card-extra">
-          ${kd.offers_count != null ? `<span>${kd.offers_count} Angebote</span>` : ""}
-          ${kd.bestseller   != null ? `<span>${kd.bestseller ? "⭐ Bestseller" : ""}</span>` : ""}
-          ${kd.min_shipping != null && kd.min_shipping > 0 ? `<span>+ ${fmtEur(kd.min_shipping)} Versand</span>` : kd.min_shipping === 0 ? `<span>Kostenloser Versand</span>` : ""}
+          ${kd.offers_count != null ? `<span>${kd.offers_count} ${I18N.t('mp.kaufland.offers')}</span>` : ""}
+          ${kd.bestseller   != null ? `<span>${kd.bestseller ? `⭐ ${I18N.t('mp.kaufland.bestseller')}` : ""}</span>` : ""}
+          ${kd.min_shipping != null && kd.min_shipping > 0 ? `<span>${I18N.t('mp.kaufland.plus_ship')} ${fmtEur(kd.min_shipping)}</span>` : kd.min_shipping === 0 ? `<span>${I18N.t('mp.kaufland.free_ship')}</span>` : ""}
         </div>
       `;
     }
@@ -377,12 +377,12 @@ const MarketplaceView = (() => {
       const ad = d.amazon;
       extraInfo = `
         <div class="mp-card-extra">
-          ${ad.buybox_price    != null ? `<span>BuyBox: ${fmtEur(ad.buybox_price)}</span>` : ""}
-          ${ad.marketplace_new != null ? `<span>Marktplatz: ${fmtEur(ad.marketplace_new)}</span>` : ""}
-          ${ad.amazon_direct   != null ? `<span>Amazon direkt: ${fmtEur(ad.amazon_direct)}</span>` : ""}
+          ${ad.buybox_price    != null ? `<span>${I18N.t('mp.amazon.buybox')} ${fmtEur(ad.buybox_price)}</span>` : ""}
+          ${ad.marketplace_new != null ? `<span>${I18N.t('mp.amazon.marketplace')} ${fmtEur(ad.marketplace_new)}</span>` : ""}
+          ${ad.amazon_direct   != null ? `<span>${I18N.t('mp.amazon.direct')} ${fmtEur(ad.amazon_direct)}</span>` : ""}
           ${ad.asin
-            ? `<a href="https://www.amazon.de/dp/${esc(ad.asin)}" target="_blank" class="mp-asin-link">Produktseite: ${esc(ad.asin)} →</a>`
-            : `<a href="https://www.amazon.de/s?k=${encodeURIComponent(d.ean)}" target="_blank" class="mp-asin-link">Auf Amazon nach EAN suchen →</a>`
+            ? `<a href="https://www.amazon.de/dp/${esc(ad.asin)}" target="_blank" class="mp-asin-link">${I18N.t('mp.amazon.product_page')} ${esc(ad.asin)} →</a>`
+            : `<a href="https://www.amazon.de/s?k=${encodeURIComponent(d.ean)}" target="_blank" class="mp-asin-link">${I18N.t('mp.amazon.search')}</a>`
           }
         </div>
       `;
@@ -391,9 +391,9 @@ const MarketplaceView = (() => {
       const ed = d.ebay;
       extraInfo = `
         <div class="mp-card-extra">
-          ${ed.listing_count  != null ? `<span>${ed.listing_count} Listings</span>` : ""}
+          ${ed.listing_count  != null ? `<span>${ed.listing_count} ${I18N.t('mp.ebay.listings')}</span>` : ""}
           ${ed.price_avg      != null && ed.price_avg !== ed.price ? `<span>Ø ${fmtEur(ed.price_avg)}</span>` : ""}
-          ${ed.price_min != null ? `<span>Min: ${fmtEur(ed.price_min)}</span>` : ""}
+          ${ed.price_min != null ? `<span>${I18N.t('mp.ebay.min')} ${fmtEur(ed.price_min)}</span>` : ""}
         </div>
       `;
     }
@@ -401,7 +401,7 @@ const MarketplaceView = (() => {
     return `
       <div class="mp-card${best ? " mp-card-best" : ""}" id="mpCard_${p.id}"
            style="--plat-color:${p.color};--plat-bg:${p.bg};--plat-border:${p.border}">
-        ${best ? `<div class="mp-card-best-badge">⭐ Bestes Angebot</div>` : ""}
+        ${best ? `<div class="mp-card-best-badge">⭐ ${I18N.t('mp.badge.best')}</div>` : ""}
 
         <div class="mp-card-header">
           <div class="mp-card-icon">${p.icon}</div>
@@ -416,24 +416,24 @@ const MarketplaceView = (() => {
         <!-- Price -->
         <div class="mp-card-price-wrap">
           ${price != null ? `
-            <div class="mp-card-price-label">${isLive ? "Live-Preis" : "Eingegebener Preis"}</div>
+            <div class="mp-card-price-label">${isLive ? I18N.t('mp.lbl.live_price') : I18N.t('mp.lbl.manual_price')}</div>
             <div class="mp-card-price-value">${fmtEur(price)}</div>
           ` : (() => {
             // Determine why price is unavailable → show helpful hint
             const err = (p.id === "kaufland" ? d?.kaufland?.error_reason : d?.amazon?.error_reason) || null;
             let hint = "";
             if (err === "NOT_FOUND" || err === "NO_MATCH") {
-              hint = `<div class="mp-unavail-hint">${p.id === "amazon" ? "Nicht auf Amazon.de gelistet" : "Produkt nicht auf Kaufland gefunden"}</div>`;
+              hint = `<div class="mp-unavail-hint">${p.id === "amazon" ? I18N.t('mp.unavail.amazon') : I18N.t('mp.unavail.kaufland')}</div>`;
             } else if (err && (err.includes("BLOCK") || err.includes("block") || err.includes("429") || err.includes("403"))) {
-              hint = `<div class="mp-unavail-hint mp-unavail-blocked">⚠ Kaufland geblockt — Proxy erneuern</div>`;
+              hint = `<div class="mp-unavail-hint mp-unavail-blocked">⚠ ${I18N.t('mp.kaufland_blocked')}</div>`;
             } else if (err === "NO_PRICE") {
-              hint = `<div class="mp-unavail-hint">Preis wird von Keepa nicht getrackt</div>`;
+              hint = `<div class="mp-unavail-hint">${I18N.t('mp.not_tracked')}</div>`;
             } else if (err) {
-              hint = `<div class="mp-unavail-hint">Nicht verfügbar</div>`;
+              hint = `<div class="mp-unavail-hint">${I18N.t('mp.not_available')}</div>`;
             }
             return `
               ${hint}
-              <div class="mp-card-price-label" style="margin-top:${hint ? "6px" : "0"}">Manuell eingeben</div>
+              <div class="mp-card-price-label" style="margin-top:${hint ? "6px" : "0"}">${I18N.t('mp.lbl.manual_enter')}</div>
               <div class="input-prefix-wrap" style="margin-top:4px">
                 <span class="prefix">€</span>
                 <input id="mpPriceInp_${p.id}" class="input" type="number" step="0.01" min="0" placeholder="0.00"/>
@@ -459,26 +459,26 @@ const MarketplaceView = (() => {
     const roiColor    = roi    >= 20 ? "var(--green)" : roi    >= 0  ? "var(--yellow)" : "var(--red)";
     return `
       <div class="mp-metric">
-        <span class="mp-metric-l">Gewinn</span>
+        <span class="mp-metric-l">${I18N.t('mp.metric.profit')}</span>
         <span class="mp-metric-v" style="color:${profitColor}">${fmtEur(profit)}</span>
       </div>
       <div class="mp-metric">
-        <span class="mp-metric-l">Margin</span>
+        <span class="mp-metric-l">${I18N.t('mp.metric.margin')}</span>
         <span class="mp-metric-v" style="color:${marginColor}">${margin.toFixed(1)}%</span>
       </div>
       <div class="mp-metric">
-        <span class="mp-metric-l">ROI</span>
+        <span class="mp-metric-l">${I18N.t('mp.metric.roi')}</span>
         <span class="mp-metric-v" style="color:${roiColor}">${roi.toFixed(1)}%</span>
       </div>
       <div class="mp-metric">
-        <span class="mp-metric-l">${p.short}-Gebühr</span>
+        <span class="mp-metric-l">${p.short}-${I18N.t('mp.th.fee')}</span>
         <span class="mp-metric-v text-muted">−${fmtEur(fee)}</span>
       </div>
     `;
   }
 
   function renderMetricsEmpty(noPrice) {
-    return `<div class="mp-metrics-empty">${noPrice ? "Preis eingeben für<br>Gewinnberechnung" : "—"}</div>`;
+    return `<div class="mp-metrics-empty">${noPrice ? I18N.t('mp.metrics.empty') : "—"}</div>`;
   }
 
   function updateCardCalc(p) {
@@ -497,7 +497,7 @@ const MarketplaceView = (() => {
       if (best && !badge) {
         badge = document.createElement("div");
         badge.className = "mp-card-best-badge";
-        badge.textContent = "⭐ Bestes Angebot";
+        badge.textContent = `⭐ ${I18N.t('mp.badge.best')}`;
         card.prepend(badge);
       } else if (!best && badge) {
         badge.remove();
@@ -519,16 +519,16 @@ const MarketplaceView = (() => {
     const maxProfit = Math.max(...rows.map(r => r.profit).filter(v => v != null));
 
     tableEl.innerHTML = `
-      <div class="mp-table-title">Vergleichsübersicht</div>
+      <div class="mp-table-title">${I18N.t('mp.table.title')}</div>
       <table class="mp-table">
         <thead>
           <tr>
-            <th>Plattform</th>
-            <th>Verkaufspreis</th>
-            <th>Gebühr</th>
-            <th>Gewinn</th>
-            <th>Margin</th>
-            <th>ROI</th>
+            <th>${I18N.t('mp.th.platform')}</th>
+            <th>${I18N.t('mp.th.sell_price')}</th>
+            <th>${I18N.t('mp.th.fee')}</th>
+            <th>${I18N.t('mp.th.profit')}</th>
+            <th>${I18N.t('mp.th.margin')}</th>
+            <th>${I18N.t('mp.th.roi')}</th>
           </tr>
         </thead>
         <tbody>

@@ -742,6 +742,10 @@ async function boot() {
     ]);
     if (base) App.backendBase = base;
     App.settings = settings || {};
+    // Apply saved language
+    if (settings?.language && typeof I18N !== 'undefined') {
+      I18N.setLang(settings.language, { save: false });
+    }
   } catch {}
 
   // Load version

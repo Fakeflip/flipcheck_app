@@ -24,8 +24,8 @@ const AlertsView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Preisalarm</h1>
-          <p>Automatische Benachrichtigung wenn der Marktpreis dein Ziel unterschreitet</p>
+          <h1>${I18N.t('al.title')}</h1>
+          <p>${I18N.t('al.subtitle')}</p>
           <div class="al-stats-bar" id="alStatsBar" style="display:none"></div>
         </div>
         <div class="page-header-right">
@@ -34,7 +34,7 @@ const AlertsView = (() => {
               <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.86 4.4 2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               <path d="M13.5 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Jetzt prüfen
+            ${I18N.t('al.btn.refresh')}
           </button>
         </div>
       </div>
@@ -48,7 +48,7 @@ const AlertsView = (() => {
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" class="al-spin">
                 <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
               </svg>
-              Lade Alarme…
+              ${I18N.t('al.loading')}
             </div>
           </div>
         </div>
@@ -65,20 +65,20 @@ const AlertsView = (() => {
                 </svg>
               </div>
               <div>
-                <div class="al-panel-title">Neuer Preisalarm</div>
-                <div class="al-panel-sub">EAN + Zielpreis eingeben</div>
+                <div class="al-panel-title">${I18N.t('al.panel.title')}</div>
+                <div class="al-panel-sub">${I18N.t('al.panel.sub')}</div>
               </div>
             </div>
 
             <div class="la-field">
-              <label class="input-label">EAN / GTIN</label>
+              <label class="input-label">${I18N.t('al.lbl.ean')}</label>
               <input id="alEan" class="input" type="text" placeholder="z.B. 4010884506594" maxlength="20"/>
             </div>
 
             <div class="la-field">
               <label class="input-label">
-                Zielpreis
-                <span style="font-weight:400;color:var(--dim)">(Alarm wenn ≤)</span>
+                ${I18N.t('al.lbl.target')}
+                <span style="font-weight:400;color:var(--dim)">${I18N.t('al.lbl.target_hint')}</span>
               </label>
               <div class="input-prefix-wrap">
                 <span class="prefix">€</span>
@@ -88,14 +88,14 @@ const AlertsView = (() => {
 
             <div class="la-field">
               <label class="input-label">
-                Bezeichnung
-                <span style="font-weight:400;color:var(--dim)">(optional)</span>
+                ${I18N.t('al.lbl.name')}
+                <span style="font-weight:400;color:var(--dim)">${I18N.t('al.lbl.name_hint')}</span>
               </label>
               <input id="alTitle" class="input" type="text" placeholder="z.B. Nintendo Switch Lite"/>
             </div>
 
             <div class="la-field">
-              <label class="input-label">Markt</label>
+              <label class="input-label">${I18N.t('al.lbl.market')}</label>
               <select id="alMarket" class="select">
                 <option value="ebay">🛒 eBay</option>
                 <option value="amz">📦 Amazon</option>
@@ -107,7 +107,7 @@ const AlertsView = (() => {
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
                 <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
               </svg>
-              Alarm hinzufügen
+              ${I18N.t('al.btn.add')}
             </button>
           </div>
 
@@ -122,8 +122,8 @@ const AlertsView = (() => {
                 </svg>
               </div>
               <div>
-                <div class="al-panel-title">Discord Webhook</div>
-                <div class="al-panel-sub">Push-Benachrichtigung per Discord</div>
+                <div class="al-panel-title">${I18N.t('al.wh.title')}</div>
+                <div class="al-panel-sub">${I18N.t('al.wh.sub')}</div>
               </div>
             </div>
 
@@ -133,7 +133,7 @@ const AlertsView = (() => {
                 <span class="al-toggle-track"></span>
                 <span class="al-toggle-thumb"></span>
               </label>
-              <span class="al-wh-label">Alarm per Discord senden</span>
+              <span class="al-wh-label">${I18N.t('al.wh.toggle')}</span>
             </div>
 
             ${_whUrl
@@ -143,17 +143,17 @@ const AlertsView = (() => {
                        <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
                        <path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                      </svg>
-                     Webhook konfiguriert
+                     ${I18N.t('al.wh.configured')}
                    </span>
-                   <button class="btn btn-ghost btn-xs" id="alWhTest">Test senden</button>
+                   <button class="btn btn-ghost btn-xs" id="alWhTest">${I18N.t('al.wh.test')}</button>
                  </div>`
               : `<div class="al-wh-hint">
                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none" style="flex-shrink:0;opacity:.5;margin-top:1px">
                      <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
                      <path d="M8 5v4M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                    </svg>
-                   <span>Kein Webhook konfiguriert —
-                     <a href="#" id="alGoWebhook" class="al-wh-link">in Einstellungen einrichten →</a>
+                   <span>${I18N.t('al.wh.no_webhook')}
+                     <a href="#" id="alGoWebhook" class="al-wh-link">${I18N.t('al.wh.settings_link')}</a>
                    </span>
                  </div>`
             }
@@ -168,7 +168,7 @@ const AlertsView = (() => {
                   <path d="M8 5v4M8 11v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                 </svg>
               </div>
-              <div class="al-panel-title">So funktioniert's</div>
+              <div class="al-panel-title">${I18N.t('al.howto.title')}</div>
             </div>
             <div class="al-info-steps">
               <div class="al-info-step">
@@ -212,11 +212,11 @@ const AlertsView = (() => {
     const checks    = _alerts.reduce((s, a) => s + (a.check_count || 0), 0);
     bar.style.display = "flex";
     bar.innerHTML = `
-      <span class="al-stat-pill"><b>${_alerts.length}</b> Alarme</span>
-      <span class="al-stat-pill al-stat-pill-green"><b>${active}</b> Aktiv</span>
-      ${triggered ? `<span class="al-stat-pill al-stat-pill-accent"><b>${triggered}</b> Ausgelöst</span>` : ""}
-      ${paused    ? `<span class="al-stat-pill"><b>${paused}</b> Pausiert</span>` : ""}
-      <span class="al-stat-pill"><b>${checks}</b> Prüfungen</span>
+      <span class="al-stat-pill"><b>${_alerts.length}</b> ${I18N.t('al.stats.alarms')}</span>
+      <span class="al-stat-pill al-stat-pill-green"><b>${active}</b> ${I18N.t('al.stats.active')}</span>
+      ${triggered ? `<span class="al-stat-pill al-stat-pill-accent"><b>${triggered}</b> ${I18N.t('al.stats.triggered')}</span>` : ""}
+      ${paused    ? `<span class="al-stat-pill"><b>${paused}</b> ${I18N.t('al.stats.paused')}</span>` : ""}
+      <span class="al-stat-pill"><b>${checks}</b> ${I18N.t('al.stats.checks')}</span>
     `;
   }
 
@@ -233,8 +233,8 @@ const AlertsView = (() => {
               <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
             </svg>
           </div>
-          <div class="al-empty-title">Noch kein Preisalarm</div>
-          <div class="al-empty-sub">Füge rechts einen EAN + Zielpreis hinzu, um automatisch benachrichtigt zu werden.</div>
+          <div class="al-empty-title">${I18N.t('al.empty.title')}</div>
+          <div class="al-empty-sub">${I18N.t('al.empty.sub')}</div>
         </div>
       `;
       return;
@@ -272,7 +272,7 @@ const AlertsView = (() => {
             <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
             <path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
-          Ausgelöst
+          ${I18N.t('al.status.triggered')}
         </span>`;
     } else if (!active) {
       statusChip = `
@@ -281,13 +281,13 @@ const AlertsView = (() => {
             <rect x="4" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/>
             <rect x="9.5" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/>
           </svg>
-          Pausiert
+          ${I18N.t('al.status.paused')}
         </span>`;
     } else {
       statusChip = `
         <span class="al-chip al-chip-active">
           <span class="al-chip-pulse"></span>
-          Aktiv
+          ${I18N.t('al.status.active')}
         </span>`;
     }
 
@@ -309,7 +309,7 @@ const AlertsView = (() => {
     // Abstand-Kachel — computed numbers only
     const diffBlock = diffPct != null
       ? `<div class="al-price-tile">
-           <span class="al-price-label">Abstand</span>
+           <span class="al-price-label">${I18N.t('al.row.distance')}</span>
            <span class="al-price-val" style="color:${diffPct <= 0 ? "var(--green)" : diffPct < 15 ? "var(--yellow)" : "var(--text2)"}">
              ${diffPct >= 0 ? "+" : ""}${diffPct.toFixed(1)}%
            </span>
@@ -323,7 +323,7 @@ const AlertsView = (() => {
              <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
              <path d="M5 8l2 2 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
            </svg>
-           <span>Zielpreis erreicht! Preis war <strong>${fmtEur(a.triggered_price)}</strong>${a.triggered_at ? ` am ${fmtDate(a.triggered_at)}` : ""}</span>
+           <span>${I18N.t('al.notif.title')} ${I18N.t('al.discord.target')} war <strong>${fmtEur(a.triggered_price)}</strong>${a.triggered_at ? ` am ${fmtDate(a.triggered_at)}` : ""}</span>
          </div>`
       : "";
 
@@ -333,14 +333,14 @@ const AlertsView = (() => {
                <svg class="al-hist-chevron" width="10" height="10" viewBox="0 0 16 16" fill="none">
                  <path d="M5 6l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                </svg>
-               Verlauf (${a.trigger_history.length})
+               ${I18N.t('al.row.history')} (${a.trigger_history.length})
              </button>
              <div class="al-history-panel" id="al-hist-${a.id}">
                ${html.safe([...a.trigger_history].reverse().map(h => `
                  <div class="al-history-row">
                    <span class="al-hist-ts">${fmtTime(h.ts)}</span>
                    <span class="al-hist-price">${fmtEur(h.price)}</span>
-                   ${tgt ? `<span class="al-hist-delta">−${fmtEur(Math.max(0, tgt - h.price))} unter Ziel</span>` : ""}
+                   ${tgt ? `<span class="al-hist-delta">−${fmtEur(Math.max(0, tgt - h.price))} ${I18N.t('al.row.below_target')}</span>` : ""}
                  </div>`).join(""))}
              </div>`
       : "";
@@ -360,7 +360,7 @@ const AlertsView = (() => {
           <div class="al-card-top-right">
             ${html.safe(statusChip)}
             <div class="al-card-actions">
-              <button class="btn btn-ghost btn-xs al-row-toggle" title="${active ? "Pausieren" : "Aktivieren"}">
+              <button class="btn btn-ghost btn-xs al-row-toggle" title="${active ? I18N.t('al.status.paused') : I18N.t('al.status.active')}">
                 <svg width="10" height="10" viewBox="0 0 16 16" fill="none">${html.safe(toggleIcon)}</svg>
               </button>
               ${html.safe(resetBtn)}
@@ -376,14 +376,14 @@ const AlertsView = (() => {
         <!-- Price comparison tiles -->
         <div class="al-price-row">
           <div class="al-price-tile">
-            <span class="al-price-label">Zielpreis</span>
+            <span class="al-price-label">${I18N.t('al.row.target')}</span>
             <span class="al-price-val text-accent">${html.safe(fmtEur(tgt))}</span>
           </div>
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none" class="text-dim shrink-0">
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           <div class="al-price-tile${(cur != null && tgt && cur <= tgt) ? " al-price-tile-hit" : ""}">
-            <span class="al-price-label">Aktuell</span>
+            <span class="al-price-label">${I18N.t('al.row.current')}</span>
             <span class="al-price-val${(cur != null && tgt && cur <= tgt) ? " al-price-hit" : ""}">${html.safe(cur != null ? fmtEur(cur) : "—")}</span>
           </div>
           ${html.safe(diffBlock)}
@@ -395,7 +395,7 @@ const AlertsView = (() => {
             <div class="al-price-bar-fill" style="width:${barPct}%;background:${barColor}"></div>
           </div>
           <span class="al-price-bar-label">
-            ${html.safe(a.last_checked ? fmtTime(a.last_checked) : "Noch nicht geprüft")}
+            ${html.safe(a.last_checked ? fmtTime(a.last_checked) : I18N.t('al.row.not_checked'))}
           </span>
         </div>
 
@@ -430,13 +430,13 @@ const AlertsView = (() => {
 
       // ── Delete ───────────────────────────────────────────────────────────
       if (e.target.closest(".al-row-del")) {
-        const ok = await Modal.confirm("Alarm löschen", "Diesen Preisalarm wirklich entfernen?", { confirmLabel: "Löschen", danger: true });
+        const ok = await Modal.confirm(I18N.t('al.confirm.delete'), I18N.t('al.confirm.delete_sub'), { confirmLabel: I18N.t('inv.edit.del_confirm'), danger: true });
         if (ok) {
           try {
             _alerts = await Storage.removeAlert(id);
             renderList(); updateStatsBar();
           } catch (err) {
-            Toast.error("Löschen fehlgeschlagen", "Alarm konnte nicht entfernt werden.");
+            Toast.error(I18N.t('al.toast.del_failed'), I18N.t('al.toast.del_err'));
             ErrorReporter.report(err, "alerts:removeAlert");
           }
         }
@@ -448,9 +448,9 @@ const AlertsView = (() => {
         try {
           _alerts = await Storage.resetAlert(id);
           renderList(); updateStatsBar();
-          Toast.info("Zurückgesetzt", "Alarm ist wieder aktiv.");
+          Toast.info(I18N.t('al.toast.reset'), I18N.t('al.toast.reset_sub'));
         } catch (err) {
-          Toast.error("Zurücksetzen fehlgeschlagen", "Alarm konnte nicht zurückgesetzt werden.");
+          Toast.error(I18N.t('al.toast.reset_failed'), I18N.t('al.toast.reset_err'));
           ErrorReporter.report(err, "alerts:resetAlert");
         }
         return;
@@ -464,7 +464,7 @@ const AlertsView = (() => {
           _alerts = await Storage.updateAlert({ id, active: !alert.active });
           renderList(); updateStatsBar();
         } catch (err) {
-          Toast.error("Fehler", "Status konnte nicht geändert werden.");
+          Toast.error(I18N.t('al.toast.status_err'), I18N.t('al.toast.status_err_sub'));
           ErrorReporter.report(err, "alerts:toggleAlert");
         }
       }
@@ -485,11 +485,11 @@ const AlertsView = (() => {
       const market = _el.querySelector("#alMarket")?.value || "ebay";
 
       if (!ean || !/^\d{8,14}$/.test(ean)) {
-        Toast.error("Ungültige EAN", "Bitte eine gültige EAN/GTIN (8–14 Ziffern) eingeben.");
+        Toast.error(I18N.t('al.toast.invalid_ean'), I18N.t('al.toast.invalid_ean_sub'));
         return;
       }
       if (isNaN(target) || target <= 0) {
-        Toast.error("Ungültiger Zielpreis", "Bitte einen gültigen Preis (> 0 €) eingeben.");
+        Toast.error(I18N.t('al.toast.invalid_price'), I18N.t('al.toast.invalid_price_sub'));
         return;
       }
 
@@ -497,7 +497,7 @@ const AlertsView = (() => {
       btn.disabled = true;
       btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none" class="al-spin">
         <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
-      </svg> Wird hinzugefügt…`;
+      </svg> ${I18N.t('al.btn.adding')}`;
 
       try {
         _alerts = await Storage.addAlert({ ean, target_price: target, title: title || null, market });
@@ -505,16 +505,16 @@ const AlertsView = (() => {
         _el.querySelector("#alEan").value    = "";
         _el.querySelector("#alTarget").value = "";
         _el.querySelector("#alTitle").value  = "";
-        Toast.success("Alarm gespeichert", `Preisalarm für EAN ${ean} (Ziel: ${fmtEur(target)}) ist jetzt aktiv.`);
+        Toast.success(I18N.t('al.toast.saved'), `${I18N.t('al.lbl.ean')} ${ean} (${I18N.t('al.row.target')}: ${fmtEur(target)})`);
       } catch (err) {
-        Toast.error("Speichern fehlgeschlagen", "Alarm konnte nicht gespeichert werden.");
+        Toast.error(I18N.t('al.toast.save_failed'), I18N.t('al.toast.save_err'));
         ErrorReporter.report(err, "alerts:addAlert");
       }
 
       btn.disabled = false;
       btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none">
         <path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
-      </svg> Alarm hinzufügen`;
+      </svg> ${I18N.t('al.btn.add')}`;
     });
 
     // Jetzt prüfen
@@ -523,7 +523,7 @@ const AlertsView = (() => {
       btn.disabled = true;
       btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none" class="al-spin">
         <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" stroke-dasharray="28" stroke-dashoffset="10" stroke-linecap="round"/>
-      </svg> Prüfe…`;
+      </svg> ${I18N.t('al.btn.checking')}`;
       await runAlertChecks();
       _alerts = await Storage.listAlerts();
       renderList(); updateStatsBar();
@@ -533,7 +533,7 @@ const AlertsView = (() => {
           <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.86 4.4 2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           <path d="M13.5 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        Jetzt prüfen
+        ${I18N.t('al.btn.refresh')}
       `;
     });
 
@@ -547,16 +547,16 @@ const AlertsView = (() => {
     _el?.querySelector("#alWhTest")?.addEventListener("click", async () => {
       if (!_whUrl) return;
       const btn = _el.querySelector("#alWhTest");
-      btn.disabled = true; btn.textContent = "Sende…";
+      btn.disabled = true; btn.textContent = I18N.t('comp.wh.sending');
       try {
         await _fireAlertWebhook(_whUrl,
           { ean: "TEST-EAN", target_price: 29.99, title: "Testbenachrichtigung" }, 27.50);
-        Toast.success("Test gesendet", "Discord-Webhook funktioniert korrekt.");
+        Toast.success(I18N.t('al.toast.test_sent'), I18N.t('al.toast.test_ok'));
       } catch (err) {
-        Toast.error("Webhook-Fehler", "Test konnte nicht gesendet werden. URL prüfen.");
+        Toast.error(I18N.t('al.toast.wh_err'), I18N.t('al.toast.wh_err_sub'));
         ErrorReporter.report(err, "alerts:testWebhook");
       }
-      btn.disabled = false; btn.textContent = "Test senden";
+      btn.disabled = false; btn.textContent = I18N.t('al.wh.test');
     });
 
     // "konfigurieren →" → Settings
@@ -639,8 +639,8 @@ async function runAlertChecks() {
           // Desktop notification
           const mktLabel  = MARKET_LABELS_AL[alert.market] || "eBay";
           const notifBody = `${alert.title || alert.ean}: ${mktLabel} ${fmt(currentPrice)} ≤ Ziel ${fmt(alert.target_price)}`;
-          try { await window.fc.notify("🎯 Preisalarm ausgelöst!", notifBody); } catch {}
-          Toast.success("Preisalarm!", `${alert.title || alert.ean}: ${fmt(currentPrice)}`);
+          try { await window.fc.notify(`🎯 ${I18N.t('al.notif.title')}`, notifBody); } catch {}
+          Toast.success(I18N.t('al.notif.toast'), `${alert.title || alert.ean}: ${fmt(currentPrice)}`);
 
           // Discord webhook
           if (whUrl && whEnabled) {
@@ -671,13 +671,13 @@ async function _fireAlertWebhook(webhookUrl, alert, currentPrice) {
     embeds: [{
       color:       0x10B981,
       author:      { name: "▲ FLIPCHECK" },
-      title:       "🎯 Preisalarm ausgelöst!",
+      title:       `🎯 ${I18N.t('al.notif.title')}`,
       description: `**${alert.title || alert.ean}**`,
       fields: [
-        { name: "EAN",        value: String(alert.ean),               inline: true },
-        { name: "Zielpreis",  value: fmt(alert.target_price),         inline: true },
-        { name: `${MARKET_LABELS_AL[alert.market] || "eBay"}-Preis`, value: fmt(currentPrice), inline: true },
-        { name: "Ersparnis",  value: savings > 0 ? `−${fmt(savings)}` : "—", inline: true },
+        { name: "EAN",                                                          value: String(alert.ean),               inline: true },
+        { name: I18N.t('al.discord.target'),                                   value: fmt(alert.target_price),         inline: true },
+        { name: `${MARKET_LABELS_AL[alert.market] || "eBay"}-${I18N.t('al.row.current')}`, value: fmt(currentPrice), inline: true },
+        { name: I18N.t('al.discord.savings'),                                  value: savings > 0 ? `−${fmt(savings)}` : "—", inline: true },
       ],
       footer:    { text: `Flipcheck · ${new Date().toLocaleString("de-DE")}` },
       timestamp: new Date().toISOString(),

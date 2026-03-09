@@ -98,7 +98,7 @@ const InventoryView = (() => {
     inp.value = ean;
     inp.dispatchEvent(new Event("input"));
     inp.focus();
-    if (typeof Toast !== "undefined") Toast.success("EAN gescannt", ean);
+    if (typeof Toast !== "undefined") Toast.success(I18N.t('inv.scanner.toast_title'), ean);
   }
 
   async function mount(container) {
@@ -141,21 +141,21 @@ const InventoryView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Inventory</h1>
-          <p id="invCount">Lade…</p>
+          <h1>${I18N.t('nav.inventory')}</h1>
+          <p id="invCount">${I18N.t('inv.loading')}</p>
         </div>
         <div class="page-header-actions">
           <button class="btn btn-ghost btn-sm" id="btnImportCsv" title="CSV importieren">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Import
+            ${I18N.t('inv.btn.import')}
           </button>
           <button class="btn btn-ghost btn-sm" id="btnExportCsv" title="CSV exportieren">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 10V2M5 5l3-3 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Export
+            ${I18N.t('inv.btn.export')}
           </button>
           <button class="btn btn-primary btn-sm" id="btnAddItem">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 1v14M1 8h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-            Hinzufügen
+            ${I18N.t('inv.btn.add')}
           </button>
           <button class="btn btn-secondary btn-sm" id="btnRefreshInv">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1 0 1.5-3.9M2 2v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -168,30 +168,30 @@ const InventoryView = (() => {
 
       <!-- Filters -->
       <div class="inv-filters">
-        <input id="invSearch" class="input" type="search" placeholder="Suche nach Titel, EAN, SKU…" style="flex:1;max-width:280px" />
+        <input id="invSearch" class="input" type="search" placeholder="${I18N.t('inv.filter.search_placeholder')}" style="flex:1;max-width:280px" />
         <select id="invStatusFilter" class="select">
-          <option value="">Alle Status</option>
+          <option value="">${I18N.t('inv.filter.all_status')}</option>
           ${STATUSES.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join("")}
         </select>
         <select id="invMarketFilter" class="select">
-          <option value="">Alle Märkte</option>
+          <option value="">${I18N.t('inv.filter.all_markets')}</option>
           ${MARKETS.map(m => `<option value="${m}">${m.toUpperCase()}</option>`).join("")}
         </select>
       </div>
 
       <!-- Bulk Bar -->
       <div id="invBulkBar" class="inv-bulk-bar" style="display:none">
-        <span id="invBulkCount">0 ausgewählt</span>
+        <span id="invBulkCount">0 ${I18N.t('inv.bulk.selected')}</span>
         <select id="invBulkStatus" class="select" style="max-width:160px;font-size:12px;padding:4px 8px;height:28px">
-          <option value="">Status setzen…</option>
+          <option value="">${I18N.t('inv.bulk.set_status')}</option>
           ${STATUSES.map(s => `<option value="${s}">${STATUS_LABELS[s]}</option>`).join("")}
         </select>
-        <button class="btn btn-secondary btn-sm" id="btnBulkApply">Anwenden</button>
+        <button class="btn btn-secondary btn-sm" id="btnBulkApply">${I18N.t('inv.bulk.apply')}</button>
         <button class="btn btn-danger btn-sm" id="btnBulkDelete">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M5 4V2h6v2M6 7v5M10 7v5M3 4l1 10h8l1-10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Löschen
+          ${I18N.t('inv.bulk.delete')}
         </button>
-        <button class="btn btn-ghost btn-sm" id="btnBulkCancel" style="margin-left:auto">Abbrechen</button>
+        <button class="btn btn-ghost btn-sm" id="btnBulkCancel" style="margin-left:auto">${I18N.t('inv.bulk.cancel')}</button>
       </div>
 
       <!-- Table -->
@@ -268,34 +268,34 @@ const InventoryView = (() => {
     bar.innerHTML = `
       <div class="batch-sum-kpi">
         <span class="batch-sum-val">${inStock}</span>
-        <span class="batch-sum-label">Auf Lager</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.in_stock')}</span>
       </div>
       <div class="batch-sum-sep"></div>
       <div class="batch-sum-kpi">
         <span class="batch-sum-val" style="color:var(--accent)">${listed}</span>
-        <span class="batch-sum-label">Gelistet</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.listed')}</span>
       </div>
       ${inbound > 0 ? `
       <div class="batch-sum-sep"></div>
       <div class="batch-sum-kpi">
         <span class="batch-sum-val" style="color:var(--yellow)">${inbound}</span>
-        <span class="batch-sum-label">Unterwegs</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.inbound')}</span>
       </div>` : ""}
       <div class="batch-sum-sep"></div>
       <div class="batch-sum-kpi">
         <span class="batch-sum-val" style="color:var(--green)">${sold}</span>
-        <span class="batch-sum-label">Verkauft</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.sold')}</span>
       </div>
       <div class="batch-sum-sep"></div>
       <div class="batch-sum-kpi">
         <span class="batch-sum-val" style="${invested > 0 ? "" : "color:var(--text-muted)"}">${invested > 0 ? fmtEur(invested) : "—"}</span>
-        <span class="batch-sum-label">Investiert</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.invested')}</span>
       </div>
       ${avgProfit != null ? `
       <div class="batch-sum-sep"></div>
       <div class="batch-sum-kpi">
         <span class="batch-sum-val" style="color:${avgProfit >= 0 ? "var(--green)" : "var(--red)"}">${fmtEur(avgProfit)}</span>
-        <span class="batch-sum-label">Ø Profit</span>
+        <span class="batch-sum-label">${I18N.t('inv.stats.avg_profit')}</span>
       </div>` : ""}
     `;
   }
@@ -313,8 +313,8 @@ const InventoryView = (() => {
       wrap.innerHTML = `
         <div class="empty-state">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v4M10 14h4"/></svg>
-          <p class="empty-title">Keine Artikel</p>
-          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market ? "Keine Artikel mit diesen Filtern gefunden." : "Noch keine Artikel im Inventory. Klicke auf \"Hinzufügen\"."}</p>
+          <p class="empty-title">${I18N.t('inv.empty.title')}</p>
+          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market ? I18N.t('inv.empty.sub_filtered') : I18N.t('inv.empty.sub_empty')}</p>
         </div>
       `;
       return;
@@ -329,13 +329,13 @@ const InventoryView = (() => {
           <thead>
             <tr>
               <th style="width:36px"><input type="checkbox" id="invSelectAll" ${allChecked ? "checked" : ""} /></th>
-              <th class="inv-sort-th${_state.sort.col==="title"  ?" inv-sort-active":""}" data-sort="title" >Artikel ${_sortIcon("title")}</th>
-              <th class="inv-sort-th${_state.sort.col==="market" ?" inv-sort-active":""}" data-sort="market">Markt ${_sortIcon("market")}</th>
+              <th class="inv-sort-th${_state.sort.col==="title"  ?" inv-sort-active":""}" data-sort="title" >${I18N.t('inv.col.article')} ${_sortIcon("title")}</th>
+              <th class="inv-sort-th${_state.sort.col==="market" ?" inv-sort-active":""}" data-sort="market">${I18N.t('inv.col.market')} ${_sortIcon("market")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="ek"     ?" inv-sort-active":""}" data-sort="ek"    >EK ${_sortIcon("ek")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="vk"     ?" inv-sort-active":""}" data-sort="vk"    >VK ${_sortIcon("vk")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="profit" ?" inv-sort-active":""}" data-sort="profit">Profit ${_sortIcon("profit")}</th>
               <th class="inv-sort-th${_state.sort.col==="status" ?" inv-sort-active":""}" data-sort="status">Status ${_sortIcon("status")}</th>
-              <th class="inv-sort-th col-right${_state.sort.col==="age"    ?" inv-sort-active":""}" data-sort="age"   >Alter ${_sortIcon("age")}</th>
+              <th class="inv-sort-th col-right${_state.sort.col==="age"    ?" inv-sort-active":""}" data-sort="age"   >${I18N.t('inv.col.age')} ${_sortIcon("age")}</th>
               <th style="width:100px"></th>
             </tr>
           </thead>
@@ -449,7 +449,7 @@ const InventoryView = (() => {
     const el = container?.querySelector("#invCount");
     if (!el) return;
     const f = getFiltered();
-    el.textContent = `${_state.items.length} Artikel · ${f.length} angezeigt`;
+    el.textContent = `${_state.items.length} ${I18N.t('inv.count.items')} · ${f.length} ${I18N.t('inv.count.shown')}`;
   }
 
   function updateBulkBar(container) {
@@ -458,7 +458,7 @@ const InventoryView = (() => {
     if (!bar) return;
     if (_state.selected.size > 0) {
       bar.style.display = "flex";
-      if (count) count.textContent = `${_state.selected.size} ausgewählt`;
+      if (count) count.textContent = `${_state.selected.size} ${I18N.t('inv.bulk.selected')}`;
     } else {
       bar.style.display = "none";
     }
@@ -503,24 +503,24 @@ const InventoryView = (() => {
 
     container.querySelector("#btnBulkApply")?.addEventListener("click", async () => {
       const status = container.querySelector("#invBulkStatus")?.value;
-      if (!status) { Toast.warning("Kein Status", "Bitte einen Status auswählen."); return; }
+      if (!status) { Toast.warning(I18N.t('inv.bulk.no_status'), I18N.t('inv.bulk.no_status_sub')); return; }
       const ids = [..._state.selected];
       await Storage.bulkUpdate(ids, { status });
       _state.selected.clear();
       await loadItems(container);
       updateBulkBar(container);
-      Toast.success("Aktualisiert", `${ids.length} Artikel auf "${STATUS_LABELS[status]}" gesetzt.`);
+      Toast.success(I18N.t('inv.bulk.updated'), `${ids.length} ${I18N.t('inv.bulk.updated_sub')} "${STATUS_LABELS[status]}"`);
     });
 
     container.querySelector("#btnBulkDelete")?.addEventListener("click", async () => {
-      const ok = await Modal.confirm("Löschen bestätigen", `${_state.selected.size} Artikel wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.`, { confirmLabel: "Löschen", danger: true });
+      const ok = await Modal.confirm(I18N.t('inv.bulk.del_title'), `${_state.selected.size} ${I18N.t('inv.bulk.del_body')}`, { confirmLabel: I18N.t('inv.bulk.del_confirm'), danger: true });
       if (!ok) return;
       const ids = [..._state.selected];
       for (const id of ids) await Storage.deleteItem(id);
       _state.selected.clear();
       await loadItems(container);
       updateBulkBar(container);
-      Toast.success("Gelöscht", `${ids.length} Artikel gelöscht.`);
+      Toast.success(I18N.t('inv.bulk.del_done'), `${ids.length} ${I18N.t('inv.bulk.del_done_sub')}`);
     });
 
     container.querySelector("#btnBulkCancel")?.addEventListener("click", () => {
@@ -611,14 +611,14 @@ const InventoryView = (() => {
             <div style="background:${vb};border:1px solid ${vc}44;border-radius:10px;padding:8px 18px;font-size:18px;font-weight:800;color:${vc};flex-shrink:0">${esc(verdict)}</div>
             <div>
               <div style="font-size:22px;font-weight:800;line-height:1;color:var(--text-primary)">${profit != null ? fmtEur(profit) : "—"}</div>
-              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${margin != null ? `${margin.toFixed(1)} % Marge` : "EK = 0 → kein Profit"}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:3px">${margin != null ? `${margin.toFixed(1)} % ${I18N.t('inv.pc.margin')}` : I18N.t('inv.pc.no_profit')}</div>
             </div>
           </div>
           <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${fmtEur(data.sell_price_median)}</div><div class="fc-amz-kpi-l">Median VK</div></div>
-            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${profit != null ? fmtEur(profit) : "—"}</div><div class="fc-amz-kpi-l">Profit</div></div>
-            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${margin != null ? margin.toFixed(1) + " %" : "—"}</div><div class="fc-amz-kpi-l">Marge</div></div>
-            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${data.sales_30d ?? "—"}</div><div class="fc-amz-kpi-l">Verk./30d</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${fmtEur(data.sell_price_median)}</div><div class="fc-amz-kpi-l">${I18N.t('inv.pc.median_vk')}</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${profit != null ? fmtEur(profit) : "—"}</div><div class="fc-amz-kpi-l">${I18N.t('inv.pc.profit')}</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${margin != null ? margin.toFixed(1) + " %" : "—"}</div><div class="fc-amz-kpi-l">${I18N.t('inv.pc.margin')}</div></div>
+            <div class="fc-amz-kpi"><div class="fc-amz-kpi-v">${data.sales_30d ?? "—"}</div><div class="fc-amz-kpi-l">${I18N.t('fc.kpi.sales30')}</div></div>
           </div>
           <div style="font-size:11px;color:var(--dim);padding-top:8px;border-top:1px solid var(--border);display:flex;gap:16px;flex-wrap:wrap">
             <span>EAN: <strong style="color:var(--text-secondary)">${esc(ean)}</strong></span>
@@ -627,10 +627,10 @@ const InventoryView = (() => {
             ${data.sales_last_day != null ? `<span>Ø/Tag: <strong style="color:var(--text-secondary)">${data.sales_last_day.toFixed(1)}</strong></span>` : ""}
           </div>
         </div>`,
-        buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }],
+        buttons: [{ label: I18N.t('inv.pc.close'), variant: "btn-ghost", value: false }],
       });
     } catch (err) {
-      Toast.error("Flipcheck fehlgeschlagen", err.message || "Backend nicht erreichbar");
+      Toast.error(I18N.t('inv.pc.err'), err.message || I18N.t('inv.pc.err_sub'));
     } finally {
       if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
     }
@@ -640,35 +640,35 @@ const InventoryView = (() => {
     const body = `
       <div class="col gap-12">
         <div class="input-group">
-          <label class="input-label">EAN *</label>
+          <label class="input-label">${I18N.t('inv.add.ean')}</label>
           <div style="display:flex;gap:6px">
             <input id="mEan" class="input" type="text" placeholder="Barcode / EAN" autocomplete="off" style="flex:1" />
             <button type="button" class="btn btn-ghost btn-sm" id="invScanBtn" title="Handy-Scanner öffnen" style="flex-shrink:0;font-size:16px;padding:0 10px">📷</button>
           </div>
         </div>
         <div class="input-group">
-          <label class="input-label">Titel</label>
-          <input id="mTitle" class="input" type="text" placeholder="Produktname" />
+          <label class="input-label">${I18N.t('inv.add.title')}</label>
+          <input id="mTitle" class="input" type="text" placeholder="${I18N.t('inv.add.title_placeholder')}" />
         </div>
         <div class="grid-2 gap-12">
           <div class="input-group">
-            <label class="input-label">Einkaufspreis (€)</label>
+            <label class="input-label">${I18N.t('inv.add.ek')}</label>
             <input id="mEk" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
           </div>
           <div class="input-group">
-            <label class="input-label">Menge</label>
+            <label class="input-label">${I18N.t('inv.add.qty')}</label>
             <input id="mQty" class="input" type="number" min="1" value="1" />
           </div>
         </div>
         <div class="grid-2 gap-12">
           <div class="input-group">
-            <label class="input-label">Markt</label>
+            <label class="input-label">${I18N.t('inv.add.market')}</label>
             <select id="mMarket" class="select">
               ${MARKETS.map(m => `<option value="${m}">${m.toUpperCase()}</option>`).join("")}
             </select>
           </div>
           <div class="input-group">
-            <label class="input-label">Status</label>
+            <label class="input-label">${I18N.t('inv.add.status')}</label>
             <select id="mStatus" class="select">
               ${STATUSES.map(s => `<option value="${s}" ${s==="IN_STOCK"?"selected":""}>${STATUS_LABELS[s]}</option>`).join("")}
             </select>
@@ -676,24 +676,24 @@ const InventoryView = (() => {
         </div>
         ${_buildCatRowHtml("ebay", null)}
         <div class="input-group">
-          <label class="input-label">Label</label>
-          <input id="mLabel" class="input" type="text" placeholder="Tag, Kategorie…" />
+          <label class="input-label">${I18N.t('inv.add.label')}</label>
+          <input id="mLabel" class="input" type="text" placeholder="${I18N.t('inv.add.label_placeholder')}" />
         </div>
         <div class="input-group">
-          <label class="input-label">Bezugsquelle</label>
-          <input id="mSource" class="input" type="text" placeholder="z.B. Amazon, Lidl, OBI…" />
+          <label class="input-label">${I18N.t('inv.add.source')}</label>
+          <input id="mSource" class="input" type="text" placeholder="${I18N.t('inv.add.source_placeholder')}" />
         </div>
       </div>
     `;
 
     Modal.open({
-      title: "Artikel hinzufügen",
+      title: I18N.t('inv.add.modal_title'),
       body,
       buttons: [
-        { label: "Abbrechen", variant: "btn-ghost", value: false },
-        { label: "Hinzufügen", variant: "btn-primary", action: async () => {
+        { label: I18N.t('inv.add.cancel'), variant: "btn-ghost", value: false },
+        { label: I18N.t('inv.add.submit'), variant: "btn-primary", action: async () => {
           const ean = document.getElementById("mEan")?.value.trim();
-          if (!ean) { Toast.error("EAN fehlt", "Bitte eine EAN eingeben."); return; }
+          if (!ean) { Toast.error(I18N.t('inv.add.err_ean'), I18N.t('inv.add.err_ean_sub')); return; }
           await Storage.upsertItem({
             ean,
             title:  document.getElementById("mTitle")?.value.trim() || "",
@@ -707,7 +707,7 @@ const InventoryView = (() => {
           });
           Modal.close(true);
           await loadItems(container);
-          Toast.success("Hinzugefügt", `${ean} wurde zum Inventory hinzugefügt.`);
+          Toast.success(I18N.t('inv.add.added'), `${ean} ${I18N.t('inv.add.added_sub')}`);
         }},
       ],
     });
@@ -726,32 +726,32 @@ const InventoryView = (() => {
     const body = `
       <div class="col gap-12">
         <div class="input-group">
-          <label class="input-label">Titel</label>
+          <label class="input-label">${I18N.t('inv.add.title')}</label>
           <input id="eTitle" class="input" type="text" value="${esc(item.title||"")}" />
         </div>
         <div class="input-group">
-          <label class="input-label">EAN</label>
+          <label class="input-label">${I18N.t('inv.add.ean')}</label>
           <input id="eEan" class="input" type="text" value="${esc(item.ean||"")}" />
         </div>
         <div class="grid-2 gap-12">
           <div class="input-group">
-            <label class="input-label">EK (€)</label>
+            <label class="input-label">${I18N.t('inv.edit.ek')}</label>
             <input id="eEk" class="input" type="number" step="0.01" value="${item.ek||""}" />
           </div>
           <div class="input-group">
-            <label class="input-label">Menge</label>
+            <label class="input-label">${I18N.t('inv.add.qty')}</label>
             <input id="eQty" class="input" type="number" min="1" value="${item.qty||1}" />
           </div>
         </div>
         <div class="grid-2 gap-12">
           <div class="input-group">
-            <label class="input-label">Markt</label>
+            <label class="input-label">${I18N.t('inv.add.market')}</label>
             <select id="eMarket" class="select">
               ${MARKETS.map(m => `<option value="${m}" ${item.market===m?"selected":""}>${m.toUpperCase()}</option>`).join("")}
             </select>
           </div>
           <div class="input-group">
-            <label class="input-label">Status</label>
+            <label class="input-label">${I18N.t('inv.add.status')}</label>
             <select id="eStatus" class="select">
               ${STATUSES.map(s => `<option value="${s}" ${item.status===s?"selected":""}>${STATUS_LABELS[s]}</option>`).join("")}
             </select>
@@ -759,33 +759,33 @@ const InventoryView = (() => {
         </div>
         ${_buildCatRowHtml(item.market || "ebay", item.cat_id)}
         <div class="input-group">
-          <label class="input-label">Label</label>
+          <label class="input-label">${I18N.t('inv.add.label')}</label>
           <input id="eLabel" class="input" type="text" value="${esc(item.label||"")}" />
         </div>
         <div class="input-group">
-          <label class="input-label">Bezugsquelle</label>
-          <input id="eSource" class="input" type="text" value="${esc(item.source||"")}" placeholder="z.B. Amazon, Lidl, OBI" />
+          <label class="input-label">${I18N.t('inv.add.source')}</label>
+          <input id="eSource" class="input" type="text" value="${esc(item.source||"")}" placeholder="${I18N.t('inv.add.source_placeholder')}" />
         </div>
         <div class="input-group">
-          <label class="input-label">Notiz</label>
+          <label class="input-label">${I18N.t('inv.edit.notes')}</label>
           <textarea id="eNotes" class="textarea" rows="2">${esc(item.notes||"")}</textarea>
         </div>
       </div>
     `;
 
     Modal.open({
-      title: `Artikel bearbeiten`,
+      title: I18N.t('inv.edit.modal_title'),
       body,
       buttons: [
-        { label: "Löschen", variant: "btn-danger", action: async () => {
-          const ok = await Modal.confirm("Löschen?", `"${item.title||item.ean}" wirklich löschen?`, { confirmLabel: "Löschen", danger: true });
+        { label: I18N.t('inv.edit.delete'), variant: "btn-danger", action: async () => {
+          const ok = await Modal.confirm(I18N.t('inv.edit.del_title'), `"${item.title||item.ean}" ${I18N.t('inv.edit.del_body')}`, { confirmLabel: I18N.t('inv.edit.del_confirm'), danger: true });
           if (!ok) return;
           await Storage.deleteItem(id);
           await loadItems(container);
-          Toast.success("Gelöscht");
+          Toast.success(I18N.t('inv.edit.del_done'));
         }},
-        { label: "Abbrechen", variant: "btn-ghost", value: false },
-        { label: "Speichern", variant: "btn-primary", action: async () => {
+        { label: I18N.t('inv.edit.cancel'), variant: "btn-ghost", value: false },
+        { label: I18N.t('inv.edit.save'), variant: "btn-primary", action: async () => {
           const newStatus = document.getElementById("eStatus")?.value || item.status;
           await Storage.upsertItem({
             ...item,
@@ -804,7 +804,7 @@ const InventoryView = (() => {
           });
           Modal.close(true);
           await loadItems(container);
-          Toast.success("Gespeichert");
+          Toast.success(I18N.t('inv.edit.saved'));
         }},
       ],
     });
@@ -875,7 +875,7 @@ const InventoryView = (() => {
     else if (market === "kaufland") opts = _buildKlCatOptions(catId);
     else opts = _buildCatOptions(catId);
     return `<div id="invCatRow" class="input-group">
-      <label class="input-label">Kategorie (Gebühr)</label>
+      <label class="input-label">${I18N.t('inv.add.category')}</label>
       <select id="invCatSel" class="select">${opts}</select>
     </div>`;
   }
@@ -906,20 +906,20 @@ const InventoryView = (() => {
 
     const body = `
       <div class="col gap-12">
-        <p class="text-secondary text-sm">"${esc(item.title||item.ean)}" als verkauft markieren.</p>
+        <p class="text-secondary text-sm">"${esc(item.title||item.ean)}" ${I18N.t('inv.sold.subtitle')}</p>
 
         ${totalQty > 1 ? `
         <div class="input-group">
           <label class="input-label">
-            Menge verkaufen
-            <span style="color:var(--text-muted);font-weight:400;margin-left:4px">auf Lager: ${totalQty}×</span>
+            ${I18N.t('inv.sold.qty_label')}
+            <span style="color:var(--text-muted);font-weight:400;margin-left:4px">${I18N.t('inv.sold.qty_stock')}: ${totalQty}×</span>
           </label>
           <div style="display:flex;align-items:center;gap:10px">
             <input id="soldQtyInp" class="input" type="number" min="1" max="${totalQty}" value="${totalQty}"
               style="max-width:90px;text-align:center;font-size:15px;font-weight:600" />
             <div id="soldQtyHint" class="inv-sold-qty-hint inv-sold-qty-hint--all">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
-              Alle ${totalQty} Stück als verkauft
+              ${I18N.t('inv.sold.qty_all_prefix')} ${totalQty} ${I18N.t('inv.sold.qty_all_suffix')}
             </div>
           </div>
         </div>
@@ -927,14 +927,14 @@ const InventoryView = (() => {
 
         <div class="grid-2 gap-12">
           <div class="input-group">
-            <label class="input-label">Verkaufspreis (€) *</label>
+            <label class="input-label">${I18N.t('inv.sold.vk_label')}</label>
             <div class="input-prefix-wrap">
               <span class="prefix">€</span>
               <input id="soldVk" class="input" type="number" step="0.01" min="0" placeholder="0.00" />
             </div>
           </div>
           <div class="input-group">
-            <label class="input-label">Versand raus (€)</label>
+            <label class="input-label">${I18N.t('inv.sold.ship_out_label')}</label>
             <div class="input-prefix-wrap">
               <span class="prefix">€</span>
               <input id="soldShipOut" class="input" type="number" step="0.01" min="0" placeholder="0.00" value="${item.ship_out || ""}" />
@@ -943,35 +943,35 @@ const InventoryView = (() => {
         </div>
         ${(!item.market || item.market === "ebay") ? `
         <div class="input-group">
-          <label class="input-label">Kategorie (für eBay-Gebühr)</label>
+          <label class="input-label">${I18N.t('inv.sold.cat_ebay')}</label>
           <select id="soldCatId" class="select">${_buildCatOptions(item.cat_id)}</select>
         </div>` : item.market === "amz" ? `
         <div class="input-group">
-          <label class="input-label">Kategorie (Amazon Referral)</label>
+          <label class="input-label">${I18N.t('inv.sold.cat_amz')}</label>
           <select id="soldCatId" class="select">${_buildAmzCatOptions(item.cat_id)}</select>
         </div>` : item.market === "kaufland" ? `
         <div class="input-group">
-          <label class="input-label">Kategorie (Kaufland Provision)</label>
+          <label class="input-label">${I18N.t('inv.sold.cat_kl')}</label>
           <select id="soldCatId" class="select">${_buildKlCatOptions(item.cat_id)}</select>
         </div>` : `<input type="hidden" id="soldCatId" value=""/>`}
         <div class="input-group">
-          <label class="input-label">Verkaufsdatum</label>
+          <label class="input-label">${I18N.t('inv.sold.date_label')}</label>
           <input id="soldDate" class="input" type="date" value="${new Date().toISOString().slice(0,10)}" />
         </div>
         <div id="soldProfitPreview" style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px;font-size:12px;color:var(--text-secondary)">
-          Profit-Vorschau erscheint nach VK-Eingabe
+          ${I18N.t('inv.sold.preview_empty')}
         </div>
       </div>
     `;
 
     Modal.open({
-      title: "Als verkauft markieren",
+      title: I18N.t('inv.sold.modal_title'),
       body,
       buttons: [
-        { label: "Abbrechen", variant: "btn-ghost", value: false },
-        { label: "Verkauft", variant: "btn-success", action: async () => {
+        { label: I18N.t('inv.sold.cancel'), variant: "btn-ghost", value: false },
+        { label: I18N.t('inv.sold.confirm'), variant: "btn-success", action: async () => {
           const vk = parseFloat(document.getElementById("soldVk")?.value);
-          if (!vk || vk <= 0) { Toast.error("VK fehlt", "Bitte einen Verkaufspreis eingeben."); return; }
+          if (!vk || vk <= 0) { Toast.error(I18N.t('inv.sold.err_vk'), I18N.t('inv.sold.err_vk_sub')); return; }
 
           const soldDate = document.getElementById("soldDate")?.value;
           const shipOut  = parseFloat(document.getElementById("soldShipOut")?.value) || 0;
@@ -1021,13 +1021,13 @@ const InventoryView = (() => {
           });
           if (remainQty > 0) {
             Toast.success(
-              `${soldQty}× verkauft`,
-              `${remainQty}× bleibt auf Lager${perUnitProfit != null ? ` · Profit: ${fmtEur(perUnitProfit)}/Stück` : ""}`
+              `${soldQty}× ${I18N.t('inv.sold.toast_partial')}`,
+              `${remainQty}× ${I18N.t('inv.sold.toast_remain')}${perUnitProfit != null ? ` · ${I18N.t('inv.sold.toast_profit')}: ${fmtEur(perUnitProfit)}/${I18N.t('inv.sold.toast_piece')}` : ""}`
             );
           } else {
             Toast.success(
-              "Verkauft",
-              perUnitProfit != null ? `Profit (nach Gebühren): ${fmtEur(perUnitProfit)}` : "Artikel als verkauft markiert."
+              I18N.t('inv.sold.toast_done'),
+              perUnitProfit != null ? `${I18N.t('inv.sold.toast_profit_full')}: ${fmtEur(perUnitProfit)}` : I18N.t('inv.sold.toast_done_sub')
             );
           }
         }},
@@ -1040,7 +1040,7 @@ const InventoryView = (() => {
         ? Math.min(totalQty, Math.max(1, parseInt(document.getElementById("soldQtyInp")?.value) || totalQty))
         : 1;
 
-      const MKT_FEE_LABELS = { ebay: "eBay-Gebühr", amz: "Amazon-Gebühr", kaufland: "Kaufland-Gebühr", other: "Gebühr" };
+      const MKT_FEE_LABELS = { ebay: I18N.t('inv.sold.fee_ebay'), amz: I18N.t('inv.sold.fee_amz'), kaufland: I18N.t('inv.sold.fee_kl'), other: I18N.t('inv.sold.fee_other') };
 
       const updatePreview = () => {
         const vk      = parseFloat(document.getElementById("soldVk")?.value)      || 0;
@@ -1049,7 +1049,7 @@ const InventoryView = (() => {
         const soldQty = getQty();
         const el      = document.getElementById("soldProfitPreview");
         if (!el) return;
-        if (!vk || !item.ek) { el.textContent = "Profit-Vorschau erscheint nach VK-Eingabe"; return; }
+        if (!vk || !item.ek) { el.textContent = I18N.t('inv.sold.preview_empty'); return; }
         const market     = item.market || "ebay";
         const fee        = calcMarketFee(vk, market, catId);
         const feeLabel   = MKT_FEE_LABELS[market] || "Gebühr";
@@ -1058,12 +1058,12 @@ const InventoryView = (() => {
         const color      = unitProfit >= 0 ? "var(--green)" : "var(--red)";
         el.innerHTML = `
           <div style="display:flex;justify-content:space-between;align-items:center">
-            <span>Profit${soldQty > 1 ? " pro Stück" : ""} (nach Geb. + Versand)</span>
+            <span>${I18N.t('inv.sold.preview_profit')}${soldQty > 1 ? " " + I18N.t('inv.sold.preview_per_unit') : ""} (${I18N.t('inv.sold.preview_after_fees')})</span>
             <strong style="color:${color};font-size:14px">${fmtEur(unitProfit)}</strong>
           </div>
           ${soldQty > 1 ? `
           <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:12px">
-            <span style="color:var(--text-muted)">${soldQty}× gesamt</span>
+            <span style="color:var(--text-muted)">${soldQty}× ${I18N.t('inv.sold.preview_total')}</span>
             <strong style="color:${color}">${unitProfit >= 0 ? "+" : ""}${fmtEur(unitProfit * soldQty)}</strong>
           </div>` : ""}
           <div style="display:flex;justify-content:space-between;margin-top:4px;color:var(--text-muted);font-size:11px">
@@ -1084,14 +1084,14 @@ const InventoryView = (() => {
               <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
               <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            ${remQ}× bleibt auf Lager`;
+            ${remQ}× ${I18N.t('inv.sold.hint_remain')}`;
         } else {
           hint.className = "inv-sold-qty-hint inv-sold-qty-hint--all";
           hint.innerHTML = `
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none">
               <path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Alle ${totalQty} Stück als verkauft`;
+            ${I18N.t('inv.sold.qty_all_prefix')} ${totalQty} ${I18N.t('inv.sold.qty_all_suffix')}`;
         }
         updatePreview();
       };
@@ -1113,7 +1113,7 @@ const InventoryView = (() => {
    */
   function exportCsv() {
     const rows = getFiltered();
-    if (rows.length === 0) { Toast.warning("Keine Daten", "Keine Artikel zum Exportieren."); return; }
+    if (rows.length === 0) { Toast.warning(I18N.t('inv.export.empty'), I18N.t('inv.export.empty_sub')); return; }
 
     const cols   = ["ean","title","ek","qty","status","market","sell_price","ship_out","cat_id","label","source","notes","created_at","sold_at"];
     const header = ["EAN","Titel","EK","Menge","Status","Markt","VK","Versand raus","Kategorie","Label","Quelle","Notiz","Erstellt","Verkauft am"];
@@ -1136,7 +1136,7 @@ const InventoryView = (() => {
     a.download = `flipcheck-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 2000);
-    Toast.success("Exportiert", `${rows.length} Artikel als CSV gespeichert.`);
+    Toast.success(I18N.t('inv.export.done'), `${rows.length} ${I18N.t('inv.export.done_sub')}`);
   }
 
   // ── CSV Import ──────────────────────────────────────────────────────────
@@ -1156,7 +1156,7 @@ const InventoryView = (() => {
       if (!file) return;
       const reader = new FileReader();
       reader.onload  = e => parseAndPreviewCsv(e.target.result, container);
-      reader.onerror = () => Toast.error("Lesefehler", "CSV konnte nicht gelesen werden.");
+      reader.onerror = () => Toast.error(I18N.t('inv.import.read_err'), I18N.t('inv.import.read_err_sub'));
       reader.readAsText(file, "utf-8");
     });
 
@@ -1166,14 +1166,14 @@ const InventoryView = (() => {
   function parseAndPreviewCsv(text, container) {
     const { items, skipped, error } = InventoryData.parseCsv(text, STATUSES);
 
-    if (error === "too_few_lines") { Toast.error("Leere Datei", "CSV enthält keine Daten."); return; }
+    if (error === "too_few_lines") { Toast.error(I18N.t('inv.import.empty_file'), I18N.t('inv.import.empty_file_sub')); return; }
     if (error === "no_ean_column") {
-      Toast.error("Format-Fehler", "Keine EAN-Spalte. Erwartet: EAN, Barcode oder GTIN als Spaltenname.");
+      Toast.error(I18N.t('inv.import.format_err'), I18N.t('inv.import.format_err_sub'));
       return;
     }
 
     if (items.length === 0) {
-      Toast.error("Keine Artikel", skipped.length ? skipped[0] : "Keine gültigen Artikel in der CSV.");
+      Toast.error(I18N.t('inv.import.no_items'), skipped.length ? skipped[0] : I18N.t('inv.import.no_items_sub'));
       return;
     }
 
@@ -1189,13 +1189,14 @@ const InventoryView = (() => {
         <td style="font-size:11px;text-align:center">${i.qty}</td>
         <td><span class="badge status-${i.status}" style="font-size:10px">${STATUS_LABELS[i.status] || i.status}</span></td>
       </tr>`).join("");
+    // Note: table headers EAN, Titel, EK, Menge, Status are technical CSV field names — not translated
 
     const moreNote = items.length > 6
       ? `<div style="color:var(--text-muted);font-size:11px;padding:6px 0">… und ${items.length - 6} weitere Artikel</div>` : "";
 
     const previewBody = `
       <div class="col gap-12">
-        <p class="text-secondary text-sm"><strong style="color:var(--text)">${items.length}</strong> Artikel bereit zum Import:</p>
+        <p class="text-secondary text-sm"><strong style="color:var(--text)">${items.length}</strong> ${I18N.t('inv.import.preview_sub')}:</p>
         <div class="table-wrap" style="max-height:220px;overflow-y:auto">
           <table class="table">
             <thead><tr><th>EAN</th><th>Titel</th><th class="col-right">EK</th><th style="text-align:center">Menge</th><th>Status</th></tr></thead>
@@ -1209,11 +1210,11 @@ const InventoryView = (() => {
     `;
 
     Modal.open({
-      title: "CSV Import",
+      title: I18N.t('inv.import.modal_title'),
       body: previewBody,
       buttons: [
-        { label: "Abbrechen", variant: "btn-ghost", value: false },
-        { label: `${items.length} importieren`, variant: "btn-primary", action: async () => {
+        { label: I18N.t('inv.import.cancel'), variant: "btn-ghost", value: false },
+        { label: `${items.length} ${I18N.t('inv.import.submit')}`, variant: "btn-primary", action: async () => {
           Modal.close(true);
           let done = 0, failed = 0;
           for (const item of items) {
@@ -1222,9 +1223,9 @@ const InventoryView = (() => {
           }
           await loadItems(container);
           if (failed > 0) {
-            Toast.warning("Import fertig", `${done} importiert, ${failed} fehlgeschlagen.`);
+            Toast.warning(I18N.t('inv.import.done_warn'), `${done} ${I18N.t('inv.import.done_warn_sub')}, ${failed} ${I18N.t('inv.import.failed')}`);
           } else {
-            Toast.success("Import abgeschlossen", `${done} Artikel erfolgreich importiert.`);
+            Toast.success(I18N.t('inv.import.done'), `${done} ${I18N.t('inv.import.done_sub')}`);
           }
         }},
       ],

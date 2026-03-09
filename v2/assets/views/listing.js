@@ -2,13 +2,15 @@
 const ListingAssistant = (() => {
 
   // ── Zustand-Optionen (eBay DE) ────────────────────────────────────────────
-  const CONDITIONS = [
-    { id: "new",        label: "Neu",        desc: "ungeöffnete Originalverpackung" },
-    { id: "like_new",   label: "Wie neu",    desc: "geöffnet, niemals benutzt" },
-    { id: "very_good",  label: "Sehr gut",   desc: "wenig benutzt, kaum Gebrauchsspuren" },
-    { id: "good",       label: "Gut",        desc: "benutzt, kleine Gebrauchsspuren" },
-    { id: "acceptable", label: "Akzeptabel", desc: "deutliche Gebrauchsspuren, voll funktionsfähig" },
-  ];
+  function _conditions() {
+    return [
+      { id: "new",        get label() { return I18N.t('lst.cond.new'); },        get desc() { return I18N.t('lst.cond.new_desc'); } },
+      { id: "like_new",   get label() { return I18N.t('lst.cond.like_new'); },   get desc() { return I18N.t('lst.cond.like_new_desc'); } },
+      { id: "very_good",  get label() { return I18N.t('lst.cond.very_good'); },  get desc() { return I18N.t('lst.cond.very_good_desc'); } },
+      { id: "good",       get label() { return I18N.t('lst.cond.good'); },       get desc() { return I18N.t('lst.cond.good_desc'); } },
+      { id: "acceptable", get label() { return I18N.t('lst.cond.acceptable'); }, get desc() { return I18N.t('lst.cond.acceptable_desc'); } },
+    ];
+  }
 
   // ── Shipping-Optionen ─────────────────────────────────────────────────────
   const SHIP_METHODS = [
@@ -21,6 +23,7 @@ const ListingAssistant = (() => {
 
   // ── Beschreibung generieren ───────────────────────────────────────────────
   function generateDescription(title, ean, conditionId, shipMethod) {
+    const CONDITIONS = _conditions();
     const cond     = CONDITIONS.find(c => c.id === conditionId) || CONDITIONS[2];
     const ship     = SHIP_METHODS.find(s => s.id === shipMethod) || SHIP_METHODS[0];
     const condLine = `${cond.label} — ${cond.desc}`;
@@ -57,22 +60,22 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
   function renderProfitBox(profit, margin, roi, fee) {
     const c = (v, pos, mid) => v >= pos ? "var(--green)" : v >= mid ? "var(--yellow)" : "var(--red)";
     return `
-      <div class="la-profit-label">Live Profit (≈13% eBay Gebühr)</div>
+      <div class="la-profit-label">${I18N.t('lst.lbl.profit_box')}</div>
       <div class="la-profit-grid">
         <div class="la-kpi">
-          <div class="la-kpi-l">Profit</div>
+          <div class="la-kpi-l">${I18N.t('lst.kpi.profit')}</div>
           <div class="la-kpi-v" style="color:${c(profit,7,0)}">${fmtEur(profit)}</div>
         </div>
         <div class="la-kpi">
-          <div class="la-kpi-l">Margin</div>
+          <div class="la-kpi-l">${I18N.t('lst.kpi.margin')}</div>
           <div class="la-kpi-v" style="color:${c(margin,20,10)}">${margin.toFixed(1)}%</div>
         </div>
         <div class="la-kpi">
-          <div class="la-kpi-l">ROI</div>
+          <div class="la-kpi-l">${I18N.t('lst.kpi.roi')}</div>
           <div class="la-kpi-v" style="color:${c(roi,20,0)}">${roi.toFixed(1)}%</div>
         </div>
         <div class="la-kpi">
-          <div class="la-kpi-l">eBay Fee</div>
+          <div class="la-kpi-l">${I18N.t('lst.kpi.fee')}</div>
           <div class="la-kpi-v text-muted">−${fmtEur(fee)}</div>
         </div>
       </div>
@@ -86,7 +89,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
     const defaultDesc = generateDescription(title, ean, "very_good", "dhl");
     const { fee, profit, margin, roi } = liveCalc(suggestedVk, parseFloat(ek), 0);
 
-    const condOptions = CONDITIONS.map(c =>
+    const condOptions = _conditions().map(c =>
       `<option value="${c.id}"${c.id === "very_good" ? " selected" : ""}>${c.label}</option>`
     ).join("");
 
@@ -109,7 +112,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
             ${data.verdict ? `&nbsp;·&nbsp;<span class="badge badge-${data.verdict === "BUY" ? "green" : data.verdict === "HOLD" ? "yellow" : "red"}" style="font-size:9px">${data.verdict}</span>` : ""}
           </div>
 
-          <label class="input-label mb-4">Beschreibung (bearbeitbar)</label>
+          <label class="input-label mb-4">${I18N.t('lst.lbl.description')}</label>
           <textarea id="laDesc" class="la-desc">${escHtml(defaultDesc)}</textarea>
 
           <div class="row gap-8 mt-8">
@@ -118,9 +121,9 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
                 <rect x="5.5" y="1.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4"/>
                 <rect x="1.5" y="4.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="var(--bg-panel)"/>
               </svg>
-              Beschreibung kopieren
+              ${I18N.t('lst.btn.copy_desc')}
             </button>
-            <button class="btn btn-ghost btn-sm" id="laRegen">↻ Neu generieren</button>
+            <button class="btn btn-ghost btn-sm" id="laRegen">${I18N.t('lst.btn.regen')}</button>
           </div>
         </div>
 
@@ -128,7 +131,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
         <div class="la-right">
 
           <div class="la-field">
-            <label class="input-label">Verkaufspreis</label>
+            <label class="input-label">${I18N.t('lst.lbl.sell_price')}</label>
             <div class="input-prefix-wrap">
               <span class="prefix">€</span>
               <input id="laVk" class="input" type="number" step="0.01" min="0"
@@ -139,22 +142,22 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
 
           <div class="grid-2-md">
             <div class="la-field">
-              <label class="input-label">Zustand</label>
+              <label class="input-label">${I18N.t('lst.lbl.condition')}</label>
               <select id="laCondition" class="select">${condOptions}</select>
             </div>
             <div class="la-field">
-              <label class="input-label">Menge</label>
+              <label class="input-label">${I18N.t('lst.lbl.qty')}</label>
               <input id="laQty" class="input" type="number" min="1" value="1"/>
             </div>
           </div>
 
           <div class="grid-2-md">
             <div class="la-field">
-              <label class="input-label">Versandmethode</label>
+              <label class="input-label">${I18N.t('lst.lbl.ship_method')}</label>
               <select id="laShipMethod" class="select">${shipOptions}</select>
             </div>
             <div class="la-field">
-              <label class="input-label">Versandkosten (du zahlst)</label>
+              <label class="input-label">${I18N.t('lst.lbl.ship_cost')}</label>
               <div class="input-prefix-wrap">
                 <span class="prefix">€</span>
                 <input id="laShipOut" class="input" type="number" step="0.01" min="0" value="0.00"/>
@@ -168,8 +171,8 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
           </div>
 
           <div class="la-field">
-            <label class="input-label">Notizen (intern, nicht im Listing)</label>
-            <input id="laNotes" class="input" type="text" placeholder="z.B. Fundort, Zustandsbeschreibung, …"/>
+            <label class="input-label">${I18N.t('lst.lbl.notes')}</label>
+            <input id="laNotes" class="input" type="text" placeholder="${I18N.t('lst.ph.notes')}"/>
           </div>
 
           <div class="la-ctas">
@@ -178,14 +181,14 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
                 <rect x="5.5" y="1.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4"/>
                 <rect x="1.5" y="4.5" width="9" height="11" rx="1.2" stroke="currentColor" stroke-width="1.4" fill="var(--bg-panel)"/>
               </svg>
-              Kopieren + eBay öffnen
+              ${I18N.t('lst.btn.copy_open')}
             </button>
             <button class="btn btn-primary btn-sm" id="laSaveInv">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
                 <path d="M5 5V4a3 3 0 0 1 6 0v1M6 10.5h4M8 8.5v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               </svg>
-              In Inventory speichern
+              ${I18N.t('lst.btn.save')}
             </button>
           </div>
 
@@ -237,8 +240,8 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
       overlay.querySelector("#laCopyDesc")?.addEventListener("click", async () => {
         try {
           await navigator.clipboard.writeText(descTa?.value || "");
-          Toast.success("Kopiert!", "Beschreibung in der Zwischenablage.");
-        } catch { Toast.error("Kopieren fehlgeschlagen", "Text konnte nicht in die Zwischenablage kopiert werden."); }
+          Toast.success(I18N.t('lst.toast.copied'), I18N.t('lst.toast.copy_ok'));
+        } catch { Toast.error(I18N.t('lst.toast.copy_failed'), I18N.t('lst.toast.copy_err')); }
       });
 
       // Beschreibung neu generieren
@@ -248,7 +251,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
       // Titel + EAN + Preis in Zwischenablage → eBay Sell-Seite öffnen
       overlay.querySelector("#laOpenEbay")?.addEventListener("click", async () => {
         const vkVal  = parseFloat(vkInp?.value) || null;
-        const cond   = CONDITIONS.find(c => c.id === (condSel?.value || "very_good"))?.label || "Sehr gut";
+        const cond   = _conditions().find(c => c.id === (condSel?.value || "very_good"))?.label || I18N.t('lst.cond.very_good');
         const clipLines = [
           data.title || ean,
           `EAN: ${ean}`,
@@ -258,10 +261,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
 
         try { await navigator.clipboard.writeText(clipLines); } catch {}
         window.open("https://www.ebay.de/sell", "_blank");
-        Toast.info(
-          "eBay geöffnet",
-          "Titel, EAN & Preis wurden kopiert — im Listing-Formular einfügen."
-        );
+        Toast.info(I18N.t('lst.toast.ebay_opened'), I18N.t('lst.toast.ebay_sub'));
       });
 
       // In Inventory speichern
@@ -291,17 +291,17 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
         notes:      notes || "",
         condition:  condition || "very_good",
       });
-      Toast.success("Gespeichert", `${(data.title || ean).slice(0, 40)} zum Inventory hinzugefügt.`);
+      Toast.success(I18N.t('lst.toast.saved'), `${(data.title || ean).slice(0, 40)} → ${I18N.t('nav.inventory')}`);
       Modal.close();
     } catch {
-      Toast.error("Speichern fehlgeschlagen", "Listing konnte nicht im Inventory gespeichert werden.");
+      Toast.error(I18N.t('lst.toast.save_failed'), I18N.t('lst.toast.save_err'));
     }
   }
 
   // ── Öffnen ────────────────────────────────────────────────────────────────
   function open(data, ean, ek) {
     Modal.open({
-      title: "Listing erstellen",
+      title: I18N.t('lst.title'),
       body:  renderBody(data, ean, parseFloat(ek)),
       width: 860,
     });

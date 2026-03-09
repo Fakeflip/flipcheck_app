@@ -241,8 +241,8 @@ const AnalyticsView = (() => {
     const profitColor = s.totalProfit > 0 ? "text-green" : s.totalProfit < 0 ? "text-red" : "text-secondary";
     const marginColor = extra.avgMargin >= 20 ? "text-green" : extra.avgMargin >= 10 ? "text-yellow" : "text-secondary";
     const winColor    = extra.winRate >= 70 ? "text-green" : extra.winRate >= 50 ? "text-yellow" : "text-secondary";
-    const winLabel    = extra.winRate >= 70 ? "Stark" : extra.winRate >= 50 ? "Gut" : s.soldCount > 0 ? "Verbesserbar" : "—";
-    const marginLabel = extra.avgMargin >= 20 ? "Exzellent" : extra.avgMargin >= 10 ? "Gut" : s.soldCount > 0 ? "Ausbaufähig" : "—";
+    const winLabel    = extra.winRate >= 70 ? I18N.t('an.win.strong') : extra.winRate >= 50 ? I18N.t('an.win.good') : s.soldCount > 0 ? I18N.t('an.win.improvable') : "—";
+    const marginLabel = extra.avgMargin >= 20 ? I18N.t('an.margin.excellent') : extra.avgMargin >= 10 ? I18N.t('an.margin.good') : s.soldCount > 0 ? I18N.t('an.margin.improvable') : "—";
 
     // MoM trend badge with SVG arrow
     const trendBadge = extra.profitTrend === null ? "" : (() => {
@@ -262,20 +262,20 @@ const AnalyticsView = (() => {
       <!-- Page Header -->
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Analytics</h1>
-          <p>${s.soldCount} verkauft · ${s.activeCount} aktiv · ${totalCount} gesamt</p>
+          <h1>${I18N.t('an.title')}</h1>
+          <p>${s.soldCount} ${I18N.t('an.subtitle')}</p>
         </div>
         <div class="page-header-right">
           <div class="analytics-period-toggle">
-            <button class="seg-btn ${_period === "weekly" ? "active" : ""}" data-period="weekly">Wöchentlich</button>
-            <button class="seg-btn ${_period === "monthly" ? "active" : ""}" data-period="monthly">Monatlich</button>
+            <button class="seg-btn ${_period === "weekly" ? "active" : ""}" data-period="weekly">${I18N.t('an.period.weekly')}</button>
+            <button class="seg-btn ${_period === "monthly" ? "active" : ""}" data-period="monthly">${I18N.t('an.period.monthly')}</button>
           </div>
           <button class="btn btn-ghost btn-sm" id="btnRefreshAnalytics">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
               <path d="M13.5 8A5.5 5.5 0 1 1 8 2.5c1.8 0 3.4.86 4.4 2.2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               <path d="M13.5 2.5v3h-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Aktualisieren
+            ${I18N.t('an.refresh')}
           </button>
         </div>
       </div>
@@ -286,7 +286,7 @@ const AnalyticsView = (() => {
         <!-- Gesamtprofit -->
         <div class="kpi-card an-kpi-card${s.totalProfit > 0 ? " an-kpi-green" : s.totalProfit < 0 ? " an-kpi-red" : ""}">
           <div class="an-kpi-top">
-            <div class="kpi-label">Gesamtprofit</div>
+            <div class="kpi-label">${I18N.t('an.kpi.total_profit')}</div>
             <div class="an-kpi-ico${s.totalProfit >= 0 ? " an-kpi-ico--green" : " an-kpi-ico--red"}">
               <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <polyline points="1,11 5,6 8,8 12,3 15,5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -297,14 +297,14 @@ const AnalyticsView = (() => {
           <div class="kpi-value ${profitColor}">${fmtEur(s.totalProfit)}</div>
           <div class="kpi-meta">
             ${trendBadge}
-            <span>${s.soldCount} Verkäufe</span>
+            <span>${s.soldCount} ${I18N.t('an.kpi.sales')}</span>
           </div>
         </div>
 
         <!-- Win Rate -->
         <div class="kpi-card an-kpi-card">
           <div class="an-kpi-top">
-            <div class="kpi-label">Win Rate</div>
+            <div class="kpi-label">${I18N.t('an.kpi.win_rate')}</div>
             <div class="an-kpi-ico an-kpi-ico--accent">
               <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <path d="M8 1L10 6h5l-4 3 1.5 5L8 11.5 3.5 14 5 9 1 6h5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
@@ -318,14 +318,14 @@ const AnalyticsView = (() => {
           <div class="kpi-meta">
             <span class="${winColor} font-semibold">${winLabel}</span>
             <span style="color:var(--text-disabled)">·</span>
-            <span>${extra.winCount} profitabel</span>
+            <span>${extra.winCount} ${I18N.t('an.kpi.profitable')}</span>
           </div>
         </div>
 
         <!-- Ø Marge -->
         <div class="kpi-card an-kpi-card">
           <div class="an-kpi-top">
-            <div class="kpi-label">Ø Marge</div>
+            <div class="kpi-label">${I18N.t('an.kpi.avg_margin')}</div>
             <div class="an-kpi-ico">
               <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <circle cx="4.5" cy="4.5" r="2.5" stroke="currentColor" stroke-width="1.3"/>
@@ -343,7 +343,7 @@ const AnalyticsView = (() => {
         <!-- Aktives Kapital -->
         <div class="kpi-card an-kpi-card">
           <div class="an-kpi-top">
-            <div class="kpi-label">Aktives Kapital</div>
+            <div class="kpi-label">${I18N.t('an.kpi.active_capital')}</div>
             <div class="an-kpi-ico">
               <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <rect x="1" y="4" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.3"/>
@@ -353,13 +353,13 @@ const AnalyticsView = (() => {
             </div>
           </div>
           <div class="kpi-value">${fmtEur(s.activeCash)}</div>
-          <div class="kpi-meta"><span>${s.activeCount} Artikel gebunden</span></div>
+          <div class="kpi-meta"><span>${s.activeCount} ${I18N.t('an.kpi.items_bound')}</span></div>
         </div>
 
         <!-- Ø Days to Cash -->
         <div class="kpi-card an-kpi-card">
           <div class="an-kpi-top">
-            <div class="kpi-label">Ø Days to Cash</div>
+            <div class="kpi-label">${I18N.t('an.kpi.days_to_cash')}</div>
             <div class="an-kpi-ico">
               <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
                 <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.3"/>
@@ -368,7 +368,7 @@ const AnalyticsView = (() => {
             </div>
           </div>
           <div class="kpi-value">${s.avgDaysToCash > 0 ? fmtDays(s.avgDaysToCash) : "—"}</div>
-          <div class="kpi-meta"><span>Einkauf → Verkauf</span></div>
+          <div class="kpi-meta"><span>${I18N.t('an.kpi.purchase_sale')}</span></div>
         </div>
 
       </div>
@@ -384,13 +384,13 @@ const AnalyticsView = (() => {
                 <path d="M13 3h2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div class="an-panel-title">Profit-Kurve</div>
+            <div class="an-panel-title">${I18N.t('an.chart.profit_curve')}</div>
             <span class="badge badge-gray an-panel-badge" id="profitChartPeriodLabel">
-              ${_period === "monthly" ? "Monatlich" : "Wöchentlich"}
+              ${_period === "monthly" ? I18N.t('an.period.monthly') : I18N.t('an.period.weekly')}
             </span>
           </div>
           ${s.soldCount === 0
-            ? renderAnEmpty("Noch keine verkauften Artikel mit Verkaufspreis.")
+            ? renderAnEmpty(I18N.t('an.empty.no_sold_vk'))
             : `<div class="chart-container"><canvas id="chartProfit" height="200"></canvas></div>`}
         </div>
 
@@ -403,11 +403,11 @@ const AnalyticsView = (() => {
                 <rect x="11" y="1" width="3" height="14" rx="1" fill="currentColor"/>
               </svg>
             </div>
-            <div class="an-panel-title">Umsatz vs. Einkauf</div>
-            <span class="badge badge-gray an-panel-badge">Cashflow</span>
+            <div class="an-panel-title">${I18N.t('an.chart.revenue_vs')}</div>
+            <span class="badge badge-gray an-panel-badge">${I18N.t('an.chart.cashflow')}</span>
           </div>
           ${s.soldCount === 0
-            ? renderAnEmpty("Keine Verkaufsdaten vorhanden.")
+            ? renderAnEmpty(I18N.t('an.empty.no_sales'))
             : `<div class="chart-container"><canvas id="chartRevCost" height="200"></canvas></div>`}
         </div>
 
@@ -425,11 +425,11 @@ const AnalyticsView = (() => {
                 <path d="M8 8H15a7 7 0 0 0-7-7" fill="currentColor"/>
               </svg>
             </div>
-            <div class="an-panel-title">Portfolio-Split</div>
-            <span class="badge badge-gray an-panel-badge">${totalCount} Artikel</span>
+            <div class="an-panel-title">${I18N.t('an.chart.portfolio')}</div>
+            <span class="badge badge-gray an-panel-badge">${totalCount} ${I18N.t('an.chart.items')}</span>
           </div>
           ${totalCount === 0
-            ? renderAnEmpty("Keine Inventory-Daten.")
+            ? renderAnEmpty(I18N.t('an.empty.no_inventory'))
             : `<div class="an-doughnut-wrap"><canvas id="chartMarket"></canvas></div>`}
         </div>
 
@@ -442,8 +442,8 @@ const AnalyticsView = (() => {
                 <path d="M1 13c0-2.21 1.79-4 4-4M15 13c0-2.21-1.79-4-4-4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/>
               </svg>
             </div>
-            <div class="an-panel-title">Profit by Marktplatz</div>
-            <span class="badge badge-gray an-panel-badge">Verkäufe</span>
+            <div class="an-panel-title">${I18N.t('an.chart.profit_mkt')}</div>
+            <span class="badge badge-gray an-panel-badge">${I18N.t('an.chart.sales')}</span>
           </div>
           ${renderMarketBars(extra.marketProfit)}
         </div>
@@ -460,7 +460,7 @@ const AnalyticsView = (() => {
                 <path d="M8 1L10 6h5l-4 3 1.5 5L8 11.5 3.5 14 5 9 1 6h5z" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div class="an-panel-title">Beste Flips</div>
+            <div class="an-panel-title">${I18N.t('an.flips.best')}</div>
           </div>
           ${renderFlipTable(s.bestFlips)}
         </div>
@@ -473,7 +473,7 @@ const AnalyticsView = (() => {
                 <path d="M7.13 1.5L1.13 12a1 1 0 0 0 .87 1.5h12a1 1 0 0 0 .87-1.5L8.87 1.5a1 1 0 0 0-1.74 0z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
               </svg>
             </div>
-            <div class="an-panel-title">Schlechteste Flips</div>
+            <div class="an-panel-title">${I18N.t('an.flips.worst')}</div>
           </div>
           ${renderFlipTable(s.worstFlips)}
         </div>
@@ -512,7 +512,7 @@ const AnalyticsView = (() => {
   function renderMarketBars(marketProfit) {
     const entries = Object.entries(marketProfit).sort(([, a], [, b]) => b - a);
     if (!entries.length) {
-      return renderAnEmpty("Noch keine Marktdaten.");
+      return renderAnEmpty(I18N.t('an.empty.no_market'));
     }
     const maxAbs = Math.max(...entries.map(([, v]) => Math.abs(v)), 1);
     return `
@@ -541,17 +541,17 @@ const AnalyticsView = (() => {
   // ── Flip table ────────────────────────────────────────────────────────────
   function renderFlipTable(flips) {
     if (!flips.length) {
-      return renderAnEmpty("Noch keine verkauften Artikel.");
+      return renderAnEmpty(I18N.t('an.empty.no_sold'));
     }
     return `
       <div class="table-wrap">
         <table class="table">
           <thead>
             <tr>
-              <th>Artikel</th>
+              <th>${I18N.t('an.table.item')}</th>
               <th class="col-right">EK</th>
               <th class="col-right">VK</th>
-              <th class="col-right">Profit</th>
+              <th class="col-right">${I18N.t('an.ds.profit')}</th>
               <th class="col-right">ROI</th>
             </tr>
           </thead>
@@ -612,7 +612,7 @@ const AnalyticsView = (() => {
       data: {
         labels:   period.map(w => w.label),
         datasets: [{
-          label:            "Profit",
+          label:            I18N.t('an.ds.profit'),
           data:             period.map(w => w.profit),
           borderColor:      C.color,
           backgroundColor:  _css("--accent-subtle"),
@@ -660,14 +660,14 @@ const AnalyticsView = (() => {
         labels:   period.map(w => w.label),
         datasets: [
           {
-            label:           "Umsatz",
+            label:           I18N.t('an.ds.revenue'),
             data:            period.map(w => w.revenue),
             backgroundColor: C.color + "B3",
             borderRadius:    4,
             borderSkipped:   false,
           },
           {
-            label:           "Einkauf",
+            label:           I18N.t('an.ds.purchase'),
             data:            period.map(w => w.cost),
             backgroundColor: C.red + "73",
             borderRadius:    4,
@@ -726,7 +726,7 @@ const AnalyticsView = (() => {
             position: "right",
             labels: { font: { size: 11 }, padding: 12, color: C.text, boxWidth: 10, boxHeight: 10 },
           },
-          tooltip: _tooltip({ callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} Artikel` } }),
+          tooltip: _tooltip({ callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} ${I18N.t('an.chart.items')}` } }),
         },
       },
     });
@@ -741,7 +741,7 @@ const AnalyticsView = (() => {
         btn.classList.add("active");
 
         const lbl = container.querySelector("#profitChartPeriodLabel");
-        if (lbl) lbl.textContent = _period === "monthly" ? "Monatlich" : "Wöchentlich";
+        if (lbl) lbl.textContent = _period === "monthly" ? I18N.t('an.period.monthly') : I18N.t('an.period.weekly');
 
         const period = _period === "monthly"
           ? calcMonthlyPeriod(soldItems)

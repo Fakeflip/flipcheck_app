@@ -198,30 +198,30 @@ const SalesView = (() => {
     return `
     <div class="page-header">
       <div class="page-header-left">
-        <h1>Verkäufe</h1>
-        <p>Gewinn- & ROI-Analyse aller abgeschlossenen Verkäufe</p>
+        <h1>${I18N.t('sal.title')}</h1>
+        <p>${I18N.t('sal.subtitle')}</p>
         <div class="sales-stats-bar">
-          <span class="sales-stat-pill"><b>${allCount}</b> Verkäufe gesamt</span>
+          <span class="sales-stat-pill"><b>${allCount}</b> ${I18N.t('sal.stats.total_sales')}</span>
           <span class="sales-stat-pill ${allProfit >= 0 ? "sales-stat-pill-green" : "sales-stat-pill-red"}">
-            <b>${fmtEur(allProfit)}</b> Gesamtgewinn
+            <b>${fmtEur(allProfit)}</b> ${I18N.t('sal.stats.total_profit')}
           </span>
           <span class="sales-stat-pill ${allRoi >= 15 ? "sales-stat-pill-yellow" : ""}">
-            <b>Ø ${fmtPct(allRoi)}</b> ROI
+            <b>Ø ${fmtPct(allRoi)}</b> ${I18N.t('sal.stats.roi')}
           </span>
-          ${isFiltered ? `<span class="sales-stat-pill sales-stat-pill-accent"><b>${totalCount}</b> gefiltert</span>` : ""}
+          ${isFiltered ? `<span class="sales-stat-pill sales-stat-pill-accent"><b>${totalCount}</b> ${I18N.t('sal.stats.filtered')}</span>` : ""}
         </div>
       </div>
       <div class="page-header-right">
         <select class="input input-sm" id="selFilterMonth" style="width:130px">
-          <option value="">Alle Monate</option>
+          <option value="">${I18N.t('sal.filter.all_months')}</option>
           ${buildMonthOptions(_allSold)}
         </select>
         <select class="input input-sm" id="selFilterPlatform" style="width:120px">
-          <option value="">Alle Plattformen</option>
+          <option value="">${I18N.t('sal.filter.all_plat')}</option>
           <option value="ebay">eBay</option>
           <option value="amz">Amazon</option>
           <option value="kaufland">Kaufland</option>
-          <option value="other">Sonstige</option>
+          <option value="other">${I18N.t('sal.filter.other')}</option>
         </select>
         <button class="btn btn-ghost btn-sm" id="btnExportCSV">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="margin-right:4px">
@@ -236,52 +236,52 @@ const SalesView = (() => {
     <div class="sales-kpi-grid mb-16">
       <div class="comp-kpi-tile${totalCount > 0 ? " comp-kpi-accent" : ""}">
         <div class="comp-kpi-val">${totalCount}</div>
-        <div class="comp-kpi-lbl">Verkäufe${isFiltered ? " (gefiltert)" : ""}</div>
+        <div class="comp-kpi-lbl">${I18N.t('sal.kpi.sales')}${isFiltered ? ` ${I18N.t('sal.kpi.filtered')}` : ""}</div>
       </div>
       <div class="comp-kpi-tile">
         <div class="comp-kpi-val">${fmtEur(totalRevenue)}</div>
-        <div class="comp-kpi-lbl">Umsatz (brutto)</div>
+        <div class="comp-kpi-lbl">${I18N.t('sal.kpi.revenue')}</div>
       </div>
       <div class="comp-kpi-tile${totalProfit > 0 ? " comp-kpi-green" : totalProfit < 0 ? " comp-kpi-red" : ""}">
         <div class="comp-kpi-val">${fmtEur(totalProfit)}</div>
-        <div class="comp-kpi-lbl">Gewinn (netto)</div>
+        <div class="comp-kpi-lbl">${I18N.t('sal.kpi.profit')}</div>
       </div>
       <div class="comp-kpi-tile${avgRoi >= 15 ? " comp-kpi-green" : avgRoi < 0 ? " comp-kpi-red" : ""}">
         <div class="comp-kpi-val">${fmtPct(avgRoi)}</div>
-        <div class="comp-kpi-lbl">Ø ROI</div>
+        <div class="comp-kpi-lbl">${I18N.t('sal.kpi.avg_roi')}</div>
       </div>
     </div>
 
     <!-- Charts Row -->
     <div class="sales-charts-row mb-16">
       <div class="panel sales-chart-main">
-        <div class="kpi-label mb-12">Gewinn pro Monat</div>
+        <div class="kpi-label mb-12">${I18N.t('sal.chart.monthly')}</div>
         <div class="chart-wrap" style="height:180px">
           <canvas id="salesChartBar"></canvas>
         </div>
       </div>
       <div class="panel sales-chart-side">
-        <div class="kpi-label mb-12">Plattform-Split</div>
+        <div class="kpi-label mb-12">${I18N.t('sal.chart.platform')}</div>
         ${Object.keys(pSplit).length > 0 ? `
           <div class="chart-wrap" style="height:140px">
             <canvas id="salesChartDnt"></canvas>
           </div>
-        ` : `<div class="sales-empty-mini">Keine Daten</div>`}
+        ` : `<div class="sales-empty-mini">${I18N.t('sal.chart.no_data')}</div>`}
       </div>
     </div>
 
     <!-- Top 5 + Table row -->
     <div class="sales-bottom-row mb-16">
       <div class="panel">
-        <div class="kpi-label mb-12">Top 5 Verkäufe</div>
+        <div class="kpi-label mb-12">${I18N.t('sal.top5.title')}</div>
         ${top5.length > 0 ? `
         <table class="data-table" style="font-size:12px">
           <thead><tr>
-            <th>Produkt</th>
+            <th>${I18N.t('sal.th.product')}</th>
             <th class="col-right">EK</th>
             <th class="col-right">VK</th>
-            <th class="col-right">Gewinn</th>
-            <th class="col-right">ROI</th>
+            <th class="col-right">${I18N.t('sal.th.profit')}</th>
+            <th class="col-right">${I18N.t('sal.th.roi')}</th>
           </tr></thead>
           <tbody>
             ${top5.map(f => `<tr>
@@ -292,17 +292,17 @@ const SalesView = (() => {
               <td class="col-right"><span class="badge ${f._roi>=15?"badge-green":f._roi>=0?"badge-yellow":"badge-red"}">${fmtPct(f._roi)}</span></td>
             </tr>`).join("")}
           </tbody>
-        </table>` : `<div class="sales-empty-mini">Keine Verkäufe im Zeitraum</div>`}
+        </table>` : `<div class="sales-empty-mini">${I18N.t('sal.empty.period')}</div>`}
       </div>
     </div>
 
     <!-- Full Sales Table -->
     <div class="panel">
       <div class="row-between mb-12">
-        <div class="kpi-label">Alle Verkäufe</div>
-        <div class="text-xs text-muted">${filtered.length} Einträge</div>
+        <div class="kpi-label">${I18N.t('sal.all.title')}</div>
+        <div class="text-xs text-muted">${filtered.length} ${I18N.t('sal.entries')}</div>
       </div>
-      ${filtered.length > 0 ? buildTable(filtered) : `<div class="sales-empty-mini">Keine Verkäufe für diesen Filter</div>`}
+      ${filtered.length > 0 ? buildTable(filtered) : `<div class="sales-empty-mini">${I18N.t('sal.empty.filter')}</div>`}
     </div>
     `;
   }
@@ -316,15 +316,15 @@ const SalesView = (() => {
     <div style="overflow-x:auto">
     <table class="data-table sales-table">
       <thead><tr>
-        <th data-sort="title" style="cursor:pointer">Produkt${sortIcon("title")}</th>
+        <th data-sort="title" style="cursor:pointer">${I18N.t('sal.th.product')}${sortIcon("title")}</th>
         <th data-sort="ean"   style="cursor:pointer">EAN${sortIcon("ean")}</th>
         <th class="col-right" data-sort="ek"        style="cursor:pointer">EK${sortIcon("ek")}</th>
         <th class="col-right" data-sort="sell_price" style="cursor:pointer">VK${sortIcon("sell_price")}</th>
-        <th data-sort="market" style="cursor:pointer">Plattform${sortIcon("market")}</th>
-        <th class="col-right">Fee</th>
-        <th class="col-right" data-sort="profit"    style="cursor:pointer">Gewinn${sortIcon("profit")}</th>
-        <th class="col-right" data-sort="roi"       style="cursor:pointer">ROI${sortIcon("roi")}</th>
-        <th class="col-right" data-sort="sold_at"   style="cursor:pointer">Datum${sortIcon("sold_at")}</th>
+        <th data-sort="market" style="cursor:pointer">${I18N.t('sal.th.platform')}${sortIcon("market")}</th>
+        <th class="col-right">${I18N.t('sal.th.fee')}</th>
+        <th class="col-right" data-sort="profit"    style="cursor:pointer">${I18N.t('sal.th.profit')}${sortIcon("profit")}</th>
+        <th class="col-right" data-sort="roi"       style="cursor:pointer">${I18N.t('sal.th.roi')}${sortIcon("roi")}</th>
+        <th class="col-right" data-sort="sold_at"   style="cursor:pointer">${I18N.t('sal.th.date')}${sortIcon("sold_at")}</th>
         <th class="col-right"></th>
       </tr></thead>
       <tbody>
@@ -369,9 +369,9 @@ const SalesView = (() => {
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" class="text-muted">
         <path d="M12 2a10 10 0 1 0 0 20A10 10 0 0 0 12 2zM9 9l6 6M15 9l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       </svg>
-      <div class="sales-empty-title">Noch keine Verkäufe</div>
-      <div class="sales-empty-sub">Markiere Artikel im Inventory als "Verkauft", um sie hier auszuwerten.</div>
-      <button class="btn btn-primary mt-12" id="btnGoInventory">Zum Inventory</button>
+      <div class="sales-empty-title">${I18N.t('sal.empty.title')}</div>
+      <div class="sales-empty-sub">${I18N.t('sal.empty.sub')}</div>
+      <button class="btn btn-primary mt-12" id="btnGoInventory">${I18N.t('sal.btn.inventory')}</button>
     </div>`;
   }
 
@@ -419,18 +419,18 @@ const SalesView = (() => {
       const name = (item.title || item.ean || "Artikel").slice(0, 30);
       // Use Modal.confirm if available (design-system), fall back to native confirm
       const confirmed = typeof Modal !== "undefined"
-        ? await Modal.confirm("Verkauf rückgängig?", `"${name}" wird auf IN_STOCK zurückgesetzt.`)
-        : confirm(`Verkauf von "${name}" rückgängig machen?\nDer Artikel wird wieder auf IN_STOCK gesetzt.`);
+        ? await Modal.confirm(I18N.t('sal.confirm.undo'), `"${name}" ${I18N.t('sal.toast.undo_sub')}`)
+        : confirm(`${I18N.t('sal.confirm.undo')} "${name}"?\n${I18N.t('sal.toast.undo_sub')}`);
       if (!confirmed) return;
 
       try {
         const { upsertItem } = Storage;
         await upsertItem({ ...item, status: "IN_STOCK", sell_price: null, sold_at: null });
         _allSold = _allSold.filter(i => i.id !== id);
-        if (typeof Toast !== "undefined") Toast.success("Rückgängig", "Verkauf zurückgesetzt → IN_STOCK.");
+        if (typeof Toast !== "undefined") Toast.success(I18N.t('sal.toast.undo'), I18N.t('sal.toast.undo_sub'));
         render();
       } catch {
-        if (typeof Toast !== "undefined") Toast.error("Zurücksetzen fehlgeschlagen", "Verkauf konnte nicht zurückgesetzt werden.");
+        if (typeof Toast !== "undefined") Toast.error(I18N.t('sal.toast.undo_failed'), I18N.t('sal.toast.undo_err'));
       }
     });
   }
@@ -484,7 +484,7 @@ const SalesView = (() => {
           labels: monthly.map(m => m.label),
           datasets: [
             {
-              label: "Gewinn (netto)",
+              label: I18N.t('sal.ds.profit'),
               data:  monthly.map(m => +m.profit.toFixed(2)),
               backgroundColor: monthly.map(m => m.profit >= 0 ? C.accent + "BF" : C.red + "99"),
               borderColor:     monthly.map(m => m.profit >= 0 ? C.accent : C.red),
@@ -545,7 +545,7 @@ const SalesView = (() => {
                 position: "right",
                 labels: { font: { size: 11, family: C.font }, color: C.text, boxWidth: 10, padding: 10 },
               },
-              tooltip: _tooltip({ callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} Artikel` } }),
+              tooltip: _tooltip({ callbacks: { label: ctx => ` ${ctx.label}: ${ctx.parsed} ${I18N.t('an.chart.items')}` } }),
             },
           },
         });

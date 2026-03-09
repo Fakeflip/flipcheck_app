@@ -66,13 +66,13 @@ const DealScanView = (() => {
   function renderView() {
     const isAmz = _source === "amazon";
     const isKl  = _source === "kaufland";
-    const subtitle = isAmz ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
-                   : isKl  ? "Scannt Kaufland nach günstigen Produkten mit eBay-Flip-Potenzial"
-                   :         "Scannt eBay automatisch nach profitablen Produkten in deinem Budget";
+    const subtitle = isAmz ? I18N.t('ds.subtitle.amazon')
+                   : isKl  ? I18N.t('ds.subtitle.kaufland')
+                   :         I18N.t('ds.subtitle.ebay');
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Deal-Scanner</h1>
+          <h1>${I18N.t('ds.title')}</h1>
           <p id="dsSubtitle">${subtitle}</p>
         </div>
       </div>
@@ -90,28 +90,28 @@ const DealScanView = (() => {
           </div>
 
           <div class="panel mb-12">
-            <h3 class="panel-title">Scanner</h3>
+            <h3 class="panel-title">${I18N.t('ds.panel.title')}</h3>
             <div class="col gap-10">
 
               <div class="input-group">
-                <label class="input-label">Budget</label>
+                <label class="input-label">${I18N.t('ds.lbl.budget')}</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">€</span>
                   <input id="dsBudget" class="input" type="number" step="5" min="5" value="${isAmz ? 150 : isKl ? 80 : 100}"/>
                 </div>
-                <span class="input-hint">Max. Einkaufspreis pro Artikel</span>
+                <span class="input-hint">${I18N.t('ds.hint.budget')}</span>
               </div>
 
               <div class="grid-2-sm">
                 <div class="input-group">
-                  <label class="input-label">Min. Margin</label>
+                  <label class="input-label">${I18N.t('ds.lbl.min_margin')}</label>
                   <div class="input-prefix-wrap">
                     <span class="prefix">%</span>
                     <input id="dsMinMargin" class="input" type="number" step="1" min="1" max="100" value="20"/>
                   </div>
                 </div>
                 <div class="input-group">
-                  <label class="input-label">Min. ROI</label>
+                  <label class="input-label">${I18N.t('ds.lbl.min_roi')}</label>
                   <div class="input-prefix-wrap">
                     <span class="prefix">%</span>
                     <input id="dsMinRoi" class="input" type="number" step="1" min="1" max="500" value="15"/>
@@ -121,17 +121,17 @@ const DealScanView = (() => {
 
               <!-- Amazon/Kaufland-only: Min. Preisdrop -->
               <div class="input-group" id="dsDropRow" style="display:${isAmz || isKl ? "block" : "none"}">
-                <label class="input-label">Min. Preisdrop</label>
+                <label class="input-label">${I18N.t('ds.lbl.min_drop')}</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">%</span>
                   <input id="dsMinDrop" class="input" type="number" step="1" min="5" max="80" value="15"/>
                 </div>
-                <span class="input-hint">Unter 90-Tage-Schnitt</span>
+                <span class="input-hint">${I18N.t('ds.hint.drop')}</span>
               </div>
 
               <div class="grid-2-sm">
                 <div class="input-group">
-                  <label class="input-label">Max. Deals</label>
+                  <label class="input-label">${I18N.t('ds.lbl.max_deals')}</label>
                   <select id="dsLimit" class="select">
                     <option value="10">10</option>
                     <option value="15" selected>15</option>
@@ -140,11 +140,11 @@ const DealScanView = (() => {
                   </select>
                 </div>
                 <div class="input-group">
-                  <label class="input-label">Modus</label>
+                  <label class="input-label">${I18N.t('ds.lbl.mode')}</label>
                   <select id="dsMode" class="select">
-                    <option value="mid" selected>Standard</option>
-                    <option value="high">Konservativ</option>
-                    <option value="low">Aggressiv</option>
+                    <option value="mid" selected>${I18N.t('ds.mode.standard')}</option>
+                    <option value="high">${I18N.t('ds.mode.conservative')}</option>
+                    <option value="low">${I18N.t('ds.mode.aggressive')}</option>
                   </select>
                 </div>
               </div>
@@ -155,8 +155,8 @@ const DealScanView = (() => {
           <!-- Category chips -->
           <div class="panel mb-12">
             <div class="row-between mb-10">
-              <h3 class="panel-title" style="margin:0">Kategorien</h3>
-              <button class="btn btn-ghost btn-sm" id="btnDsToggleAll" style="font-size:10px;padding:2px 8px">Alle</button>
+              <h3 class="panel-title" style="margin:0">${I18N.t('ds.categories.title')}</h3>
+              <button class="btn btn-ghost btn-sm" id="btnDsToggleAll" style="font-size:10px;padding:2px 8px">${I18N.t('ds.btn.all')}</button>
             </div>
             <div style="display:flex;flex-wrap:wrap;gap:6px" id="dsCatChips">
               ${renderCatChips()}
@@ -168,10 +168,10 @@ const DealScanView = (() => {
               <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
               <path d="M10.5 10.5L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            Scan starten
+            ${I18N.t('ds.btn.start')}
           </button>
           <button class="btn btn-ghost" id="btnDsStop" style="width:100%;justify-content:center;margin-top:6px;display:none">
-            Abbrechen
+            ${I18N.t('ds.btn.stop')}
           </button>
         </div>
 
@@ -182,9 +182,9 @@ const DealScanView = (() => {
             <div class="row-between mb-8">
               <div class="row gap-8">
                 <div class="ds-pulse"></div>
-                <span class="text-sm font-semibold text-primary" id="dsStatusText">Suche läuft…</span>
+                <span class="text-sm font-semibold text-primary" id="dsStatusText">${I18N.t('ds.status.running')}</span>
               </div>
-              <span class="text-xs text-muted" id="dsFoundCount">0 gefunden</span>
+              <span class="text-xs text-muted" id="dsFoundCount">0 ${I18N.t('ds.status.found')}</span>
             </div>
             <div class="ds-progress-track">
               <div class="ds-progress-bar" id="dsProgressBar" style="width:0%"></div>
@@ -196,16 +196,16 @@ const DealScanView = (() => {
             <div class="row gap-5">
               <span class="text-xs text-muted" style="white-space:nowrap">Sort:</span>
               ${[
-                { k:"score",   l:"Score ↓"  },
-                { k:"profit",  l:"Profit ↓" },
-                { k:"roi_pct", l:"ROI ↓"    },
-                { k:"ek",      l:"EK ↑"     },
+                { k:"score",   l: I18N.t('ds.sort.score')  },
+                { k:"profit",  l: I18N.t('ds.sort.profit') },
+                { k:"roi_pct", l: I18N.t('ds.sort.roi')    },
+                { k:"ek",      l: I18N.t('ds.sort.ek')     },
               ].map(s => `<button class="ds-sort-btn ${s.k === "score" ? "active" : ""}" data-sort="${s.k}">${s.l}</button>`).join("")}
             </div>
             <div class="row gap-4">
               ${["all","BUY","HOLD"].map(v => `
                 <button class="ds-filter-btn ${v === "all" ? "active" : ""}" data-filter="${v}">
-                  ${v === "all" ? "Alle" : v}
+                  ${v === "all" ? I18N.t('ds.filter.all') : v}
                 </button>
               `).join("")}
             </div>
@@ -235,8 +235,8 @@ const DealScanView = (() => {
           <path d="M2 12C2 12 5 5 12 5s10 7 10 7-3 7-10 7S2 12 2 12z"/>
           <circle cx="12" cy="12" r="3"/>
         </svg>
-        <p class="empty-title">Bereit zum Scannen</p>
-        <p class="empty-sub">Kategorie wählen, Budget setzen, Scan starten.</p>
+        <p class="empty-title">${I18N.t('ds.empty.title')}</p>
+        <p class="empty-sub">${I18N.t('ds.empty.sub')}</p>
       </div>
     `;
   }
@@ -286,7 +286,7 @@ const DealScanView = (() => {
         : (deal.has_research ? `<span class="ds-chip ds-chip-accent">Research</span>` : `<span class="ds-chip">Browse</span>`),
     ].filter(Boolean).join("");
 
-    const linkLabel = isAmz ? "Amazon" : "eBay";
+    const linkLabel = isAmz ? I18N.t('ds.btn.amazon') : I18N.t('ds.btn.ebay');
     const linkUrl   = deal.item_url || (isAmz && deal.asin ? `https://www.amazon.de/dp/${deal.asin}` : null);
 
     return `
@@ -308,19 +308,19 @@ const DealScanView = (() => {
         <!-- KPI grid -->
         <div class="ds-kpi-grid mb-10">
           <div class="ds-kpi">
-            <div class="ds-kpi-lbl">${isAmz ? "Amazon EK" : "Kaufpreis"}</div>
+            <div class="ds-kpi-lbl">${isAmz ? I18N.t('ds.card.amz_ek') : I18N.t('ds.card.buy_price')}</div>
             <div class="ds-kpi-val">${fmtEur(deal.ek)}</div>
           </div>
           <div class="ds-kpi">
-            <div class="ds-kpi-lbl">eBay VK</div>
+            <div class="ds-kpi-lbl">${I18N.t('ds.card.ebay_vk')}</div>
             <div class="ds-kpi-val">${fmtEur(deal.sell_price)}</div>
           </div>
           <div class="ds-kpi">
-            <div class="ds-kpi-lbl">Profit</div>
+            <div class="ds-kpi-lbl">${I18N.t('ds.card.profit')}</div>
             <div class="ds-kpi-val" style="color:${pc}">${fmtEur(deal.profit)}</div>
           </div>
           <div class="ds-kpi">
-            <div class="ds-kpi-lbl">ROI</div>
+            <div class="ds-kpi-lbl">${I18N.t('ds.card.roi')}</div>
             <div class="ds-kpi-val">${fmtPct(deal.roi_pct ?? deal.roi)}</div>
           </div>
         </div>
@@ -335,7 +335,7 @@ const DealScanView = (() => {
               <rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
               <path d="M6 10h4M8 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            Inventory
+            ${I18N.t('ds.btn.inventory')}
           </button>
           ${linkUrl ? `
             <a href="${esc(linkUrl)}" class="btn btn-ghost btn-sm" style="gap:4px" target="_blank">
@@ -365,9 +365,9 @@ const DealScanView = (() => {
 
       // Subtitle
       const sub = container.querySelector("#dsSubtitle");
-      if (sub) sub.textContent = _source === "amazon"   ? "Findet Amazon-Preisdrops und prüft den eBay-Resale-Gewinn"
-                               : _source === "kaufland" ? "Scannt Kaufland nach günstigen Produkten mit eBay-Flip-Potenzial"
-                               :                         "Scannt eBay automatisch nach profitablen Produkten in deinem Budget";
+      if (sub) sub.textContent = _source === "amazon"   ? I18N.t('ds.subtitle.amazon')
+                               : _source === "kaufland" ? I18N.t('ds.subtitle.kaufland')
+                               :                         I18N.t('ds.subtitle.ebay');
 
       // Show/hide drop input
       const dropRow = container.querySelector("#dsDropRow");
@@ -440,14 +440,14 @@ const DealScanView = (() => {
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
             <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01" stroke-linecap="round"/>
           </svg>
-          <p class="empty-title">🔜 Kaufland-Scanner</p>
-          <p class="empty-sub">Der Kaufland Deal-Scanner ist in Entwicklung und bald verfügbar.</p>
+          <p class="empty-title">🔜 ${I18N.t('ds.kaufland.title')}</p>
+          <p class="empty-sub">${I18N.t('ds.kaufland.sub')}</p>
         </div>`;
       return;
     }
 
     const sel = _activeSelected();
-    if (sel.size === 0) { Toast.warning("Kategorien", "Bitte mind. eine Kategorie wählen."); return; }
+    if (sel.size === 0) { Toast.warning(I18N.t('ds.toast.no_cat'), I18N.t('ds.toast.no_cat_sub')); return; }
 
     const budget    = parseFloat(container.querySelector("#dsBudget")?.value)    || (_source === "amazon" ? 150 : 100);
     const minMargin = parseFloat(container.querySelector("#dsMinMargin")?.value)  || 20;
@@ -520,7 +520,7 @@ const DealScanView = (() => {
     if (_evtSource) { _evtSource.close(); _evtSource = null; }
     _scanning = false;
     if (_results.length > 0) {
-      Toast.info("Abgebrochen", `${_results.length} Deal${_results.length !== 1 ? "s" : ""} vor Abbruch gefunden.`);
+      Toast.info(I18N.t('ds.toast.stopped'), `${_results.length} Deal${_results.length !== 1 ? "s" : ""} ${I18N.t('ds.status.found')}.`);
       finishScan(container, false);
     } else {
       const btnScan  = container?.querySelector("#btnDsScan");
@@ -551,25 +551,25 @@ const DealScanView = (() => {
       const resultsEl = container?.querySelector("#dsResults");
       if (resultsEl) resultsEl.innerHTML = `
         <div class="empty-state" style="padding:60px">
-          <p class="empty-title">Backend nicht erreichbar</p>
-          <p class="empty-sub">Stelle sicher, dass das Backend läuft.</p>
+          <p class="empty-title">${I18N.t('ds.toast.backend_err')}</p>
+          <p class="empty-sub">${I18N.t('ds.toast.backend_sub')}</p>
         </div>`;
       ErrorReporter.report(new Error("Deal-Scanner: Backend nicht erreichbar"), "dealscan:scan");
-      Toast.error("Verbindungsfehler", "Backend nicht erreichbar. Bitte Verbindung prüfen.");
+      Toast.error(I18N.t('ds.toast.conn_err'), I18N.t('ds.toast.conn_sub'));
       return;
     }
 
     if (_results.length > 0) {
       if (sortBar) { sortBar.style.display = "flex"; attachSortFilterEvents(container); }
-      Toast.success("Scan abgeschlossen", `${_results.length} Deal${_results.length !== 1 ? "s" : ""} gefunden.`);
+      Toast.success(I18N.t('ds.toast.done'), `${_results.length} Deal${_results.length !== 1 ? "s" : ""} ${I18N.t('ds.status.found')}.`);
     } else {
       const resultsEl = container?.querySelector("#dsResults");
       if (resultsEl) resultsEl.innerHTML = `
         <div class="empty-state" style="padding:60px">
-          <p class="empty-title">Keine Deals gefunden</p>
-          <p class="empty-sub">Budget erhöhen oder Mindestkriterien senken.</p>
+          <p class="empty-title">${I18N.t('ds.empty2.title')}</p>
+          <p class="empty-sub">${I18N.t('ds.empty2.sub')}</p>
         </div>`;
-      Toast.info("Scan abgeschlossen", "Keine Deals gefunden.");
+      Toast.info(I18N.t('ds.toast.done'), I18N.t('ds.empty2.title'));
     }
   }
 
@@ -593,7 +593,7 @@ const DealScanView = (() => {
     const asc = _sortKey === "ek";
     list.sort((a, b) => asc ? a[_sortKey] - b[_sortKey] : b[_sortKey] - a[_sortKey]);
     if (!list.length) {
-      resultsEl.innerHTML = `<div class="empty-state" style="padding:60px"><p class="empty-title">Keine Deals für diesen Filter</p></div>`;
+      resultsEl.innerHTML = `<div class="empty-state" style="padding:60px"><p class="empty-title">${I18N.t('ds.empty2.filter')}</p></div>`;
       return;
     }
     resultsEl.innerHTML = `<div class="deal-grid">${list.map(renderDealCard).join("")}</div>`;
@@ -620,11 +620,11 @@ const DealScanView = (() => {
         status: "IN_STOCK",
         qty:    1,
       });
-      Toast.success("Hinzugefügt", `${(deal.title || "Deal").slice(0, 45)} → Inventory`);
+      Toast.success(I18N.t('ds.toast.added'), `${(deal.title || "Deal").slice(0, 45)} → ${I18N.t('nav.inventory')}`);
       btn.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><polyline points="2,8 6,12 14,4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg> OK`;
       btn.style.opacity = "0.55";
     } catch {
-      Toast.error("Inventory-Fehler", "Artikel konnte nicht zum Inventory hinzugefügt werden.");
+      Toast.error(I18N.t('ds.toast.inv_err'), I18N.t('ds.toast.inv_err_sub'));
       btn.disabled = false;
     }
   }
@@ -634,8 +634,8 @@ const DealScanView = (() => {
     const foundCount  = _container?.querySelector("#dsFoundCount");
     const progressBar = _container?.querySelector("#dsProgressBar");
     const src = _source === "amazon" ? "Amazon" : _source === "kaufland" ? "Kaufland" : "eBay";
-    if (statusText)  statusText.textContent  = `${src} wird durchsucht… ${found} / ${total}`;
-    if (foundCount)  foundCount.textContent  = `${found} gefunden`;
+    if (statusText)  statusText.textContent  = `${src} ${I18N.t('ds.status.running')} ${found} / ${total}`;
+    if (foundCount)  foundCount.textContent  = `${found} ${I18N.t('ds.status.found')}`;
     if (progressBar) progressBar.style.width = `${Math.min(100, (found / Math.max(1, total)) * 100)}%`;
   }
 

@@ -91,7 +91,7 @@ const BatchView = (() => {
     if (!ta) return;
     const current = ta.value.trim();
     ta.value = current ? current + "\n" + ean : ean;
-    if (typeof Toast !== "undefined") Toast.success("EAN gescannt", `${ean} zur Liste hinzugefügt`);
+    if (typeof Toast !== "undefined") Toast.success(I18N.t('bt.scanner.toast_title'), `${ean} ${I18N.t('bt.scanner.toast_sub')}`);
   }
 
   // ─── Mount ─────────────────────────────────────────────────────────────────
@@ -124,14 +124,14 @@ const BatchView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Batch Flipcheck</h1>
-          <p>Mehrere Produkte gleichzeitig auf Profitabilität prüfen</p>
+          <h1>${I18N.t('nav.batch')}</h1>
+          <p>${I18N.t('bt.subtitle')}</p>
         </div>
         <div class="page-header-actions" id="batchHeaderActions">
           ${isVat
             ? `<div class="fc-info-pill fc-info-pill--accent">
                  <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#6366F1" stroke-width="1.2"/><path d="M8 5v3.5M8 10.5v.5" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round"/></svg>
-                 Regelbesteuerung 19%
+                 ${I18N.t('bt.vat_pill')}
                </div>`
             : ""
           }
@@ -142,7 +142,7 @@ const BatchView = (() => {
 
         <!-- Input Panel -->
         <div class="panel" id="batchInputPanel">
-          <h3 class="panel-title">Produkte eingeben</h3>
+          <h3 class="panel-title">${I18N.t('bt.form.title')}</h3>
 
           <!-- Drop Zone -->
           <div class="drop-zone" id="batchDropZone">
@@ -151,45 +151,45 @@ const BatchView = (() => {
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <h3>CSV droppen</h3>
-            <p>oder klicken zum Auswählen</p>
+            <h3>${I18N.t('bt.dropzone.title')}</h3>
+            <p>${I18N.t('bt.dropzone.sub')}</p>
             <input type="file" id="batchFileInput" accept=".csv,.txt" style="display:none" />
           </div>
 
           <div class="row" style="margin:12px 0;gap:8px;align-items:center">
             <div style="flex:1;height:1px;background:var(--border)"></div>
-            <span class="text-xs text-muted">oder manuell</span>
+            <span class="text-xs text-muted">${I18N.t('bt.or_manual')}</span>
             <div style="flex:1;height:1px;background:var(--border)"></div>
           </div>
 
           <!-- Manual Input -->
           <div class="input-group" style="margin-bottom:12px">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-              <label class="input-label" style="margin:0">EAN-Liste (eine pro Zeile)</label>
-              <button class="btn btn-ghost btn-sm" id="batchScanBtn" title="Handy-Scanner — scannt in diese Liste" style="font-size:14px;padding:2px 8px">📷 Scanner</button>
+              <label class="input-label" style="margin:0">${I18N.t('bt.form.ean_list')}</label>
+              <button class="btn btn-ghost btn-sm" id="batchScanBtn" title="${I18N.t('bt.form.scanner_hint')}" style="font-size:14px;padding:2px 8px">📷 ${I18N.t('bt.form.scanner')}</button>
             </div>
             <textarea id="batchEanList" class="textarea" rows="5" placeholder="4010355360205&#10;4006381333955&#10;4250538302777…"></textarea>
           </div>
 
           <div class="input-group" style="margin-bottom:12px">
-            <label class="input-label">Standard-Einkaufspreis${isVat ? " <span style='color:var(--accent);font-weight:500'>(brutto)</span>" : " (€)"}</label>
+            <label class="input-label">${I18N.t('bt.form.default_ek')}${isVat ? " <span style='color:var(--accent);font-weight:500'>("+I18N.t('bt.form.gross')+")</span>" : " (€)"}</label>
             <div class="input-prefix-wrap">
               <span class="prefix">€</span>
               <input id="batchDefaultEk" class="input" type="number" step="0.01" min="0.01" placeholder="z.B. 18.50" />
             </div>
-            <span class="input-hint">${isVat ? "Regelbesteuerung aktiv — Profit netto gerechnet" : "Wird für alle EANs verwendet"}</span>
+            <span class="input-hint">${isVat ? I18N.t('bt.form.vat_hint') : I18N.t('bt.form.ek_hint')}</span>
           </div>
 
           <div class="input-group" style="margin-bottom:12px">
-            <label class="input-label">eBay-Kategorie</label>
+            <label class="input-label">${I18N.t('bt.form.category')}</label>
             <select id="batchCategory" class="select">
               ${buildCatOptions("sonstiges")}
             </select>
-            <span class="input-hint">Gebühr wird für alle Produkte im Batch verwendet</span>
+            <span class="input-hint">${I18N.t('bt.form.category_hint')}</span>
           </div>
 
           <div class="input-group" style="margin-bottom:16px">
-            <label class="input-label">Modus</label>
+            <label class="input-label">${I18N.t('bt.form.mode')}</label>
             <select id="batchMode" class="select">
               <option value="mid">MID — Margin ≥20%, Profit ≥€7</option>
               <option value="high">HIGH — Margin ≥25%, Profit ≥€10</option>
@@ -199,10 +199,10 @@ const BatchView = (() => {
 
           <button class="btn btn-primary" id="btnBatchRun" style="width:100%;justify-content:center">
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><polygon points="4,2 14,8 4,14" fill="currentColor"/></svg>
-            Batch starten
+            ${I18N.t('bt.form.start_btn')}
           </button>
           <button class="btn btn-ghost btn-sm" id="btnBatchStop" style="width:100%;justify-content:center;margin-top:6px;display:none">
-            Abbrechen
+            ${I18N.t('bt.form.cancel_btn')}
           </button>
         </div>
 
@@ -211,7 +211,7 @@ const BatchView = (() => {
           <div id="batchProgress" style="display:none" class="panel panel-sm mb-16">
             <div class="batch-progress">
               <div class="batch-progress-row">
-                <span class="batch-progress-label" id="batchProgressLabel">Verarbeite…</span>
+                <span class="batch-progress-label" id="batchProgressLabel">${I18N.t('bt.progress.processing')}</span>
                 <span class="batch-progress-count" id="batchProgressCount">0 / 0</span>
               </div>
               <div class="progress-wrap">
@@ -236,8 +236,8 @@ const BatchView = (() => {
           <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
           <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
         </svg>
-        <p class="empty-title">Keine Ergebnisse</p>
-        <p class="empty-sub">EAN-Liste eingeben oder CSV importieren und Batch starten.</p>
+        <p class="empty-title">${I18N.t('bt.empty.title')}</p>
+        <p class="empty-sub">${I18N.t('bt.empty.sub')}</p>
       </div>
     `;
   }
@@ -263,17 +263,17 @@ const BatchView = (() => {
         <div class="batch-sum-sep"></div>
         <div class="batch-sum-kpi">
           <span class="batch-sum-val" id="bSum-totalProfit">—</span>
-          <span class="batch-sum-label">Ges. Profit</span>
+          <span class="batch-sum-label">${I18N.t('bt.summary.total_profit')}</span>
         </div>
         <div class="batch-sum-sep"></div>
         <div class="batch-sum-kpi">
           <span class="batch-sum-val" id="bSum-avgMargin">—</span>
-          <span class="batch-sum-label">⌀ Marge</span>
+          <span class="batch-sum-label">⌀ ${I18N.t('bt.summary.avg_margin')}</span>
         </div>
         <div class="batch-sum-sep"></div>
         <div class="batch-sum-kpi">
           <span class="batch-sum-val text-muted" id="bSum-total">0</span>
-          <span class="batch-sum-label">Gesamt</span>
+          <span class="batch-sum-label">${I18N.t('bt.summary.total')}</span>
         </div>
         <div class="batch-sum-actions">
           <button class="btn btn-secondary btn-sm" id="btnExportCsv">
@@ -291,10 +291,10 @@ const BatchView = (() => {
           <table class="table">
             <thead>
               <tr>
-                <th>EAN</th><th>Titel</th>
-                <th class="col-right">EK</th><th class="col-right">Ø VK</th>
-                <th class="col-right">Profit</th><th class="col-right">Marge</th>
-                <th class="col-right">Verk./30d</th><th>Verdict</th><th></th>
+                <th>EAN</th><th>${I18N.t('bt.table.title')}</th>
+                <th class="col-right">${I18N.t('bt.table.ek')}</th><th class="col-right">${I18N.t('bt.table.avg_vk')}</th>
+                <th class="col-right">${I18N.t('bt.table.profit')}</th><th class="col-right">${I18N.t('bt.table.margin')}</th>
+                <th class="col-right">${I18N.t('bt.table.sales30d')}</th><th>${I18N.t('bt.table.verdict')}</th><th></th>
               </tr>
             </thead>
             <tbody id="batchTbody"></tbody>
@@ -394,7 +394,7 @@ const BatchView = (() => {
         <tr>
           <td class="text-mono text-xs text-dim">${esc(r.ean)}</td>
           <td colspan="6" style="font-size:12px;color:var(--red)">${esc(r.error)}</td>
-          <td><span class="batch-vrd batch-vrd-err">Fehler</span></td>
+          <td><span class="batch-vrd batch-vrd-err">${I18N.t('bt.row.error')}</span></td>
           <td></td>
         </tr>
       `;
@@ -440,7 +440,7 @@ const BatchView = (() => {
               <rect x="1" y="2" width="10" height="13" rx="1.2" stroke="currentColor" stroke-width="1.5"/>
               <path d="M4 6h4M4 9h3M11 10l2 2 2-2M13 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
-            Listing
+            ${I18N.t('bt.row.listing')}
           </button>` : ""}
         </td>
       </tr>
@@ -457,20 +457,20 @@ const BatchView = (() => {
       const body = `
         <div style="text-align:center">
           <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
-            Öffne diese URL auf deinem Handy. Gescannte EANs werden automatisch zur Liste hinzugefügt.
+            ${I18N.t('bt.scanner.modal_sub')}
           </p>
           <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px">
             <div style="font-family:monospace;font-size:16px;font-weight:700;color:var(--accent);word-break:break-all">${esc(url)}</div>
           </div>
-          <button class="btn btn-secondary btn-sm" id="batchScanUrlCopy">📋 URL kopieren</button>
+          <button class="btn btn-secondary btn-sm" id="batchScanUrlCopy">📋 ${I18N.t('bt.scanner.copy_url')}</button>
         </div>
       `;
       if (typeof Modal !== "undefined") {
-        Modal.open({ title: "📷 Handy-Scanner (Batch)", body, buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }] });
+        Modal.open({ title: `📷 ${I18N.t('bt.scanner.modal_title')}`, body, buttons: [{ label: I18N.t('bt.scanner.close'), variant: "btn-ghost", value: false }] });
         setTimeout(() => {
           document.getElementById("batchScanUrlCopy")?.addEventListener("click", () => {
             navigator.clipboard?.writeText(url).then(() => {
-              if (typeof Toast !== "undefined") Toast.success("Kopiert", url);
+              if (typeof Toast !== "undefined") Toast.success(I18N.t('bt.scanner.copied'), url);
             }).catch(() => {});
           });
         }, 50);
@@ -517,13 +517,13 @@ const BatchView = (() => {
       });
 
       if (eans.length === 0) {
-        Toast.warning("Keine EANs gefunden", "CSV enthält keine erkennbaren EAN-Nummern.");
+        Toast.warning(I18N.t('bt.csv.no_eans'), I18N.t('bt.csv.no_eans_sub'));
         return;
       }
 
       const textarea = container.querySelector("#batchEanList");
       if (textarea) textarea.value = eans.join("\n");
-      Toast.info("CSV importiert", `${eans.length} EANs erkannt.`);
+      Toast.info(I18N.t('bt.csv.imported'), `${eans.length} ${I18N.t('bt.csv.imported_sub')}`);
     };
     reader.readAsText(file);
   }
@@ -538,17 +538,17 @@ const BatchView = (() => {
     const uniqueEans = [...new Set(rawEans)];
 
     if (uniqueEans.length === 0) {
-      Toast.warning("Keine EANs", "Bitte EAN-Nummern eingeben oder eine CSV-Datei importieren.");
+      Toast.warning(I18N.t('bt.run.no_eans'), I18N.t('bt.run.no_eans_sub'));
       return;
     }
     const dupCount = rawEans.length - uniqueEans.length;
     if (dupCount > 0) {
-      Toast.info("Duplikate entfernt", `${dupCount} doppelte EAN${dupCount > 1 ? "s" : ""} wurden entfernt.`);
+      Toast.info(I18N.t('bt.run.dupes_removed'), `${dupCount} ${I18N.t('bt.run.dupes_sub')}`);
     }
 
     const defaultEk = parseFloat(defaultEkInput?.value);
     if (!defaultEk || defaultEk <= 0) {
-      Toast.error("EK fehlt", "Bitte einen Standard-Einkaufspreis eingeben (z.B. 18.50).");
+      Toast.error(I18N.t('bt.run.ek_missing'), I18N.t('bt.run.ek_missing_sub'));
       defaultEkInput?.focus();
       return;
     }
@@ -581,7 +581,7 @@ const BatchView = (() => {
       const pct = Math.round(((i + 1) / uniqueEans.length) * 100);
 
       if (progressBar)   progressBar.style.width    = `${pct}%`;
-      if (progressLabel) progressLabel.textContent  = `Prüfe ${ean}…`;
+      if (progressLabel) progressLabel.textContent  = `${I18N.t('bt.progress.checking')} ${ean}…`;
       if (progressCount) progressCount.textContent  = `${i + 1} / ${uniqueEans.length}`;
 
       // Insert skeleton loading row before API call
@@ -645,13 +645,13 @@ const BatchView = (() => {
 
     // Done
     if (progressBar)   progressBar.style.width   = "100%";
-    if (progressLabel) progressLabel.textContent = "Abgeschlossen";
+    if (progressLabel) progressLabel.textContent = I18N.t('bt.progress.done');
     if (btnRun)  btnRun.disabled = false;
     if (btnStop) btnStop.style.display = "none";
     _running = false;
 
     const buyCount = _results.filter(r => r.verdict === "BUY").length;
-    Toast.success("Batch abgeschlossen", `${uniqueEans.length} EANs geprüft · ${buyCount} BUY-Empfehlungen`);
+    Toast.success(I18N.t('bt.run.done'), `${uniqueEans.length} ${I18N.t('bt.run.done_sub')} · ${buyCount} BUY`);
 
     setTimeout(() => {
       if (progressEl) progressEl.style.display = "none";
@@ -703,13 +703,13 @@ const BatchView = (() => {
     a.download = `flipcheck_batch_${new Date().toISOString().slice(0, 10)}.csv`;
     a.click();
     URL.revokeObjectURL(url);
-    Toast.success("Exportiert", "CSV wurde heruntergeladen.");
+    Toast.success(I18N.t('bt.export.done'), I18N.t('bt.export.done_sub'));
   }
 
   // ─── Add BUYs to Inventory ─────────────────────────────────────────────────
   async function addBuysToInventory() {
     const buys = _results.filter(r => r.verdict === "BUY" && !r.error);
-    if (!buys.length) { Toast.info("Keine BUYs", "Keine BUY-Empfehlungen zum Hinzufügen."); return; }
+    if (!buys.length) { Toast.info(I18N.t('bt.inv.no_buys'), I18N.t('bt.inv.no_buys_sub')); return; }
 
     let added = 0;
     for (const r of buys) {
@@ -725,7 +725,7 @@ const BatchView = (() => {
         added++;
       } catch {}
     }
-    Toast.success("Hinzugefügt", `${added} Artikel zum Inventory hinzugefügt.`);
+    Toast.success(I18N.t('bt.inv.added'), `${added} ${I18N.t('bt.inv.added_sub')}`);
   }
 
   return { mount, unmount };

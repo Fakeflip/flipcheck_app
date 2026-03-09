@@ -5,7 +5,15 @@ const OnboardingWizard = (() => {
   let _draft   = { vat_mode: "no_vat", ek_mode: "gross", flipcheck_mode: "mid" };
 
   const TOTAL_STEPS = 4;
-  const STEP_LABELS = ["Willkommen", "Steuer", "Modus", "Fertig"];
+
+  function stepLabels() {
+    return [
+      I18N.t('ob.step.welcome'),
+      I18N.t('ob.step.tax'),
+      I18N.t('ob.step.mode'),
+      I18N.t('ob.step.done'),
+    ];
+  }
 
   // ── Public ────────────────────────────────────────────────────────────────
   function show() {
@@ -38,7 +46,8 @@ const OnboardingWizard = (() => {
 
   // ── Stepper ───────────────────────────────────────────────────────────────
   function buildStepper() {
-    const items = STEP_LABELS.map((label, i) => {
+    const labels = stepLabels();
+    const items = labels.map((label, i) => {
       const n     = i + 1;
       const done  = n < _step;
       const active = n === _step;
@@ -72,10 +81,10 @@ const OnboardingWizard = (() => {
   }
 
   function buildActions(step) {
-    if (step === 1 || step === 4) return `<div></div>`;   // steps have own CTAs
-    const back = `<button class="btn btn-ghost btn-sm" id="wzBack">← Zurück</button>`;
+    if (step === 1 || step === 4) return `<div></div>`;
+    const back = `<button class="btn btn-ghost btn-sm" id="wzBack">${I18N.t('ob.btn.back')}</button>`;
     const next = step < TOTAL_STEPS
-      ? `<button class="btn btn-primary" id="wzNext">Weiter →</button>`
+      ? `<button class="btn btn-primary" id="wzNext">${I18N.t('ob.btn.next')}</button>`
       : "";
     return `${back}${next}`;
   }
@@ -89,8 +98,8 @@ const OnboardingWizard = (() => {
             stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>`,
         color: "accent",
-        title: "Live Marktdaten",
-        sub: "eBay-Preise, Verkaufszahlen & Konkurrenz — direkt aus der API, in Echtzeit.",
+        title: I18N.t('ob.welcome.feat.market.title'),
+        sub:   I18N.t('ob.welcome.feat.market.sub'),
       },
       {
         icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -98,8 +107,8 @@ const OnboardingWizard = (() => {
           <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
         </svg>`,
         color: "green",
-        title: "BUY / HOLD / SKIP in Sekunden",
-        sub: "Profit, Marge und ROI automatisch kalkuliert — du entscheidest nur noch.",
+        title: I18N.t('ob.welcome.feat.decision.title'),
+        sub:   I18N.t('ob.welcome.feat.decision.sub'),
       },
       {
         icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
@@ -107,8 +116,8 @@ const OnboardingWizard = (() => {
           <path d="M5 7h6M5 10h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
         </svg>`,
         color: "yellow",
-        title: "Inventory & Verkaufs-Tracking",
-        sub: "Artikel anlegen, Verkäufe erfassen, monatliche Gewinn-Auswertung.",
+        title: I18N.t('ob.welcome.feat.inventory.title'),
+        sub:   I18N.t('ob.welcome.feat.inventory.sub'),
       },
     ];
 
@@ -118,8 +127,14 @@ const OnboardingWizard = (() => {
       yellow: { bg: "var(--yellow-subtle)", border: "var(--yellow-border)", color: "var(--yellow)" },
     };
 
+    const titleLines = I18N.t('ob.welcome.title').split('\n');
+
     return `
       <div class="wz-welcome">
+        <div class="wz-lang-row">
+          ${I18N.renderSelector(I18N.getLang())}
+        </div>
+
         <div class="wz-brand">
           <div class="wz-brand-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -131,11 +146,8 @@ const OnboardingWizard = (() => {
         </div>
 
         <div class="wz-headline-block">
-          <h1 class="wz-title">Wisse in Sekunden,<br>ob sich ein Flip lohnt.</h1>
-          <p class="wz-subtitle">
-            Echtzeit-Marktdaten, automatische Gebührenkalkulation und
-            ein klares Verdict — für jeden Deal.
-          </p>
+          <h1 class="wz-title">${titleLines.join('<br>')}</h1>
+          <p class="wz-subtitle">${I18N.t('ob.welcome.subtitle')}</p>
         </div>
 
         <div class="wz-features">
@@ -156,14 +168,14 @@ const OnboardingWizard = (() => {
         </div>
 
         <button class="btn btn-primary wz-start-btn" id="wzStart">
-          Einrichtung starten
+          ${I18N.t('ob.welcome.start')}
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
             <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor"
               stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
 
-        <p class="wz-start-hint">Dauert etwa 60 Sekunden — kein Kreditkarte, keine Pflichten.</p>
+        <p class="wz-start-hint">${I18N.t('ob.welcome.hint')}</p>
       </div>
     `;
   }
@@ -175,8 +187,8 @@ const OnboardingWizard = (() => {
     const vatOpts = [
       {
         val:   "no_vat",
-        title: "Kleinunternehmer",
-        sub:   "§ 19 UStG — du weist keine MwSt aus. Jahresumsatz unter ~22.000 €.",
+        title: I18N.t('ob.tax.vat.no_vat.title'),
+        sub:   I18N.t('ob.tax.vat.no_vat.sub'),
         icon:  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none">
           <path d="M8 2a6 6 0 100 12A6 6 0 008 2z" stroke="currentColor" stroke-width="1.5"/>
           <path d="M6 8h4M8 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -184,8 +196,8 @@ const OnboardingWizard = (() => {
       },
       {
         val:   "ust_19",
-        title: "Regelbesteuerung",
-        sub:   "19% MwSt — du bist vorsteuerabzugsberechtigt. Umsatz über 22.000 €/Jahr.",
+        title: I18N.t('ob.tax.vat.ust_19.title'),
+        sub:   I18N.t('ob.tax.vat.ust_19.sub'),
         icon:  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none">
           <rect x="2" y="4" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
           <path d="M5 4V3a3 3 0 016 0v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -196,8 +208,8 @@ const OnboardingWizard = (() => {
     const ekOpts = [
       {
         val:   "gross",
-        title: "Brutto (inkl. MwSt)",
-        sub:   "Standard bei Amazon, Kaufland & Co. — Preis wie angezeigt eingeben.",
+        title: I18N.t('ob.tax.ek.gross.title'),
+        sub:   I18N.t('ob.tax.ek.gross.sub'),
         icon:  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none">
           <path d="M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           <path d="M5.5 5.5C5.5 4.12 6.62 3 8 3s2.5 1.12 2.5 2.5S9.38 8 8 8"
@@ -207,8 +219,8 @@ const OnboardingWizard = (() => {
       },
       {
         val:   "net",
-        title: "Netto (exkl. MwSt)",
-        sub:   "Für Gewerbetreibende mit Vorsteuerabzug — Nettobetrag aus Rechnung.",
+        title: I18N.t('ob.tax.ek.net.title'),
+        sub:   I18N.t('ob.tax.ek.net.sub'),
         icon:  `<svg width="15" height="15" viewBox="0 0 16 16" fill="none">
           <path d="M2 10l3-6 3 6M3.5 8h3M10 4v8M10 4c2 0 3.5.9 3.5 2s-1.5 2-3.5 2"
             stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
@@ -219,17 +231,14 @@ const OnboardingWizard = (() => {
     return `
       <div class="wz-section">
         <div class="wz-step-header">
-          <div class="wz-step-eyebrow">Schritt 2 von ${TOTAL_STEPS}</div>
-          <h2 class="wz-step-title">Steuer & Einkaufspreise</h2>
-          <p class="wz-step-sub">
-            Flipcheck nutzt diese Angaben um deinen Gewinn exakt zu kalkulieren.
-            Du kannst alles später in den Einstellungen ändern.
-          </p>
+          <div class="wz-step-eyebrow">${I18N.t('ob.tax.eyebrow')}</div>
+          <h2 class="wz-step-title">${I18N.t('ob.tax.title')}</h2>
+          <p class="wz-step-sub">${I18N.t('ob.tax.sub')}</p>
         </div>
 
         <div class="wz-form">
           <div class="wz-form-group">
-            <label class="wz-label">Bist du umsatzsteuerpflichtig?</label>
+            <label class="wz-label">${I18N.t('ob.tax.vat.label')}</label>
             <div class="wz-opt-grid" id="optVat">
               ${vatOpts.map(o => `
                 <div class="wz-opt-card ${v.vat_mode === o.val ? "selected" : ""}" data-val="${o.val}">
@@ -244,7 +253,7 @@ const OnboardingWizard = (() => {
           </div>
 
           <div class="wz-form-group">
-            <label class="wz-label">Wie gibst du deinen Einkaufspreis ein?</label>
+            <label class="wz-label">${I18N.t('ob.tax.ek.label')}</label>
             <div class="wz-opt-grid" id="optEk">
               ${ekOpts.map(o => `
                 <div class="wz-opt-card ${v.ek_mode === o.val ? "selected" : ""}" data-val="${o.val}">
@@ -268,11 +277,11 @@ const OnboardingWizard = (() => {
     const modes = [
       {
         id:    "low",
-        label: "Konservativ",
+        label: I18N.t('ob.mode.low.label'),
         badge: null,
         margin: "≥ 25 %",
         roi:   "≥ 30 %",
-        desc:  "Nur sichere Flips. Weniger Deals, maximale Sicherheit.",
+        desc:  I18N.t('ob.mode.low.desc'),
         icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2L3 5.5v5C3 13.5 5.5 15 8 15s5-1.5 5-4.5v-5L8 2z"
             stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
@@ -283,11 +292,11 @@ const OnboardingWizard = (() => {
       },
       {
         id:    "mid",
-        label: "Ausgewogen",
-        badge: "EMPFOHLEN",
+        label: I18N.t('ob.mode.mid.label'),
+        badge: I18N.t('ob.mode.mid.badge'),
         margin: "≥ 15 %",
         roi:   "≥ 20 %",
-        desc:  "Gute Balance. Ideal für Einsteiger und erfahrene Reseller.",
+        desc:  I18N.t('ob.mode.mid.desc'),
         icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2v12M4 8h8" stroke="currentColor"
             stroke-width="1.5" stroke-linecap="round"/>
@@ -297,11 +306,11 @@ const OnboardingWizard = (() => {
       },
       {
         id:    "high",
-        label: "Aggressiv",
+        label: I18N.t('ob.mode.high.label'),
         badge: null,
         margin: "≥ 10 %",
         roi:   "≥ 10 %",
-        desc:  "Mehr Deals, mehr Risiko. Für erfahrene Reseller mit Kapitalpuffer.",
+        desc:  I18N.t('ob.mode.high.desc'),
         icon: `<svg width="16" height="16" viewBox="0 0 16 16" fill="none">
           <path d="M8 2l1.5 4h4L10 8.5l1.5 4L8 10l-3.5 2.5L6 8.5 2.5 6h4L8 2z"
             stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
@@ -319,12 +328,10 @@ const OnboardingWizard = (() => {
     return `
       <div class="wz-section">
         <div class="wz-step-header">
-          <div class="wz-step-eyebrow">Schritt 3 von ${TOTAL_STEPS}</div>
-          <h2 class="wz-step-title">Flipcheck-Modus</h2>
+          <div class="wz-step-eyebrow">${I18N.t('ob.mode.eyebrow')}</div>
+          <h2 class="wz-step-title">${I18N.t('ob.mode.title')}</h2>
           <p class="wz-step-sub">
-            Der Modus bestimmt, ab welcher Marge Flipcheck ein
-            <strong class="text-green">BUY</strong> ausspricht.
-            Du kannst ihn jederzeit pro Check ändern.
+            ${I18N.t('ob.mode.sub').replace('BUY', '<strong class="text-green">BUY</strong>')}
           </p>
         </div>
 
@@ -342,7 +349,7 @@ const OnboardingWizard = (() => {
                 <div class="wz-mode-label">${m.label}</div>
                 <div class="wz-mode-metrics">
                   <div class="wz-mode-metric">
-                    <span class="wz-mode-metric-lbl">Marge</span>
+                    <span class="wz-mode-metric-lbl">${I18N.t('ob.mode.margin')}</span>
                     <span class="wz-mode-metric-val">${m.margin}</span>
                   </div>
                   <div class="wz-mode-metric">
@@ -366,6 +373,7 @@ const OnboardingWizard = (() => {
 
   // ── Step 4: Bereit ────────────────────────────────────────────────────────
   function buildDoneStep() {
+    const subLines = I18N.t('ob.done.sub').split('\n');
     return `
       <div class="wz-done">
         <div class="wz-check-wrap">
@@ -379,11 +387,8 @@ const OnboardingWizard = (() => {
         </div>
 
         <div class="wz-done-text">
-          <h2 class="wz-done-title">Alles eingerichtet!</h2>
-          <p class="wz-done-sub">
-            Deine Einstellungen wurden gespeichert.<br>
-            Scanne jetzt dein erstes Produkt oder starte direkt ins Dashboard.
-          </p>
+          <h2 class="wz-done-title">${I18N.t('ob.done.title')}</h2>
+          <p class="wz-done-sub">${subLines.join('<br>')}</p>
         </div>
 
         <div class="wz-done-scan">
@@ -393,20 +398,20 @@ const OnboardingWizard = (() => {
                 stroke="var(--accent)" stroke-width="1.5" stroke-linecap="round"/>
               <rect x="5" y="5" width="6" height="6" rx="1" stroke="var(--accent)" stroke-width="1.5"/>
             </svg>
-            Erstes Produkt scannen <span class="wz-done-optional">optional</span>
+            ${I18N.t('ob.done.scan.label')} <span class="wz-done-optional">${I18N.t('ob.done.scan.optional')}</span>
           </div>
           <div class="row gap-8">
             <input class="input" id="wzFirstEan"
-              placeholder="EAN eingeben — z.B. 4010355040672"
+              placeholder="${I18N.t('ob.done.scan.placeholder')}"
               style="flex:1;font-family:var(--font-mono,monospace);font-size:12px"
               maxlength="14" autocomplete="off" spellcheck="false">
-            <button class="btn btn-secondary btn-sm" id="wzScanFirst">Scannen →</button>
+            <button class="btn btn-secondary btn-sm" id="wzScanFirst">${I18N.t('ob.done.scan.btn')}</button>
           </div>
         </div>
 
         <div class="wz-done-actions">
           <button class="btn btn-primary wz-start-btn" id="wzFinish">
-            Zum Dashboard
+            ${I18N.t('ob.done.finish')}
             <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
               <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor"
                 stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
@@ -415,9 +420,9 @@ const OnboardingWizard = (() => {
         </div>
 
         <div class="wz-done-shortcuts">
-          <span>Nächste Schritte:</span>
-          <span class="wz-done-tip">→ Extension installieren für passive Badges beim Browsen</span>
-          <span class="wz-done-tip">→ Inventory anlegen für Gewinn-Tracking</span>
+          <span>${I18N.t('ob.done.next')}</span>
+          <span class="wz-done-tip">${I18N.t('ob.done.tip1')}</span>
+          <span class="wz-done-tip">${I18N.t('ob.done.tip2')}</span>
         </div>
       </div>
     `;
@@ -425,6 +430,14 @@ const OnboardingWizard = (() => {
 
   // ── Events ────────────────────────────────────────────────────────────────
   function attachStepEvents(root) {
+
+    // Language selector buttons (step 1 only)
+    root.querySelectorAll(".lang-btn[data-lang]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        I18N.setLang(btn.dataset.lang, { save: false }); // save on wizard finish
+        renderStep(root); // re-render with new language
+      });
+    });
 
     // Step 1: "Los geht's" button
     root.querySelector("#wzStart")?.addEventListener("click", () => {
@@ -505,6 +518,7 @@ const OnboardingWizard = (() => {
     try {
       await Storage.saveSettings({
         onboarding_done: true,
+        language: I18N.getLang(),
         tax: {
           vat_mode: _draft.vat_mode,
           ek_mode:  _draft.ek_mode,
@@ -518,6 +532,8 @@ const OnboardingWizard = (() => {
     } catch (e) {
       console.error("[Onboarding] saveSettings failed:", e);
     }
+    // Apply language to DOM now that it's saved
+    I18N.applyToDOM();
     root.style.display = "none";
     root.innerHTML = "";
     if (_resolve) { _resolve(firstEan || null); _resolve = null; }

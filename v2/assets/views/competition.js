@@ -35,8 +35,8 @@ const CompetitionView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Konkurrenz-Monitor</h1>
-          <p>Verkäufer beobachten · Marktposition deiner Produkte checken</p>
+          <h1>${I18N.t('comp.title')}</h1>
+          <p>${I18N.t('comp.subtitle')}</p>
           <div class="comp-stats-bar" id="compStatsBar" style="display:none"></div>
         </div>
         <div class="page-header-right">
@@ -48,7 +48,7 @@ const CompetitionView = (() => {
               <path d="M7.5 10.5l-1-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
               <path d="M8.5 5.5l1 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            Webhooks
+            ${I18N.t('comp.btn.webhooks')}
           </button>
         </div>
       </div>
@@ -59,7 +59,7 @@ const CompetitionView = (() => {
             <circle cx="8" cy="5.5" r="3" stroke="currentColor" stroke-width="1.5"/>
             <path d="M2 14c0-3.31 2.69-6 6-6s6 2.69 6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          Verkäufer
+          ${I18N.t('comp.tab.sellers')}
         </button>
         <button class="comp-tab" data-tab="inventory">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -67,7 +67,7 @@ const CompetitionView = (() => {
             <path d="M5 5V3.5A3 3 0 0 1 11 3.5V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <path d="M5.5 9.5h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          Mein Inventory
+          ${I18N.t('comp.tab.inventory')}
         </button>
         <button class="comp-tab" data-tab="webhooks">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -77,7 +77,7 @@ const CompetitionView = (() => {
             <path d="M7.5 10.5l-1-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             <path d="M8.5 5.5l1 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
           </svg>
-          Webhooks
+          ${I18N.t('comp.tab.webhooks')}
         </button>
       </div>
 
@@ -126,10 +126,10 @@ const CompetitionView = (() => {
     const totalListings = _sellers.reduce((sum, s) => sum + (s.listing_count || 0), 0);
     bar.style.display = "flex";
     bar.innerHTML = `
-      <span class="comp-stats-pill"><b>${_sellers.length}</b> Verkäufer</span>
-      ${totalListings ? `<span class="comp-stats-pill"><b>${totalListings.toLocaleString("de-DE")}</b> Listings gesamt</span>` : ""}
-      <span class="comp-stats-pill">letzter Check <b>${lastCheckStr}</b></span>
-      ${_wh.url ? `<span class="comp-stats-pill" style="color:var(--green);border-color:var(--green-bdr);background:var(--green-sub)">● Webhook aktiv</span>` : ""}
+      <span class="comp-stats-pill"><b>${_sellers.length}</b> ${I18N.t('comp.stats.sellers')}</span>
+      ${totalListings ? `<span class="comp-stats-pill"><b>${totalListings.toLocaleString("de-DE")}</b> ${I18N.t('comp.stats.listings')}</span>` : ""}
+      <span class="comp-stats-pill">${I18N.t('comp.stats.last_check')} <b>${lastCheckStr}</b></span>
+      ${_wh.url ? `<span class="comp-stats-pill" style="color:var(--green);border-color:var(--green-bdr);background:var(--green-sub)">● ${I18N.t('comp.stats.webhook')}</span>` : ""}
     `;
   }
 
@@ -150,7 +150,7 @@ const CompetitionView = (() => {
         bindSellerList(container);
       } else if (_tab === "inventory") {
         content.style.display = "";
-        content.innerHTML = renderLoadingFull("Inventory wird geladen…");
+        content.innerHTML = renderLoadingFull(I18N.t('comp.loading'));
         _inventory = await Storage.listInventory();
         content.innerHTML = renderInventoryPanel();
         bindInvList(container);
@@ -171,22 +171,22 @@ const CompetitionView = (() => {
       <div class="comp-left" id="sellerLeft">
         <div class="comp-add-wrap">
           <input class="input" id="sellerInput" placeholder="eBay Username…" style="flex:1;min-width:0"/>
-          <button class="btn btn-primary btn-sm" id="btnAddSeller" style="white-space:nowrap">+ Hinzufügen</button>
+          <button class="btn btn-primary btn-sm" id="btnAddSeller" style="white-space:nowrap">${I18N.t('comp.seller.add')}</button>
         </div>
         <div id="sellerList" class="comp-list"></div>
       </div>
-      <div class="comp-right" id="compRight">${renderRightEmpty("Verkäufer auswählen", "Links einen Verkäufer auswählen oder per Username hinzufügen.")}</div>
+      <div class="comp-right" id="compRight">${renderRightEmpty(I18N.t('comp.right.sel_seller'), I18N.t('comp.right.sel_sub'))}</div>
     `;
   }
 
   const _AVATAR_CLASSES = ["comp-avatar-a","comp-avatar-b","comp-avatar-c","comp-avatar-d"];
 
   function renderSellerListItems() {
-    if (!_sellers.length) return `<div class="comp-list-empty">Noch keine Verkäufer.<br>Username oben eingeben.</div>`;
+    if (!_sellers.length) return `<div class="comp-list-empty">${I18N.t('comp.seller.empty')}<br>${I18N.t('comp.seller.empty_sub')}</div>`;
     return _sellers.map((s, idx) => {
       const fbStr   = s.feedback_score != null ? `${Number(s.feedback_score).toLocaleString("de-DE")} Bew.` : null;
       const listStr = s.listing_count  != null ? `${s.listing_count} Listings` : null;
-      const sub     = [listStr, fbStr].filter(Boolean).join(" · ") || "noch nicht geladen";
+      const sub     = [listStr, fbStr].filter(Boolean).join(" · ") || I18N.t('comp.seller.not_loaded');
       const avatarCls = _AVATAR_CLASSES[idx % _AVATAR_CLASSES.length];
       return `
         <div class="comp-list-item ${_sellerSelected === s.username ? "active" : ""}" data-seller="${esc(s.username)}">
@@ -225,7 +225,7 @@ const CompetitionView = (() => {
         _sellers = await Storage.addSeller(username);
         rerenderSellerLeft();
         await loadSellerListings(username);
-      } catch (err) { ErrorReporter.report(err, "competition:addSeller"); Toast.error("Hinzufügen fehlgeschlagen", "Verkäufer konnte nicht hinzugefügt werden."); }
+      } catch (err) { ErrorReporter.report(err, "competition:addSeller"); Toast.error(I18N.t('comp.toast.add_failed'), I18N.t('comp.toast.add_err')); }
       finally  { btn.disabled = false; }
     };
     btn.addEventListener("click", doAdd);
@@ -248,7 +248,7 @@ const CompetitionView = (() => {
         if (_sellerSelected === u) {
           _sellerSelected = null;
           const right = _container?.querySelector("#compRight");
-          if (right) right.innerHTML = renderRightEmpty("Verkäufer auswählen", "Links einen Verkäufer auswählen.");
+          if (right) right.innerHTML = renderRightEmpty(I18N.t('comp.right.sel_seller'), I18N.t('comp.right.sel_sub2'));
         }
         rerenderSellerLeft();
       });
@@ -259,7 +259,7 @@ const CompetitionView = (() => {
     _sellerSelected = username;
     rerenderSellerLeft();
     const right = _container?.querySelector("#compRight");
-    if (right) right.innerHTML = renderRightLoading(`@${username} wird geladen…`);
+    if (right) right.innerHTML = renderRightLoading(`@${username}…`);
     try {
       const { ok, data } = await API.sellerListings(username, 100, q);
       if (!ok || !data?.ok) throw new Error(data?.error || "API-Fehler");
@@ -301,7 +301,7 @@ const CompetitionView = (() => {
 
     const totalLabel = activeQ
       ? `${total} Treffer für „${esc(activeQ)}"`
-      : `${total} Listings · gerade abgerufen`;
+      : `${total} Listings · ${I18N.t('comp.loaded')}`;
 
     const fbParts = [];
     if (feedbackScore != null) fbParts.push(`<span class="comp-stat-pill">⭐ ${Number(feedbackScore).toLocaleString("de-DE")} Bew.</span>`);
@@ -321,25 +321,25 @@ const CompetitionView = (() => {
               <circle cx="6.5" cy="6.5" r="4.5" stroke="currentColor" stroke-width="1.5"/>
               <path d="M10.5 10.5L14.5 14.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
-            <input class="comp-search-input" id="sellerSearchInput" placeholder="Listings durchsuchen…"
+            <input class="comp-search-input" id="sellerSearchInput" placeholder="${I18N.t('comp.seller.searching')}"
               value="${esc(activeQ)}" data-seller="${esc(username)}"/>
           </div>
           <button class="btn btn-secondary btn-sm" data-refresh-seller="${esc(username)}">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13 8A5 5 0 1 1 3.07 5.65M3 2v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Alle laden
+            ${I18N.t('comp.seller.load_all')}
           </button>
         </div>
       </div>
       <div class="comp-table-wrap">
         <table class="comp-table">
           <thead><tr>
-            <th>Titel</th>
-            <th class="text-right">Preis</th>
-            <th class="text-right">Versand</th>
-            <th>Zustand</th>
+            <th>${I18N.t('comp.th.title')}</th>
+            <th class="text-right">${I18N.t('comp.th.price')}</th>
+            <th class="text-right">${I18N.t('comp.th.shipping')}</th>
+            <th>${I18N.t('comp.th.condition')}</th>
             <th></th>
           </tr></thead>
-          <tbody>${rows || `<tr><td colspan="5" class="text-center text-muted" style="padding:32px">Keine Listings gefunden.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td colspan="5" class="text-center text-muted" style="padding:32px">${I18N.t('comp.no_listings')}</td></tr>`}</tbody>
         </table>
       </div>
     `;
@@ -358,37 +358,37 @@ const CompetitionView = (() => {
             <div class="comp-list-item ${_invSelected?.id === item.id ? "active" : ""}" data-inv="${esc(item.id)}">
               <div style="flex:1;min-width:0">
                 <div class="comp-item-name" style="font-size:12px">${esc((item.title || item.ean || "—").slice(0, 38))}</div>
-                <div class="text-xs text-muted">${esc(item.ean || "keine EAN")}</div>
+                <div class="text-xs text-muted">${esc(item.ean || I18N.t('comp.inv.no_ean'))}</div>
                 ${statusHtml}
               </div>
               <button class="btn btn-ghost btn-sm comp-check-btn" style="font-size:10px;padding:2px 7px;flex-shrink:0" data-check="${esc(item.id)}">Check</button>
             </div>
           `;
         }).join("")
-      : `<div class="comp-list-empty">Keine aktiven Items im Inventory.</div>`;
+      : `<div class="comp-list-empty">${I18N.t('comp.inv.no_items')}</div>`;
 
     return `
       <div class="comp-left">
         <div class="row-between mb-10">
-          <span class="text-xs text-muted font-semibold">${active.length} aktive Produkte</span>
-          <button class="btn btn-secondary btn-sm" id="btnCheckAll" style="font-size:11px">Alle prüfen</button>
+          <span class="text-xs text-muted font-semibold">${active.length} ${I18N.t('comp.inv.active')}</span>
+          <button class="btn btn-secondary btn-sm" id="btnCheckAll" style="font-size:11px">${I18N.t('comp.inv.check_all')}</button>
         </div>
         <div class="comp-list" id="invList">${leftRows}</div>
       </div>
-      <div class="comp-right" id="compRight">${renderRightEmpty("Produkt wählen", "Links ein Inventory-Item wählen um die Konkurrenz zu sehen.")}</div>
+      <div class="comp-right" id="compRight">${renderRightEmpty(I18N.t('comp.inv.sel_product'), I18N.t('comp.inv.sel_sub'))}</div>
     `;
   }
 
   function renderInvStatusChip(item, cache) {
     const { total, items } = cache;
     const myPrice = item.sell_price || null;
-    if (!myPrice) return `<div class="comp-status-chip comp-status-neutral">${total} Anbieter</div>`;
+    if (!myPrice) return `<div class="comp-status-chip comp-status-neutral">${total} ${I18N.t('comp.inv.kpi.provider')}</div>`;
     const cheapest = items[0]?.total_price;
     if (cheapest && cheapest < myPrice - 0.01)
-      return `<div class="comp-status-chip comp-status-danger">⚠ unterboten ${fmtEur(cheapest)}</div>`;
+      return `<div class="comp-status-chip comp-status-danger">${I18N.t('comp.chip.undercut')} ${fmtEur(cheapest)}</div>`;
     const rank = items.filter(i => i.total_price < myPrice).length + 1;
     if (rank === 1)
-      return `<div class="comp-status-chip comp-status-good">✓ günstigster</div>`;
+      return `<div class="comp-status-chip comp-status-good">${I18N.t('comp.chip.cheapest')}</div>`;
     return `<div class="comp-status-chip comp-status-neutral">#${rank} von ${total}</div>`;
   }
 
@@ -413,18 +413,18 @@ const CompetitionView = (() => {
 
   async function checkAllInventory() {
     const active = _inventory.filter(i => ["IN_STOCK","LISTED","LISTING_PENDING"].includes(i.status) && i.ean);
-    if (!active.length) { Toast.info("Keine EANs", "Keine aktiven Items mit EAN."); return; }
-    Toast.info("Prüfe alle…", `${active.length} Items werden geprüft.`);
+    if (!active.length) { Toast.info(I18N.t('comp.toast.no_eans'), I18N.t('comp.toast.no_active')); return; }
+    Toast.info(I18N.t('comp.toast.checking'), `${active.length} Items werden geprüft.`);
     for (const item of active) {
       await loadInvCompetition(item, true);
       await new Promise(r => setTimeout(r, 400));
     }
-    Toast.success("Fertig", `${active.length} Items geprüft.`);
+    Toast.success(I18N.t('comp.toast.done'), `${active.length} Items geprüft.`);
     rerenderInvLeft();
   }
 
   async function loadInvCompetition(item, silent = false) {
-    if (!item.ean) { if (!silent) Toast.warning("EAN fehlt", "Dieses Item hat keine EAN hinterlegt."); return; }
+    if (!item.ean) { if (!silent) Toast.warning(I18N.t('comp.toast.ean_missing'), I18N.t('comp.toast.no_ean_set')); return; }
     _invSelected = item;
     rerenderInvLeft();
     const right = _container?.querySelector("#compRight");
@@ -461,14 +461,14 @@ const CompetitionView = (() => {
             <div class="comp-list-item ${_invSelected?.id === item.id ? "active" : ""}" data-inv="${esc(item.id)}">
               <div style="flex:1;min-width:0">
                 <div class="comp-item-name" style="font-size:12px">${esc((item.title || item.ean || "—").slice(0, 38))}</div>
-                <div class="text-xs text-muted">${esc(item.ean || "keine EAN")}</div>
+                <div class="text-xs text-muted">${esc(item.ean || I18N.t('comp.inv.no_ean'))}</div>
                 ${statusHtml}
               </div>
               <button class="btn btn-ghost btn-sm comp-check-btn" style="font-size:10px;padding:2px 7px;flex-shrink:0" data-check="${esc(item.id)}">Check</button>
             </div>
           `;
         }).join("")
-      : `<div class="comp-list-empty">Keine aktiven Items.</div>`;
+      : `<div class="comp-list-empty">${I18N.t('comp.inv.no_items2')}</div>`;
     bindInvList(_container);
   }
 
@@ -485,16 +485,16 @@ const CompetitionView = (() => {
     if (myPrice != null && cheapest != null) {
       if (cheapest < myPrice - 0.01) {
         banner = `<div class="comp-banner comp-banner-danger">
-          ⚠️  Du wirst unterboten — günstigster Konkurrent: <strong>${fmtEur(cheapest)}</strong>
+          ⚠️  ${I18N.t('comp.inv.banner.undercut')} <strong>${fmtEur(cheapest)}</strong>
           (dein VK: ${fmtEur(myPrice)}, Differenz: ${fmtEur(myPrice - cheapest)})
         </div>`;
       } else if (myRank === 1) {
         banner = `<div class="comp-banner comp-banner-success">
-          ✅  Du bist der günstigste Anbieter (${fmtEur(myPrice)}) — ${total - 1} Anbieter teurer als du.
+          ✅  ${I18N.t('comp.inv.banner.cheapest')} (${fmtEur(myPrice)}) — ${total - 1} ${I18N.t('comp.inv.kpi.provider')} teurer als du.
         </div>`;
       } else {
         banner = `<div class="comp-banner comp-banner-neutral">
-          📊  Du bist Rang <strong>#${myRank}</strong> von ${total} Anbietern (${fmtEur(myPrice)}).
+          📊  Du bist Rang <strong>#${myRank}</strong> von ${total} ${I18N.t('comp.inv.kpi.provider')}n (${fmtEur(myPrice)}).
         </div>`;
       }
     }
@@ -504,19 +504,19 @@ const CompetitionView = (() => {
       <div class="comp-kpi-grid">
         <div class="comp-kpi-tile comp-kpi-green">
           <div class="comp-kpi-val">${fmtEur(cheapest)}</div>
-          <div class="comp-kpi-lbl">Günstigster</div>
+          <div class="comp-kpi-lbl">${I18N.t('comp.inv.kpi.cheapest')}</div>
         </div>
         <div class="comp-kpi-tile comp-kpi-red">
           <div class="comp-kpi-val">${fmtEur(highest)}</div>
-          <div class="comp-kpi-lbl">Teuerster</div>
+          <div class="comp-kpi-lbl">${I18N.t('comp.inv.kpi.priciest')}</div>
         </div>
         <div class="comp-kpi-tile">
           <div class="comp-kpi-val">${myRank != null ? `#${myRank} / ${total}` : total}</div>
-          <div class="comp-kpi-lbl">${myRank != null ? "Mein Rang" : "Anbieter"}</div>
+          <div class="comp-kpi-lbl">${myRank != null ? I18N.t('comp.inv.kpi.my_rank') : I18N.t('comp.inv.kpi.provider')}</div>
         </div>
         <div class="comp-kpi-tile comp-kpi-accent">
           <div class="comp-kpi-val">${myPrice != null ? fmtEur(myPrice) : "—"}</div>
-          <div class="comp-kpi-lbl">Mein VK</div>
+          <div class="comp-kpi-lbl">${I18N.t('comp.inv.kpi.my_vk')}</div>
         </div>
       </div>
     `;
@@ -528,11 +528,11 @@ const CompetitionView = (() => {
       return `
         <tr class="${rowClass}">
           <td class="text-xs font-semibold nowrap">
-            ${isMe ? `<span class="badge badge-blue" style="font-size:9px;margin-right:4px">ich</span>` : ""}
+            ${isMe ? `<span class="badge badge-blue" style="font-size:9px;margin-right:4px">${I18N.t('comp.inv.me')}</span>` : ""}
             ${esc(it.seller_id || "—")}
           </td>
           <td class="text-right font-bold tabular-nums nowrap">${fmtEur(it.price)}</td>
-          <td class="text-muted text-right text-sm nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : "inkl."}</td>
+          <td class="text-muted text-right text-sm nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : I18N.t('comp.inv.incl')}</td>
           <td class="text-right font-bold" style="font-variant-numeric:tabular-nums;white-space:nowrap;color:${isCheapest && !isMe ? "var(--red)" : "var(--text-primary)"}">${fmtEur(it.total_price)}</td>
           <td><span class="badge badge-muted" style="font-size:9px">${esc(it.condition || "—")}</span></td>
           <td class="text-xs nowrap">
@@ -552,11 +552,11 @@ const CompetitionView = (() => {
       <div class="comp-right-hdr">
         <div>
           <div class="font-semibold" style="font-size:14px">${esc((item.title || item.ean || "—").slice(0, 60))}</div>
-          <div class="text-xs text-muted">EAN: ${esc(item.ean || "—")} · ${total} Angebote · gerade abgerufen</div>
+          <div class="text-xs text-muted">EAN: ${esc(item.ean || "—")} · ${total} ${I18N.t('comp.inv.offers')} · ${I18N.t('comp.inv.just_fetched')}</div>
         </div>
         <button class="btn btn-secondary btn-sm" data-refresh-inv="${esc(item.id)}">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13 8A5 5 0 1 1 3.07 5.65M3 2v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Aktualisieren
+          ${I18N.t('comp.inv.refresh')}
         </button>
       </div>
       ${banner}
@@ -564,15 +564,15 @@ const CompetitionView = (() => {
       <div class="comp-table-wrap">
         <table class="comp-table">
           <thead><tr>
-            <th>Verkäufer</th>
-            <th class="text-right">Preis</th>
-            <th class="text-right">Versand</th>
-            <th class="text-right">Gesamt</th>
-            <th>Zustand</th>
-            <th>Bewertungen</th>
+            <th>${I18N.t('comp.inv.th.seller')}</th>
+            <th class="text-right">${I18N.t('comp.inv.th.price')}</th>
+            <th class="text-right">${I18N.t('comp.inv.th.shipping')}</th>
+            <th class="text-right">${I18N.t('comp.inv.th.total')}</th>
+            <th>${I18N.t('comp.inv.th.condition')}</th>
+            <th>${I18N.t('comp.inv.th.ratings')}</th>
             <th></th>
           </tr></thead>
-          <tbody>${rows || `<tr><td colspan="7" class="text-center text-muted" style="padding:32px">Keine Angebote gefunden.</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td colspan="7" class="text-center text-muted" style="padding:32px">${I18N.t('comp.inv.no_offers')}</td></tr>`}</tbody>
         </table>
       </div>
     `;
@@ -583,28 +583,28 @@ const CompetitionView = (() => {
   // ──────────────────────────────────────────────────────────────────────────
   const _WH_EVENTS = [
     {
-      id: "undercut", label: "Günstigster Konkurrent unterboten",
-      desc: "Wenn ein Konkurrent deinen Listenpreis unterbietet",
+      id: "undercut", get label() { return I18N.t('comp.wh.ev.undercut'); },
+      get desc() { return I18N.t('comp.wh.ev_desc.undercut'); },
       tag: "ALERT", tagCls: "comp-wh-event-tag-red",
     },
     {
-      id: "new_listing", label: "Neues Listing von beobachtetem Verkäufer",
-      desc: "Wenn ein überwachter Verkäufer ein neues Angebot einstellt",
+      id: "new_listing", get label() { return I18N.t('comp.wh.ev.new_listing'); },
+      get desc() { return I18N.t('comp.wh.ev_desc.new_listing'); },
       tag: "NEU", tagCls: "comp-wh-event-tag-yellow",
     },
     {
-      id: "price_drop", label: "Preis deutlich gesunken",
-      desc: "Wenn der Marktpreis eines deiner Produkte stark fällt",
+      id: "price_drop", get label() { return I18N.t('comp.wh.ev.price_drop'); },
+      get desc() { return I18N.t('comp.wh.ev_desc.price_drop'); },
       tag: "PREIS", tagCls: "comp-wh-event-tag-yellow",
     },
     {
-      id: "verdict_change", label: "Flipcheck Verdict geändert",
-      desc: "Wenn ein Produkt von BUY zu HOLD oder SKIP wechselt",
+      id: "verdict_change", get label() { return I18N.t('comp.wh.ev.verdict'); },
+      get desc() { return I18N.t('comp.wh.ev_desc.verdict'); },
       tag: "VERDICT", tagCls: "comp-wh-event-tag-accent",
     },
     {
-      id: "new_seller", label: "Neuer Konkurrent aufgetaucht",
-      desc: "Wenn ein neuer Anbieter für dein Produkt erscheint",
+      id: "new_seller", get label() { return I18N.t('comp.wh.ev.new_seller'); },
+      get desc() { return I18N.t('comp.wh.ev_desc.new_seller'); },
       tag: "KONKURRENZ", tagCls: "comp-wh-event-tag-accent",
     },
   ];
@@ -636,9 +636,9 @@ const CompetitionView = (() => {
         <!-- URL Section -->
         <div class="comp-wh-section">
           <div class="comp-wh-section-hdr">
-            <span class="comp-wh-section-title">Discord Webhook URL</span>
+            <span class="comp-wh-section-title">${I18N.t('comp.wh.url_title')}</span>
             <span class="comp-wh-status ${hasUrl ? "comp-wh-status-ok" : "comp-wh-status-idle"}" id="whStatusPill">
-              ${hasUrl ? "● Gespeichert" : "○ Nicht konfiguriert"}
+              ${hasUrl ? I18N.t('comp.wh.saved') : I18N.t('comp.wh.not_configured')}
             </span>
           </div>
           <div class="comp-wh-section-body">
@@ -646,16 +646,16 @@ const CompetitionView = (() => {
               <input class="input" id="whUrlInput" type="text"
                 placeholder="https://discord.com/api/webhooks/…"
                 value="${urlVal}" autocomplete="off" spellcheck="false"/>
-              <button class="btn btn-primary btn-sm" id="btnSaveWh" style="white-space:nowrap">Speichern</button>
+              <button class="btn btn-primary btn-sm" id="btnSaveWh" style="white-space:nowrap">${I18N.t('comp.wh.save_btn')}</button>
               <button class="btn btn-secondary btn-sm" id="btnTestWh" style="white-space:nowrap" ${hasUrl ? "" : "disabled"}>
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>
-                Test
+                ${I18N.t('comp.wh.test_btn')}
               </button>
             </div>
             <p class="text-xs text-muted" style="margin:0">
-              Discord: Server-Einstellungen → Integrationen → Webhooks → Neuer Webhook → URL kopieren.
+              ${I18N.t('comp.wh.discord_hint')}
             </p>
           </div>
         </div>
@@ -663,8 +663,8 @@ const CompetitionView = (() => {
         <!-- Events Section -->
         <div class="comp-wh-section">
           <div class="comp-wh-section-hdr">
-            <span class="comp-wh-section-title">Benachrichtigungen</span>
-            <span class="text-xs text-muted">Wähle welche Ereignisse eine Nachricht auslösen</span>
+            <span class="comp-wh-section-title">${I18N.t('comp.wh.notif_title')}</span>
+            <span class="text-xs text-muted">${I18N.t('comp.wh.notif_sub')}</span>
           </div>
           <div class="comp-wh-section-body" style="padding:6px 8px">
             <div class="comp-wh-events">${eventRows}</div>
@@ -674,18 +674,18 @@ const CompetitionView = (() => {
         <!-- Monitor Status Section -->
         <div class="comp-wh-section">
           <div class="comp-wh-section-hdr">
-            <span class="comp-wh-section-title">Hintergrund-Monitor</span>
+            <span class="comp-wh-section-title">${I18N.t('comp.wh.monitor_title')}</span>
             ${monStatus
               ? `<span class="comp-wh-status ${monStatus.active ? "comp-wh-status-ok" : "comp-wh-status-idle"}">
-                   ${monStatus.active ? "● Aktiv" : "○ Gestoppt"}
+                   ${monStatus.active ? I18N.t('comp.wh.monitor_active') : I18N.t('comp.wh.monitor_stopped')}
                  </span>`
-              : `<span class="comp-wh-status comp-wh-status-idle">○ Wird geladen…</span>`
+              : `<span class="comp-wh-status comp-wh-status-idle">${I18N.t('comp.wh.monitor_loading')}</span>`
             }
           </div>
           <div class="comp-wh-section-body">
             <div class="grid-2-md mb-4">
               <div>
-                <div class="text-xs text-muted" style="margin-bottom:4px">Letzter Check</div>
+                <div class="text-xs text-muted" style="margin-bottom:4px">${I18N.t('comp.wh.last_check')}</div>
                 <div class="font-semibold" style="font-size:13px" id="monLastRun">
                   ${monStatus?.lastRun
                     ? `vor ${timeSinceStatic(monStatus.lastRun)}`
@@ -694,7 +694,7 @@ const CompetitionView = (() => {
                 </div>
               </div>
               <div>
-                <div class="text-xs text-muted" style="margin-bottom:4px">Prüf-Intervall</div>
+                <div class="text-xs text-muted" style="margin-bottom:4px">${I18N.t('comp.wh.interval')}</div>
                 <select class="input" id="monIntervalSelect" style="font-size:12px;padding:4px 8px">
                   <option value="5"  ${(monStatus?.intervalMin||15)===5  ?"selected":""}>alle 5 Min.</option>
                   <option value="10" ${(monStatus?.intervalMin||15)===10 ?"selected":""}>alle 10 Min.</option>
@@ -705,8 +705,7 @@ const CompetitionView = (() => {
               </div>
             </div>
             <p class="text-xs text-muted" style="margin:0">
-              Der Monitor läuft im Hintergrund — auch wenn die App minimiert ist.
-              Ohne Webhook-URL werden keine Checks ausgeführt.
+              ${I18N.t('comp.wh.monitor_hint')}
             </p>
           </div>
         </div>
@@ -714,8 +713,8 @@ const CompetitionView = (() => {
         <!-- Embed Preview Section -->
         <div class="comp-wh-section">
           <div class="comp-wh-section-hdr">
-            <span class="comp-wh-section-title">Discord Embed Vorschau</span>
-            <span class="text-xs text-muted">So sieht die Benachrichtigung aus</span>
+            <span class="comp-wh-section-title">${I18N.t('comp.wh.embed_title')}</span>
+            <span class="text-xs text-muted">${I18N.t('comp.wh.embed_sub')}</span>
           </div>
           <div class="comp-wh-section-body">
             ${renderEmbedPreview()}
@@ -805,7 +804,7 @@ const CompetitionView = (() => {
 
       <!-- Preview event selector -->
       <div style="margin-top:10px;display:flex;align-items:center;gap:8px">
-        <span class="text-xs text-muted">Vorschau für:</span>
+        <span class="text-xs text-muted">${I18N.t('comp.wh.preview_for')}</span>
         <select class="input" id="whPreviewSelect" style="font-size:11px;padding:4px 8px;width:auto">
           ${_WH_EVENTS.map(e => `<option value="${e.id}" ${e.id===eventId?"selected":""}>${e.label}</option>`).join("")}
         </select>
@@ -824,29 +823,29 @@ const CompetitionView = (() => {
       const pill = c.querySelector("#whStatusPill");
       if (pill) {
         pill.className = `comp-wh-status ${url ? "comp-wh-status-ok" : "comp-wh-status-idle"}`;
-        pill.textContent = url ? "● Gespeichert" : "○ Nicht konfiguriert";
+        pill.textContent = url ? I18N.t('comp.wh.saved') : I18N.t('comp.wh.not_configured');
       }
       const testBtn = c.querySelector("#btnTestWh");
       if (testBtn) testBtn.disabled = !url;
       updateStatsBar();
-      Toast.success("Gespeichert", url ? "Webhook URL gespeichert." : "Webhook URL geleert.");
+      Toast.success(I18N.t('comp.wh.toast_saved'), url ? I18N.t('comp.wh.toast_url_saved') : I18N.t('comp.wh.toast_url_cleared'));
     });
 
     // Test webhook
     c.querySelector("#btnTestWh")?.addEventListener("click", async () => {
       const btn = c.querySelector("#btnTestWh");
-      if (!_wh.url) { Toast.error("Kein URL", "Bitte erst eine Webhook-URL eintragen."); return; }
+      if (!_wh.url) { Toast.error(I18N.t('comp.wh.toast_no_url'), I18N.t('comp.wh.toast_no_url_sub')); return; }
       btn.disabled = true;
-      btn.textContent = "Sende…";
+      btn.textContent = I18N.t('comp.wh.sending');
       try {
         await fireWebhook("undercut", {
           product: "Samsung UE43TU7090 43\" — Testbenachrichtigung",
           myPrice: 89.99, cheapest: 84.50, total: 7,
         });
-        Toast.success("Test gesendet", "Benachrichtigung wurde an Discord gesendet.");
+        Toast.success(I18N.t('comp.wh.toast_sent'), I18N.t('comp.wh.toast_sent_sub'));
       } catch (e) {
         ErrorReporter.report(e, "competition:webhookTest");
-        Toast.error("Webhook-Fehler", e.message || "Test-Nachricht konnte nicht gesendet werden.");
+        Toast.error(I18N.t('comp.wh.toast_err'), e.message || I18N.t('comp.wh.toast_err_sub'));
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg> Test`;
@@ -865,7 +864,7 @@ const CompetitionView = (() => {
     c.querySelector("#monIntervalSelect")?.addEventListener("change", async e => {
       const min = parseInt(e.target.value);
       await Storage.setMonitorInterval(min);
-      Toast.success("Gespeichert", `Monitor läuft jetzt alle ${min} Minuten.`);
+      Toast.success(I18N.t('comp.wh.toast_saved'), `${I18N.t('comp.wh.toast_interval')} ${min} ${I18N.t('comp.wh.toast_interval_min')}`);
     });
 
     // Preview selector
@@ -897,36 +896,36 @@ const CompetitionView = (() => {
     const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1 };
     const icons  = { undercut: "⚠️", new_listing: "🆕", price_drop: "📉", verdict_change: "🔄", new_seller: "👤" };
     const labels = {
-      undercut:       "Günstigster Konkurrent unterboten",
-      new_listing:    "Neues Listing von beobachtetem Verkäufer",
-      price_drop:     "Preis deutlich gesunken",
-      verdict_change: "Flipcheck Verdict geändert",
-      new_seller:     "Neuer Konkurrent aufgetaucht",
+      undercut:       I18N.t('comp.wh.ev.undercut'),
+      new_listing:    I18N.t('comp.wh.ev.new_listing'),
+      price_drop:     I18N.t('comp.wh.ev.price_drop'),
+      verdict_change: I18N.t('comp.wh.ev.verdict'),
+      new_seller:     I18N.t('comp.wh.ev.new_seller'),
     };
 
-    const productName = data.product || data.item?.title || data.item?.ean || "Unbekanntes Produkt";
+    const productName = data.product || data.item?.title || data.item?.ean || I18N.t('comp.wh.unknown_product');
     const fields = [];
 
     if (eventId === "undercut") {
-      if (data.myPrice  != null) fields.push({ name: "Dein VK",     value: fmtEur(data.myPrice),  inline: true });
-      if (data.cheapest != null) fields.push({ name: "Konkurrent",  value: fmtEur(data.cheapest), inline: true });
+      if (data.myPrice  != null) fields.push({ name: I18N.t('comp.wh.field.my_vk'),   value: fmtEur(data.myPrice),  inline: true });
+      if (data.cheapest != null) fields.push({ name: I18N.t('comp.wh.field.comp'),     value: fmtEur(data.cheapest), inline: true });
       if (data.myPrice  != null && data.cheapest != null)
-        fields.push({ name: "Differenz", value: fmtEur(data.myPrice - data.cheapest), inline: true });
-      if (data.total    != null) fields.push({ name: "Anbieter",    value: String(data.total),     inline: true });
+        fields.push({ name: I18N.t('comp.wh.field.diff'), value: fmtEur(data.myPrice - data.cheapest), inline: true });
+      if (data.total    != null) fields.push({ name: I18N.t('comp.wh.field.provider'), value: String(data.total),     inline: true });
     } else if (eventId === "new_listing") {
-      if (data.username != null) fields.push({ name: "Verkäufer",  value: `@${data.username}`,    inline: true });
-      if (data.price    != null) fields.push({ name: "Preis",       value: fmtEur(data.price),     inline: true });
+      if (data.username != null) fields.push({ name: I18N.t('comp.wh.field.seller'),  value: `@${data.username}`,    inline: true });
+      if (data.price    != null) fields.push({ name: I18N.t('comp.wh.field.price'),    value: fmtEur(data.price),     inline: true });
     } else if (eventId === "price_drop") {
-      if (data.before   != null) fields.push({ name: "Vorher",     value: fmtEur(data.before),    inline: true });
-      if (data.after    != null) fields.push({ name: "Jetzt",       value: fmtEur(data.after),     inline: true });
-      if (data.pct      != null) fields.push({ name: "Veränderung", value: `${data.pct.toFixed(1)}%`, inline: true });
+      if (data.before   != null) fields.push({ name: I18N.t('comp.wh.field.before'),   value: fmtEur(data.before),    inline: true });
+      if (data.after    != null) fields.push({ name: I18N.t('comp.wh.field.now'),       value: fmtEur(data.after),     inline: true });
+      if (data.pct      != null) fields.push({ name: I18N.t('comp.wh.field.change'),   value: `${data.pct.toFixed(1)}%`, inline: true });
     } else if (eventId === "verdict_change") {
-      if (data.from     != null) fields.push({ name: "Vorher",     value: data.from,               inline: true });
-      if (data.to       != null) fields.push({ name: "Jetzt",       value: data.to,                 inline: true });
+      if (data.from     != null) fields.push({ name: I18N.t('comp.wh.field.before'),   value: data.from,               inline: true });
+      if (data.to       != null) fields.push({ name: I18N.t('comp.wh.field.now'),       value: data.to,                 inline: true });
     } else if (eventId === "new_seller") {
-      if (data.seller   != null) fields.push({ name: "Verkäufer",  value: `@${data.seller}`,       inline: true });
-      if (data.price    != null) fields.push({ name: "Preis",       value: fmtEur(data.price),      inline: true });
-      if (data.total    != null) fields.push({ name: "Anbieter ges.", value: String(data.total),    inline: true });
+      if (data.seller   != null) fields.push({ name: I18N.t('comp.wh.field.seller'),   value: `@${data.seller}`,       inline: true });
+      if (data.price    != null) fields.push({ name: I18N.t('comp.wh.field.price'),     value: fmtEur(data.price),      inline: true });
+      if (data.total    != null) fields.push({ name: I18N.t('comp.wh.field.provider_total'), value: String(data.total), inline: true });
     }
 
     const payload = {
@@ -976,7 +975,7 @@ const CompetitionView = (() => {
   function renderRightError(msg) {
     return `
       <div class="empty-state" style="padding:60px">
-        <p class="empty-title text-red">Fehler</p>
+        <p class="empty-title text-red">${I18N.t('comp.wh.toast_err')}</p>
         <p class="empty-sub">${esc(msg)}</p>
       </div>
     `;
@@ -1028,10 +1027,10 @@ const CompetitionView = (() => {
 
   function timeSince(isoStr) {
     const secs = Math.floor((Date.now() - new Date(isoStr).getTime()) / 1000);
-    if (secs < 60)    return "gerade eben";
+    if (secs < 60)    return I18N.t('comp.timesince.just_now');
     if (secs < 3600)  return `${Math.floor(secs / 60)} Min.`;
     if (secs < 86400) return `${Math.floor(secs / 3600)} Std.`;
-    return `${Math.floor(secs / 86400)} Tagen`;
+    return `${Math.floor(secs / 86400)} ${I18N.t('comp.timesince.days')}`;
   }
 
   return { mount, unmount };

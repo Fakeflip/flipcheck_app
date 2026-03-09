@@ -24,6 +24,7 @@ const SettingsView = (() => {
     await Storage.saveSettings(patch);
     const indicator = container.querySelector("#saveIndicator");
     if (indicator) {
+      indicator.textContent = I18N.t('st.saved');
       indicator.style.opacity = "1";
       clearTimeout(indicator._t);
       indicator._t = setTimeout(() => { indicator.style.opacity = "0"; }, 2000);
@@ -58,11 +59,11 @@ const SettingsView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Einstellungen</h1>
-          <p>Konto, Präferenzen und App-Konfiguration</p>
+          <h1>${I18N.t('st.title')}</h1>
+          <p>${I18N.t('st.subtitle')}</p>
         </div>
         <div class="page-header-actions">
-          <span id="saveIndicator" class="st-save-indicator">Gespeichert ✓</span>
+          <span id="saveIndicator" class="st-save-indicator">${I18N.t('st.saved')}</span>
         </div>
       </div>
 
@@ -70,7 +71,7 @@ const SettingsView = (() => {
 
         <!-- ── Konto ──────────────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("Konto", icoUser(), "Profil und Lizenzstatus")}
+          ${sectionHeader(I18N.t('st.section.account'), icoUser(), I18N.t('st.section.account.desc'))}
           <div class="panel st-panel" id="profileSection">
             <div class="settings-row" style="border:none;gap:14px;padding:2px 0">
               <div class="skeleton" style="width:52px;height:52px;border-radius:50%;flex-shrink:0"></div>
@@ -83,34 +84,50 @@ const SettingsView = (() => {
           </div>
         </div>
 
+        <!-- ── Sprache ────────────────────────────────────────────────────── -->
+        <div class="st-section">
+          ${sectionHeader(I18N.t('st.section.lang'), icoGlobe(), I18N.t('st.section.lang.desc'))}
+          <div class="panel st-panel">
+            <div class="settings-row" style="border:none">
+              <div class="settings-row-left">
+                <h4>${I18N.t('st.section.lang')}</h4>
+                <p>${I18N.t('st.section.lang.desc')}</p>
+              </div>
+              <div id="stLangSelector">
+                ${I18N.renderSelector(I18N.getLang())}
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Berechnungen ───────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("Berechnungen", icoCalc(), "MwSt-Modus, EK-Eingabe und Standard-Werte")}
+          ${sectionHeader(I18N.t('st.section.calc'), icoCalc(), I18N.t('st.section.calc.desc'))}
           <div class="panel st-panel">
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>MwSt-Modus</h4>
-                <p>Wie Verkaufspreise im Profit-Rechner behandelt werden</p>
+                <h4>${I18N.t('st.vat.title')}</h4>
+                <p>${I18N.t('st.vat.desc')}</p>
               </div>
               <select id="sVatMode" class="select" style="width:200px">
-                <option value="no_vat" ${vat === "no_vat" ? "selected" : ""}>Kleinunternehmer (§19, 0 %)</option>
-                <option value="ust_19" ${vat === "ust_19" ? "selected" : ""}>Regelbesteuerung (19 %)</option>
+                <option value="no_vat" ${vat === "no_vat" ? "selected" : ""}>${I18N.t('st.vat.small')}</option>
+                <option value="ust_19" ${vat === "ust_19" ? "selected" : ""}>${I18N.t('st.vat.regular')}</option>
               </select>
             </div>
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>EK-Eingabe</h4>
-                <p>Einkaufspreis als Brutto (inkl. MwSt) oder Netto eingeben</p>
+                <h4>${I18N.t('st.ek.title')}</h4>
+                <p>${I18N.t('st.ek.desc')}</p>
               </div>
               <div class="seg" id="sEkModeSeg">
-                <button class="seg-btn ${ekMode === "gross" ? "active" : ""}" data-val="gross">Brutto</button>
-                <button class="seg-btn ${ekMode === "net"   ? "active" : ""}" data-val="net">Netto</button>
+                <button class="seg-btn ${ekMode === "gross" ? "active" : ""}" data-val="gross">${I18N.t('st.ek.gross')}</button>
+                <button class="seg-btn ${ekMode === "net"   ? "active" : ""}" data-val="net">${I18N.t('st.ek.net')}</button>
               </div>
             </div>
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>Standard-Marktplatz</h4>
-                <p>Vorausgewählter Markt beim Öffnen des Flipchecks</p>
+                <h4>${I18N.t('st.market.title')}</h4>
+                <p>${I18N.t('st.market.desc')}</p>
               </div>
               <select id="sDefaultMarket" class="select" style="width:160px">
                 <option value="ebay"     ${defaultMarket === "ebay"     ? "selected" : ""}>eBay</option>
@@ -120,8 +137,8 @@ const SettingsView = (() => {
             </div>
             <div class="settings-row" style="border:none">
               <div class="settings-row-left">
-                <h4>Analyse-Modus</h4>
-                <p>LOW = konservativ &nbsp;·&nbsp; MID = realistisch &nbsp;·&nbsp; HIGH = optimistisch</p>
+                <h4>${I18N.t('st.mode.title')}</h4>
+                <p>${I18N.t('st.mode.desc')}</p>
               </div>
               <div class="seg" id="sModeSeg">
                 <button class="seg-btn ${defaultMode === "low"  ? "active" : ""}" data-val="low">LOW</button>
@@ -134,12 +151,12 @@ const SettingsView = (() => {
 
         <!-- ── Analytics ──────────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("Analytics", icoChart(), "Ziele und Dashboard-Tracking")}
+          ${sectionHeader(I18N.t('st.section.analytics'), icoChart(), I18N.t('st.section.analytics.desc'))}
           <div class="panel st-panel">
             <div class="settings-row" style="border:none">
               <div class="settings-row-left">
-                <h4>Wöchentliches Profit-Ziel</h4>
-                <p>Wird als Ziel-Linie im Analytics-Dashboard angezeigt</p>
+                <h4>${I18N.t('st.profit.title')}</h4>
+                <p>${I18N.t('st.profit.desc')}</p>
               </div>
               <div class="input-prefix-wrap" style="width:120px">
                 <span class="prefix">€</span>
@@ -153,7 +170,7 @@ const SettingsView = (() => {
 
         <!-- ── Shortcuts ──────────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("Tastenkürzel", icoKeyboard(), "Schnellnavigation und Eingabe-Shortcuts")}
+          ${sectionHeader(I18N.t('st.section.shortcuts'), icoKeyboard(), I18N.t('st.section.shortcuts.desc'))}
           <div class="panel st-panel">
             ${renderShortcuts()}
           </div>
@@ -161,23 +178,23 @@ const SettingsView = (() => {
 
         <!-- ── App & Updates ──────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("App & Updates", icoApp(), "Version und automatische Updates")}
+          ${sectionHeader(I18N.t('st.section.app'), icoApp(), I18N.t('st.section.app.desc'))}
           <div class="panel st-panel">
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>Version</h4>
+                <h4>${I18N.t('st.version.title')}</h4>
                 <p id="settingsVersion" style="font-family:var(--font-mono,monospace);font-size:11px;margin-top:2px">Lade…</p>
               </div>
               <div id="updaterStatus" style="font-size:11px;color:var(--text-muted);text-align:right"></div>
             </div>
             <div class="settings-row" style="border:none">
               <div class="settings-row-left">
-                <h4>Nach Updates suchen</h4>
-                <p>Automatischer Download bei neuem Release</p>
+                <h4>${I18N.t('st.update.title')}</h4>
+                <p>${I18N.t('st.update.desc')}</p>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
-                <button class="btn btn-secondary btn-sm" id="btnCheckUpdates">Prüfen</button>
-                <button class="btn btn-primary btn-sm" id="btnInstallUpdate" style="display:none">↺ Installieren</button>
+                <button class="btn btn-secondary btn-sm" id="btnCheckUpdates">${I18N.t('st.update.check')}</button>
+                <button class="btn btn-primary btn-sm" id="btnInstallUpdate" style="display:none">${I18N.t('st.update.install')}</button>
               </div>
             </div>
           </div>
@@ -185,28 +202,28 @@ const SettingsView = (() => {
 
         <!-- ── Gefahrenzone ───────────────────────────────────────────────── -->
         <div class="st-section">
-          ${sectionHeader("Gefahrenzone", icoDanger(), "Irreversible Aktionen — nicht rückgängig zu machen", true)}
+          ${sectionHeader(I18N.t('st.section.danger'), icoDanger(), I18N.t('st.section.danger.desc'), true)}
           <div class="panel st-panel" style="border-color:var(--red-border)">
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>Preishistorie bereinigen</h4>
-                <p>EANs ohne Eintrag der letzten 90 Tage entfernen</p>
+                <h4>${I18N.t('st.danger.history.title')}</h4>
+                <p>${I18N.t('st.danger.history.desc')}</p>
               </div>
-              <button class="btn btn-sm" id="btnVacuumHistory" style="border-color:var(--red-border);color:var(--red)">Bereinigen</button>
+              <button class="btn btn-sm" id="btnVacuumHistory" style="border-color:var(--red-border);color:var(--red)">${I18N.t('st.danger.history.btn')}</button>
             </div>
             <div class="settings-row">
               <div class="settings-row-left">
-                <h4>Inventory zurücksetzen</h4>
-                <p>Alle Artikel dauerhaft löschen</p>
+                <h4>${I18N.t('st.danger.inventory.title')}</h4>
+                <p>${I18N.t('st.danger.inventory.desc')}</p>
               </div>
-              <button class="btn btn-danger btn-sm" id="btnClearInventory">Löschen</button>
+              <button class="btn btn-danger btn-sm" id="btnClearInventory">${I18N.t('st.danger.inventory.btn')}</button>
             </div>
             <div class="settings-row" style="border:none">
               <div class="settings-row-left">
-                <h4>Abmelden</h4>
-                <p>Token wird gelöscht, Gerät wird aus der Lizenz entknüpft</p>
+                <h4>${I18N.t('st.danger.logout.title')}</h4>
+                <p>${I18N.t('st.danger.logout.desc')}</p>
               </div>
-              <button class="btn btn-danger btn-sm" id="btnSettingsLogout">Logout</button>
+              <button class="btn btn-danger btn-sm" id="btnSettingsLogout">${I18N.t('st.danger.logout.btn')}</button>
             </div>
           </div>
         </div>
@@ -231,10 +248,10 @@ const SettingsView = (() => {
   // ─── Shortcuts table ────────────────────────────────────────────────────────
   function renderShortcuts() {
     const rows = [
-      { keys: ["Enter"],    desc: "Check starten (im EK-Feld)" },
-      { keys: ["Escape"],   desc: "Modal schließen" },
-      { keys: ["↑", "↓"],  desc: "Inventar / Listen navigieren" },
-      { keys: ["Alt", "F"], desc: "Extension-Panel öffnen / schließen (Browser)" },
+      { keys: ["Enter"],    desc: I18N.t('st.sc.enter') },
+      { keys: ["Escape"],   desc: I18N.t('st.sc.escape') },
+      { keys: ["↑", "↓"],  desc: I18N.t('st.sc.arrows') },
+      { keys: ["Alt", "F"], desc: I18N.t('st.sc.panel') },
     ];
     return rows.map((r, i) => `
       <div class="settings-row${i === rows.length - 1 ? ' style="border:none"' : ''}">
@@ -253,6 +270,12 @@ const SettingsView = (() => {
     return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <circle cx="8" cy="5.5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
       <path d="M2.5 14c0-3 2.5-4.5 5.5-4.5s5.5 1.5 5.5 4.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>`;
+  }
+  function icoGlobe() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M8 2c-2 2-2 8 0 12M8 2c2 2 2 8 0 12M2 8h12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>`;
   }
   function icoCalc() {
@@ -289,6 +312,17 @@ const SettingsView = (() => {
   // ─── Events ────────────────────────────────────────────────────────────────
   function attachEvents(container, settings) {
 
+    // Language selector
+    container.querySelectorAll("#stLangSelector .lang-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        I18N.setLang(btn.dataset.lang); // saves to storage + updates DOM
+        // Re-render settings with new language
+        container.innerHTML = renderView(settings);
+        attachEvents(container, settings);
+        loadProfile(container);
+      });
+    });
+
     // Seg buttons → auto-save
     ["#sEkModeSeg", "#sModeSeg"].forEach(id => {
       container.querySelectorAll(`${id} .seg-btn`).forEach(btn => {
@@ -309,9 +343,9 @@ const SettingsView = (() => {
     // Price history vacuum
     container.querySelector("#btnVacuumHistory")?.addEventListener("click", async () => {
       const ok = await Modal.confirm(
-        "Preishistorie bereinigen",
+        I18N.t('st.danger.history.title'),
         "EANs ohne Eintrag in den letzten 90 Tagen werden dauerhaft entfernt. Fortfahren?",
-        { confirmLabel: "Bereinigen", danger: false }
+        { confirmLabel: I18N.t('st.danger.history.btn'), danger: false }
       );
       if (!ok) return;
       try {
@@ -324,16 +358,16 @@ const SettingsView = (() => {
         Toast.error("Fehler", "Bereinigung fehlgeschlagen.");
       } finally {
         const btn = container.querySelector("#btnVacuumHistory");
-        if (btn) btn.textContent = "Bereinigen";
+        if (btn) btn.textContent = I18N.t('st.danger.history.btn');
       }
     });
 
     // Danger: clear inventory
     container.querySelector("#btnClearInventory")?.addEventListener("click", async () => {
       const ok = await Modal.confirm(
-        "Inventory löschen",
+        I18N.t('st.danger.inventory.title'),
         "Wirklich alle Artikel aus dem Inventory löschen? Diese Aktion kann nicht rückgängig gemacht werden.",
-        { confirmLabel: "Alles löschen", danger: true }
+        { confirmLabel: I18N.t('st.danger.inventory.btn'), danger: true }
       );
       if (!ok) return;
       try {
@@ -347,7 +381,7 @@ const SettingsView = (() => {
 
     // Danger: logout
     container.querySelector("#btnSettingsLogout")?.addEventListener("click", async () => {
-      const ok = await Modal.confirm("Abmelden", "Wirklich ausloggen? Das Gerät wird aus der Lizenz entknüpft.", { confirmLabel: "Ausloggen", danger: true });
+      const ok = await Modal.confirm(I18N.t('st.danger.logout.title'), "Wirklich ausloggen? Das Gerät wird aus der Lizenz entknüpft.", { confirmLabel: I18N.t('st.danger.logout.btn'), danger: true });
       if (!ok) return;
       try { await window.fc.logout(); } catch {}
       window.location.reload();
@@ -363,12 +397,12 @@ const SettingsView = (() => {
     container.querySelector("#btnCheckUpdates")?.addEventListener("click", async () => {
       const btn      = container.querySelector("#btnCheckUpdates");
       const statusEl = container.querySelector("#updaterStatus");
-      btn.disabled = true; btn.textContent = "Prüfe…";
+      btn.disabled = true; btn.textContent = I18N.t('st.update.checking');
       try { await window.fc?.checkForUpdates?.(); } catch {}
       setTimeout(() => {
-        btn.disabled = false; btn.textContent = "Prüfen";
+        btn.disabled = false; btn.textContent = I18N.t('st.update.check');
         if (statusEl && !statusEl.dataset.hasUpdate) {
-          statusEl.innerHTML = `<span class="text-green">Aktuell ✓</span>`;
+          statusEl.innerHTML = `<span class="text-green">${I18N.t('st.update.ok')}</span>`;
           setTimeout(() => { if (statusEl && !statusEl.dataset.hasUpdate) statusEl.textContent = ""; }, 3000);
         }
       }, 3500);
@@ -405,7 +439,6 @@ const SettingsView = (() => {
     const profileSection = container.querySelector("#profileSection");
     if (!profileSection) return;
 
-    // Fallback: extract basic info from JWT claims without a server round-trip
     const claims = _jwtClaims(App.token);
 
     try {
@@ -447,7 +480,7 @@ const SettingsView = (() => {
                 ? `<div class="text-xs" style="color:var(--text-muted);margin-top:2px">${esc(u.email)}</div>`
                 : ""}
               ${since
-                ? `<div class="text-xs" style="color:var(--text-muted);margin-top:3px">Mitglied seit ${since}</div>`
+                ? `<div class="text-xs" style="color:var(--text-muted);margin-top:3px">${I18N.t('st.profile.member_since')} ${since}</div>`
                 : ""}
             </div>
           </div>
@@ -457,7 +490,7 @@ const SettingsView = (() => {
               ${plan}
             </span>
             ${!u.license_ok
-              ? `<button class="btn btn-primary btn-sm" style="font-size:11px" id="btnSettingsUpgrade">Upgrade auf Pro →</button>`
+              ? `<button class="btn btn-primary btn-sm" style="font-size:11px" id="btnSettingsUpgrade">${I18N.t('st.profile.upgrade')}</button>`
               : ""}
           </div>
         </div>
@@ -480,7 +513,6 @@ const SettingsView = (() => {
           }
         </div>
       `;
-      // Bind upgrade button in settings
       const upgBtn = profileSection.querySelector("#btnSettingsUpgrade");
       if (upgBtn) {
         upgBtn.addEventListener("click", async () => {
@@ -491,21 +523,19 @@ const SettingsView = (() => {
             if (ok && data?.checkout_url) window.open(data.checkout_url, "_blank");
             else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
           } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
-          finally { upgBtn.disabled = false; upgBtn.textContent = "Upgrade auf Pro →"; }
+          finally { upgBtn.disabled = false; upgBtn.textContent = I18N.t('st.profile.upgrade'); }
         });
       }
     } catch {
-      // If /auth/me fails but we still have a valid token, show basic info from JWT claims.
-      // Only show the "not logged in" state if there are no claims at all.
       const name = claims.discord_username || claims.sub || "";
       if (!name) {
         profileSection.innerHTML = `
           <div class="settings-row" style="border:none">
             <div class="settings-row-left">
-              <h4>Nicht angemeldet</h4>
-              <p>Token abgelaufen oder ungültig</p>
+              <h4>${I18N.t('st.profile.not_logged.title')}</h4>
+              <p>${I18N.t('st.profile.not_logged.sub')}</p>
             </div>
-            <button class="btn btn-primary btn-sm" onclick="window.location.reload()">Neu einloggen</button>
+            <button class="btn btn-primary btn-sm" onclick="window.location.reload()">${I18N.t('st.profile.not_logged.btn')}</button>
           </div>
         `;
         return;

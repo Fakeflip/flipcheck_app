@@ -131,7 +131,7 @@ const FlipcheckView = (() => {
     inp.value = ean;
     inp.dispatchEvent(new Event("input"));
     inp.focus();
-    if (typeof Toast !== "undefined") Toast.success("EAN gescannt", ean);
+    if (typeof Toast !== "undefined") Toast.success(I18N.t('fc.scanner.toast_title'), ean);
   }
 
   // ─── Mount ────────────────────────────────────────────────────────────────
@@ -208,11 +208,11 @@ const FlipcheckView = (() => {
     const vatBadge = _vatMode === "ust_19"
       ? `<div class="fc-info-pill fc-info-pill--accent mt-8">
            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#6366F1" stroke-width="1.2"/><path d="M8 5v3.5M8 10.5v.5" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round"/></svg>
-           <span class="text-xs">Regelbesteuerung 19% MwSt — Preise werden netto gerechnet</span>
+           <span class="text-xs">${I18N.t('fc.vat.regelbesteuerung')}</span>
          </div>`
       : `<div class="fc-info-pill fc-info-pill--neutral mt-8">
            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="var(--text-muted)" stroke-width="1.2"/><path d="M5 8h6" stroke="var(--text-muted)" stroke-width="1.5" stroke-linecap="round"/></svg>
-           <span class="text-xs text-muted">Kleinunternehmer — keine MwSt-Anpassung</span>
+           <span class="text-xs text-muted">${I18N.t('fc.vat.kleinunternehmer')}</span>
          </div>`;
 
     const isAmz = selectedMarket === "amazon";
@@ -220,8 +220,8 @@ const FlipcheckView = (() => {
     return `
       <div class="page-header">
         <div class="page-header-left">
-          <h1>Flipcheck</h1>
-          <p>Produkt analysieren — BUY / HOLD / SKIP auf eBay, Amazon &amp; Kaufland</p>
+          <h1>${I18N.t('nav.flipcheck')}</h1>
+          <p>${I18N.t('fc.subtitle')}</p>
         </div>
       </div>
 
@@ -229,7 +229,7 @@ const FlipcheckView = (() => {
         <!-- Form -->
         <div class="panel">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <h3 class="panel-title" style="margin:0">Produkt analysieren</h3>
+            <h3 class="panel-title" style="margin:0">${I18N.t('fc.form.title')}</h3>
             ${renderMarketToggle()}
           </div>
 
@@ -238,13 +238,13 @@ const FlipcheckView = (() => {
               <label class="input-label">${isAmz ? "ASIN / EAN" : "EAN"}</label>
               <div style="display:flex;gap:6px">
                 <input id="fcEan" class="input" type="text"
-                  placeholder="${isAmz ? "z.B. B09XXXX oder EAN" : "z.B. 4010355360205"}"
+                  placeholder="${isAmz ? I18N.t('fc.form.ean_placeholder_amz') : I18N.t('fc.form.ean_placeholder')}"
                   value="${esc(state.ean||"")}" autocomplete="off" style="flex:1" />
                 ${!isAmz ? `<button class="btn btn-ghost btn-sm" id="fcScanBtn" title="Handy-Scanner öffnen" style="flex-shrink:0;font-size:16px;padding:0 10px">📷</button>` : ""}
               </div>
               ${isAmz ? `
               <div id="fcConverterBox" style="display:none;margin-top:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm)">
-                <div style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">EAN ↔ ASIN Konverter</div>
+                <div style="font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px">${I18N.t('fc.converter.title')}</div>
                 <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
                   <div>
                     <div style="font-size:10px;color:var(--dim);margin-bottom:2px">EAN</div>
@@ -255,13 +255,13 @@ const FlipcheckView = (() => {
                     <div style="font-size:10px;color:var(--dim);margin-bottom:2px">ASIN</div>
                     <span id="fcConvAsin" class="text-mono" style="font-size:12px;color:var(--accent)">—</span>
                   </div>
-                  <button id="fcConvCopy" class="btn btn-ghost btn-xs" style="margin-left:auto;font-size:10px;padding:2px 8px" title="Anderen Identifier kopieren">Kopieren</button>
+                  <button id="fcConvCopy" class="btn btn-ghost btn-xs" style="margin-left:auto;font-size:10px;padding:2px 8px" title="${I18N.t('fc.converter.copy_hint')}">${I18N.t('fc.converter.copy')}</button>
                 </div>
               </div>` : ""}
             </div>
 
             <div class="input-group">
-              <label class="input-label">Einkaufspreis (€)</label>
+              <label class="input-label">${I18N.t('fc.form.ek_label')}</label>
               <div class="input-prefix-wrap">
                 <span class="prefix">€</span>
                 <input id="fcEk" class="input" type="number" step="0.01" min="0" placeholder="0.00"
@@ -272,7 +272,7 @@ const FlipcheckView = (() => {
             <!-- eBay / Kaufland category field (hidden for Amazon) -->
             <div id="fcEbayFields" style="display:${isAmz?"none":"contents"}">
               <div class="input-group">
-                <label class="input-label">${isKl ? "Kaufland Kategorie" : "eBay Kategorie"}</label>
+                <label class="input-label">${isKl ? I18N.t('fc.form.kl_category') : I18N.t('fc.form.ebay_category')}</label>
                 <select id="fcCategory" class="select">
                   ${isKl ? _buildKlCatOptions(catId) : buildCatOptions(catId)}
                 </select>
@@ -280,10 +280,10 @@ const FlipcheckView = (() => {
               </div>
 
               <div class="input-group">
-                <label class="input-label">Versandkosten${_vatMode==="ust_19"?" (brutto)":""}</label>
+                <label class="input-label">${I18N.t('fc.form.shipping')}${_vatMode==="ust_19"?" "+I18N.t('fc.form.gross_suffix'):""}</label>
                 <div class="grid-2-sm">
                   <div>
-                    <div class="text-xs text-muted mb-4">Einkauf (rein)</div>
+                    <div class="text-xs text-muted mb-4">${I18N.t('fc.form.ship_in')}</div>
                     <div class="input-prefix-wrap">
                       <span class="prefix">€</span>
                       <input id="fcShipIn" class="input" type="number" step="0.01" min="0" placeholder="0.00"
@@ -291,7 +291,7 @@ const FlipcheckView = (() => {
                     </div>
                   </div>
                   <div>
-                    <div class="text-xs text-muted mb-4">Verkauf (raus)</div>
+                    <div class="text-xs text-muted mb-4">${I18N.t('fc.form.ship_out')}</div>
                     <div class="input-prefix-wrap">
                       <span class="prefix">€</span>
                       <input id="fcShipOut" class="input" type="number" step="0.01" min="0" placeholder="0.00"
@@ -302,20 +302,20 @@ const FlipcheckView = (() => {
               </div>
 
               <div class="input-group">
-                <label class="input-label">Verpackungskosten (€/Stk.)</label>
+                <label class="input-label">${I18N.t('fc.form.packaging')}</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">€</span>
                   <input id="fcPackaging" class="input" type="number" step="0.01" min="0" placeholder="0.00"
                     value="${esc(state.packaging||"")}" />
                 </div>
-                <span class="input-hint">Bleibt erhalten bis du die Seite verlässt</span>
+                <span class="input-hint">${I18N.t('fc.form.packaging_hint')}</span>
               </div>
             </div>
 
             <!-- Amazon-only fields -->
             <div id="fcAmazonFields" style="display:${isAmz?"contents":"none"}">
               <div class="input-group">
-                <label class="input-label">Kategorie (Referral Fee)</label>
+                <label class="input-label">${I18N.t('fc.form.amz_category')}</label>
                 <select id="fcAmzCategory" class="select">
                   ${Object.entries({ computer_tablets:"Computer / Tablets (7%)", handys:"Smartphones (7%)", konsolen:"Gaming / Konsolen (8%)", foto_camcorder:"Foto & Camcorder (7%)", tv_video_audio:"TV, Video & Audio (7%)", haushaltsgeraete:"Haushaltsgeräte (7%)", drucker:"Drucker (7%)", handy_zubehoer:"Handy-Zubehör (15%)", notebook_zubehoer:"Notebook-Zubehör (15%)", kabel:"Kabel & Stecker (15%)", mode:"Mode (15%)", sport_freizeit:"Sport & Freizeit (15%)", spielzeug:"Spielzeug (15%)", buecher:"Bücher (15%)", sonstiges:"Sonstiges (15%)" })
                     .map(([v,l]) => `<option value="${v}"${v==="sonstiges"?" selected":""}>${esc(l)}</option>`).join("")}
@@ -323,15 +323,15 @@ const FlipcheckView = (() => {
               </div>
 
               <div class="input-group">
-                <label class="input-label">Versandmethode</label>
+                <label class="input-label">${I18N.t('fc.form.amz_method')}</label>
                 <div class="seg" id="fcAmzMethodSeg">
                   <button class="seg-btn active" data-method="fba">FBA</button>
-                  <button class="seg-btn" data-method="fbm">FBM (selbst)</button>
+                  <button class="seg-btn" data-method="fbm">${I18N.t('fc.form.amz_fbm')}</button>
                 </div>
               </div>
 
               <div id="fcAmzShipInWrap" class="input-group" style="display:none">
-                <label class="input-label">Versandkosten EK (€)</label>
+                <label class="input-label">${I18N.t('fc.form.amz_ship_in')}</label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">€</span>
                   <input id="fcAmzShipIn" class="input" type="number" step="0.01" min="0" placeholder="4.99" />
@@ -339,8 +339,8 @@ const FlipcheckView = (() => {
               </div>
 
               <div class="input-group">
-                <label class="input-label">PREP Gebühr (€/Stk.)
-                  <span class="input-hint" style="display:inline;margin-left:6px">Labeling, Bagging, Bubble Wrap…</span>
+                <label class="input-label">${I18N.t('fc.form.amz_prep')}
+                  <span class="input-hint" style="display:inline;margin-left:6px">${I18N.t('fc.form.amz_prep_hint')}</span>
                 </label>
                 <div class="input-prefix-wrap">
                   <span class="prefix">€</span>
@@ -352,10 +352,10 @@ const FlipcheckView = (() => {
             <div style="display:flex;gap:6px;margin-top:4px">
               <button class="btn btn-primary" id="btnCheck" style="flex:1;justify-content:center">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
-                Jetzt prüfen
+                ${I18N.t('fc.form.check_btn')}
               </button>
-              <button class="btn btn-ghost btn-sm" id="btnCopyLink" title="Link kopieren — in Discord teilen, Klick öffnet App mit diesen Werten" style="flex-shrink:0;white-space:nowrap;padding:0 10px">
-                🔗 Link
+              <button class="btn btn-ghost btn-sm" id="btnCopyLink" title="${I18N.t('fc.form.link_hint')}" style="flex-shrink:0;white-space:nowrap;padding:0 10px">
+                🔗 ${I18N.t('fc.form.link_btn')}
               </button>
             </div>
           </div>
@@ -370,15 +370,15 @@ const FlipcheckView = (() => {
   function renderResultPlaceholder() {
     return `<div class="empty-state">
       <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:48px;height:48px"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      <p class="empty-title" style="font-size:14px">Bereit zur Analyse</p>
-      <p class="empty-sub">EAN und Einkaufspreis eingeben, dann auf "Jetzt prüfen" klicken.</p>
+      <p class="empty-title" style="font-size:14px">${I18N.t('fc.placeholder.title')}</p>
+      <p class="empty-sub">${I18N.t('fc.placeholder.sub')}</p>
     </div>`;
   }
 
   function renderLoading(market = "ebay") {
-    const label = market === "amazon"   ? "Amazon/Keepa-Daten werden abgerufen…"
-                : market === "kaufland" ? "Kaufland-Daten werden abgerufen…"
-                :                        "eBay-Daten werden abgerufen…";
+    const label = market === "amazon"   ? I18N.t('fc.loading.amazon')
+                : market === "kaufland" ? I18N.t('fc.loading.kaufland')
+                :                        I18N.t('fc.loading.ebay');
     return `<div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
       <div class="spinner"></div>
       <span class="text-secondary">${label}</span>
@@ -427,8 +427,8 @@ const FlipcheckView = (() => {
     const scoreColor = score >= 70 ? "var(--green)" : score >= 44 ? "var(--yellow)" : "var(--red)";
 
     // ── Market signals ────────────────────────────────────────────────────
-    const compLevel = offers == null ? null : offers <= 5 ? ["Niedrig","badge-green"] : offers <= 20 ? ["Mittel","badge-yellow"] : ["Hoch","badge-red"];
-    const demLevel  = sales == null  ? null : sales  >= 40 ? ["Hoch","badge-green"]  : sales >= 10  ? ["Mittel","badge-yellow"]  : ["Niedrig","badge-red"];
+    const compLevel = offers == null ? null : offers <= 5 ? [I18N.t('fc.level.low'),"badge-green"] : offers <= 20 ? [I18N.t('fc.level.mid'),"badge-yellow"] : [I18N.t('fc.level.high'),"badge-red"];
+    const demLevel  = sales == null  ? null : sales  >= 40 ? [I18N.t('fc.level.high'),"badge-green"]  : sales >= 10  ? [I18N.t('fc.level.mid'),"badge-yellow"]  : [I18N.t('fc.level.low'),"badge-red"];
 
     // ── Verdict icon ──────────────────────────────────────────────────────
     const vIcon = v === "BUY"
@@ -460,18 +460,18 @@ const FlipcheckView = (() => {
             <div class="fc-score-bar">
               <div class="fc-score-fill" style="width:${score}%;background:${scoreColor}"></div>
             </div>
-            <div class="fc-score-sub">${v === "BUY" ? "Empfohlen zum Kauf" : v === "HOLD" ? "Abwarten & beobachten" : "Nicht rentabel"}</div>
+            <div class="fc-score-sub">${v === "BUY" ? I18N.t('fc.score.buy') : v === "HOLD" ? I18N.t('fc.score.hold') : I18N.t('fc.score.skip')}</div>
           </div>
         </div>
 
         <!-- ── 4-KPI Strip ── -->
         <div class="fc-kpi-row mb-16">
           <div class="fc-kpi-card ${dispProfit > 0 ? "green" : dispProfit < 0 ? "red" : ""}">
-            <div class="fc-kpi-label">Profit${isVAT ? " (netto)" : ""}</div>
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.profit')}${isVAT ? " "+I18N.t('fc.kpi.net_suffix') : ""}</div>
             <div class="fc-kpi-value ${profitColor}">${dispProfit != null ? fmtEur(dispProfit) : "—"}</div>
           </div>
           <div class="fc-kpi-card ${marginColor}">
-            <div class="fc-kpi-label">Marge</div>
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.margin')}</div>
             <div class="fc-kpi-value ${marginColor}">${dispMargin != null ? fmtPct(dispMargin) : "—"}</div>
           </div>
           <div class="fc-kpi-card">
@@ -479,7 +479,7 @@ const FlipcheckView = (() => {
             <div class="fc-kpi-value">${days != null ? fmtDays(days) : "—"}</div>
           </div>
           <div class="fc-kpi-card">
-            <div class="fc-kpi-label">Verk./30d</div>
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.sales30d')}</div>
             <div class="fc-kpi-value">${sales != null ? sales : "—"}</div>
           </div>
         </div>
@@ -487,18 +487,18 @@ const FlipcheckView = (() => {
         <!-- ── Market Signals ── -->
         <div class="fc-market-row mb-16">
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Ø VK${isVAT ? " (brutto)" : ""}</span>
+            <span class="fc-market-chip-l">${I18N.t('fc.chip.avg_vk')}${isVAT ? " "+I18N.t('fc.form.gross_suffix') : ""}</span>
             <span class="fc-market-chip-v">${fmtEur(vk)}</span>
           </div>
           ${offers != null ? `
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Angebote</span>
+            <span class="fc-market-chip-l">${I18N.t('fc.chip.offers')}</span>
             <span class="fc-market-chip-v">${offers}</span>
             ${compLevel ? `<span class="badge ${compLevel[1]}">${compLevel[0]}</span>` : ""}
           </div>` : ""}
           ${sales != null ? `
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Nachfrage</span>
+            <span class="fc-market-chip-l">${I18N.t('fc.chip.demand')}</span>
             ${demLevel ? `<span class="badge ${demLevel[1]}">${demLevel[0]}</span>` : ""}
           </div>` : ""}
           <div class="fc-market-chip">
@@ -510,7 +510,7 @@ const FlipcheckView = (() => {
         <!-- ── Waterfall Profit Breakdown ── -->
         ${vk != null ? `
         <div class="fc-waterfall mb-16">
-          <div class="fc-wf-title">Kostenstruktur${isVAT ? " (Netto, 19% MwSt)" : ""}</div>
+          <div class="fc-wf-title">${I18N.t('fc.waterfall.title')}${isVAT ? " "+I18N.t('fc.waterfall.vat_suffix') : ""}</div>
           <div class="fc-wf-flow">
             <div class="fc-wf-step">
               <div class="fc-wf-step-l">VK</div>
@@ -519,25 +519,25 @@ const FlipcheckView = (() => {
             ${dispFee != null ? `
             <div class="fc-wf-arrow">→</div>
             <div class="fc-wf-step red">
-              <div class="fc-wf-step-l">Gebühr</div>
+              <div class="fc-wf-step-l">${I18N.t('fc.waterfall.fee')}</div>
               <div class="fc-wf-step-v">−${fmtEur(dispFee)}</div>
             </div>` : ""}
             ${dispSoNet > 0 ? `
             <div class="fc-wf-arrow">→</div>
             <div class="fc-wf-step red">
-              <div class="fc-wf-step-l">Versand</div>
+              <div class="fc-wf-step-l">${I18N.t('fc.waterfall.shipping')}</div>
               <div class="fc-wf-step-v">−${fmtEur(dispSoNet)}</div>
             </div>` : ""}
             ${dispSiNet > 0 ? `
             <div class="fc-wf-arrow">→</div>
             <div class="fc-wf-step red">
-              <div class="fc-wf-step-l">Vers. EK</div>
+              <div class="fc-wf-step-l">${I18N.t('fc.waterfall.ship_in')}</div>
               <div class="fc-wf-step-v">−${fmtEur(dispSiNet)}</div>
             </div>` : ""}
             ${calc?.packNet > 0 ? `
             <div class="fc-wf-arrow">→</div>
             <div class="fc-wf-step red">
-              <div class="fc-wf-step-l">Verp.</div>
+              <div class="fc-wf-step-l">${I18N.t('fc.waterfall.packaging')}</div>
               <div class="fc-wf-step-v">−${fmtEur(calc.packNet)}</div>
             </div>` : ""}
             <div class="fc-wf-arrow">→</div>
@@ -565,21 +565,21 @@ const FlipcheckView = (() => {
           ${v === "BUY" ? `
           <button class="btn btn-primary" id="btnCreateListing" style="flex:1;min-width:140px;justify-content:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="10" height="13" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M4 6h4M4 9h3M11 10l2 2 2-2M13 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Listing erstellen
+            ${I18N.t('fc.action.create_listing')}
           </button>` : v === "HOLD" ? `
           <button class="btn btn-secondary btn-sm" id="btnCreateListing">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="10" height="13" rx="1.2" stroke="currentColor" stroke-width="1.5"/><path d="M4 6h4M4 9h3M11 10l2 2 2-2M13 8v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Listing erstellen
+            ${I18N.t('fc.action.create_listing')}
           </button>` : ""}
           <button class="btn btn-secondary btn-sm" id="btnAddToInv">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 5V4a3 3 0 0 1 6 0v1M6 10h4M8 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Zu Inventory
+            ${I18N.t('fc.action.add_inventory')}
           </button>
-          <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
+          <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
           <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
-            🛒 eBay Verkäufe ↗
+            🛒 ${I18N.t('fc.action.ebay_sales')} ↗
           </a>
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
             🏷 Idealo ↗
@@ -667,10 +667,10 @@ const FlipcheckView = (() => {
 
         <!-- ── 4 Primary KPIs ── -->
         <div class="fc-amz-kpi-grid mb-16">
-          ${_amzKpi(fmtEur(profit), "Profit", profitColor)}
-          ${_amzKpi(fmtPct(margin), "Marge", marginColor)}
+          ${_amzKpi(fmtEur(profit), I18N.t('fc.kpi.profit'), profitColor)}
+          ${_amzKpi(fmtPct(margin), I18N.t('fc.kpi.margin'), marginColor)}
           ${_amzKpi(fmtPct(roiPct), "ROI", roiColor)}
-          ${_amzKpi(mtlGewinn > 0 ? fmtEur(mtlGewinn) : "—", "Mtl. Gewinn", mtlGewinn > 0 ? "text-green" : "")}
+          ${_amzKpi(mtlGewinn > 0 ? fmtEur(mtlGewinn) : "—", I18N.t('fc.kpi.monthly_profit'), mtlGewinn > 0 ? "text-green" : "")}
         </div>
 
         <!-- ── Secondary Metrics Strip ── -->
@@ -689,11 +689,11 @@ const FlipcheckView = (() => {
         <!-- ── Break-Even + Net Payout ── -->
         <div class="grid-2-md mb-16">
           <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
-            <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">Break-Even VK</div>
+            <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">${I18N.t('fc.kpi.break_even')}</div>
             <div class="font-semibold" style="font-size:15px;font-variant-numeric:tabular-nums">${breakEven != null ? fmtEur(breakEven) : "—"}</div>
           </div>
           <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
-            <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">Net Payout</div>
+            <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">${I18N.t('fc.kpi.net_payout')}</div>
             <div class="font-semibold ${netPayout != null && netPayout > 0 ? "text-green" : ""}" style="font-size:15px;font-variant-numeric:tabular-nums">${netPayout != null ? fmtEur(netPayout) : "—"}</div>
           </div>
         </div>
@@ -704,7 +704,7 @@ const FlipcheckView = (() => {
         <!-- ── Kostenstruktur Accordion ── -->
         <details class="fc-accordion">
           <summary>
-            <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">Amazon Kostenstruktur</span>
+            <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.cost_structure.amz')}</span>
             ${_CHEV}
           </summary>
           <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
@@ -718,7 +718,7 @@ const FlipcheckView = (() => {
             ${prepFeeV > 0 ? _brkRow("PREP Gebühr", "−" + fmtEur(prepFeeV), "text-red") : ""}
             ${_brkRow(isVatAmz ? "EK (netto)" : "Einkaufspreis (EK)", "−" + fmtEur(ekDisp), "text-red")}
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-elevated)">
-              <span class="text-sm font-semibold text-primary">Profit (netto)</span>
+              <span class="text-sm font-semibold text-primary">${I18N.t('fc.cost_structure.profit_net')}</span>
               <span class="text-sm font-semibold ${profitColor}">${fmtEur(profit)}</span>
             </div>
           </div>
@@ -735,12 +735,12 @@ const FlipcheckView = (() => {
         <div class="row mt-16" style="gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" id="btnAddToInv">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 5V4a3 3 0 0 1 6 0v1M6 10h4M8 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            Zu Inventory
+            ${I18N.t('fc.action.add_inventory')}
           </button>
           <a class="btn btn-ghost btn-sm" href="https://www.amazon.de/dp/${esc(data.asin||identifier)}" target="_blank" rel="noopener">
-            Amazon öffnen ↗
+            ${I18N.t('fc.action.amazon_open')} ↗
           </a>
-          <button class="btn btn-ghost btn-sm" id="btnReset">Neu prüfen</button>
+          <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
           <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
@@ -820,7 +820,7 @@ const FlipcheckView = (() => {
     if (!signals) return "";
     const vc = signals.variation_count;
     const varColor = vc === 0 ? "gray" : vc < 5 ? "green" : vc < 20 ? "yellow" : "red";
-    const varText  = vc === 0 ? "Keine Varianten" : vc < 5 ? `${vc || "Keine"} Varianten` : `${vc} Varianten`;
+    const varText  = vc === 0 ? I18N.t('fc.signals.no_variations') : vc < 5 ? `${vc || I18N.t('fc.signals.no')} ${I18N.t('fc.signals.variations')}` : `${vc} ${I18N.t('fc.signals.variations')}`;
 
     const warnBadge = warnCount > 0
       ? `<span class="fc-warn-badge">${_WARN_ICON} ${warnCount}</span>`
@@ -829,34 +829,34 @@ const FlipcheckView = (() => {
     return `
     <details class="fc-accordion" open>
       <summary>
-        <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">Hinweise${warnBadge}</span>
+        <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.signals.title')}${warnBadge}</span>
         ${_CHEV}
       </summary>
       <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-        ${_sigRow("Buybox",
-            signals.buybox_is_amazon ? "Amazon hat die Buybox" : "Drittanbieter",
+        ${_sigRow(I18N.t('fc.signals.buybox'),
+            signals.buybox_is_amazon ? I18N.t('fc.signals.buybox_amazon') : I18N.t('fc.signals.buybox_third'),
             signals.buybox_is_amazon ? "red" : "green",
             signals.buybox_is_amazon)}
-        ${_sigRow("Variationen", varText, varColor)}
-        ${_sigRow("Private Label", signals.pl_text,
+        ${_sigRow(I18N.t('fc.signals.variations_label'), varText, varColor)}
+        ${_sigRow(I18N.t('fc.signals.pl'), signals.pl_text,
             signals.pl_risk === "likely"   ? "yellow"
           : signals.pl_risk === "possible" ? "gray" : "green")}
-        ${_sigRow("IP Analyse", signals.ip_text,
+        ${_sigRow(I18N.t('fc.signals.ip'), signals.ip_text,
             signals.ip_risk === "high"   ? "red"
           : signals.ip_risk === "medium" ? "yellow" : "green",
             signals.ip_risk === "high")}
-        ${_sigRow("Größe", signals.size_tier,
+        ${_sigRow(I18N.t('fc.signals.size'), signals.size_tier,
             signals.is_oversize ? "red" : "green",
             signals.is_oversize)}
-        ${_sigRow("Schmelzbar",
-            signals.is_meltable ? "Schmelzbar" : "Nicht schmelzbar",
+        ${_sigRow(I18N.t('fc.signals.meltable'),
+            signals.is_meltable ? I18N.t('fc.signals.meltable_yes') : I18N.t('fc.signals.meltable_no'),
             signals.is_meltable ? "red" : "green")}
-        ${_sigRow("Gefahrengut",
-            signals.is_hazmat ? "Möglicherweise gefährlich" : "Nicht gefährlich",
+        ${_sigRow(I18N.t('fc.signals.hazmat'),
+            signals.is_hazmat ? I18N.t('fc.signals.hazmat_yes') : I18N.t('fc.signals.hazmat_no'),
             signals.is_hazmat ? "red" : "green")}
         ${signals.ungated_markets ? `
         <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 14px;gap:8px">
-          <span class="text-xs text-secondary">Ungated</span>
+          <span class="text-xs text-secondary">${I18N.t('fc.signals.ungated')}</span>
           <div style="display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end">${_buildUngatedFlags(signals.ungated_markets)}</div>
         </div>` : ""}
       </div>
@@ -879,15 +879,15 @@ const FlipcheckView = (() => {
           </svg>
         </div>
         <div>
-          <div style="font-size:16px;font-weight:600;color:var(--text1);margin-bottom:6px">Kein aktiver Plan</div>
+          <div style="font-size:16px;font-weight:600;color:var(--text1);margin-bottom:6px">${I18N.t('fc.upgrade.title')}</div>
           <div style="font-size:13px;color:var(--text2);max-width:280px;line-height:1.5">
-            Aktiviere dein Flipcheck-Abo für unbegrenzten Zugriff auf alle Checks &amp; Features.
+            ${I18N.t('fc.upgrade.sub')}
           </div>
         </div>
         <button id="btnUpgradeCheckout"
            style="display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border-radius:8px;background:#6366f1;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s"
            onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
-          Jetzt upgraden
+          ${I18N.t('fc.upgrade.btn')}
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
         </button>
       </div>`;
@@ -898,20 +898,20 @@ const FlipcheckView = (() => {
     if (!btn) return;
     btn.addEventListener("click", async () => {
       btn.disabled = true;
-      btn.textContent = "Lade Checkout…";
+      btn.textContent = I18N.t('fc.upgrade.loading');
       try {
         const { ok, data } = await API.createCheckoutSession();
         if (ok && data?.checkout_url) {
           // Opens in default browser via Electron setWindowOpenHandler
           window.open(data.checkout_url, "_blank");
         } else {
-          Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+          Toast.error(I18N.t('fc.upgrade.err_title'), I18N.t('fc.upgrade.err_checkout'));
         }
       } catch {
-        Toast.error("Fehler", "Verbindung zum Server fehlgeschlagen.");
+        Toast.error(I18N.t('fc.upgrade.err_title'), I18N.t('fc.upgrade.err_conn'));
       } finally {
         btn.disabled = false;
-        btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+        btn.innerHTML = `${I18N.t('fc.upgrade.btn')} <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
       }
     });
   }
@@ -978,7 +978,7 @@ const FlipcheckView = (() => {
       chartWrap.innerHTML = `
         <div style="padding:10px 14px;background:var(--bg-panel);border:1px solid var(--border);border-radius:var(--r);display:flex;align-items:center;gap:8px">
           <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="#475569" stroke-width="1.2"/><path d="M8 5v3.5M8 10.5v.5" stroke="#475569" stroke-width="1.5" stroke-linecap="round"/></svg>
-          <span class="text-xs text-muted">Noch keine Preishistorie für diese EAN verfügbar.</span>
+          <span class="text-xs text-muted">${I18N.t('fc.chart.no_history')}</span>
         </div>`;
       return;
     }
@@ -997,14 +997,14 @@ const FlipcheckView = (() => {
     const seriesSource = chartWrap.dataset.market === "amazon"   ? "Keepa/Buy Box"
                        : chartWrap.dataset.market === "kaufland" ? "Kaufland Research"
                        :                                           "eBay Research";
-    const periodLabel  = isFromSeries ? `letzte 30 Tage (${seriesSource})` : `letzte ${chartEntries.length} Checks`;
+    const periodLabel  = isFromSeries ? `${I18N.t('fc.chart.last30')} (${seriesSource})` : `${I18N.t('fc.chart.last')} ${chartEntries.length} ${I18N.t('fc.chart.checks')}`;
 
     chartWrap.innerHTML = `
       <div class="panel" style="padding:14px 16px">
         <div class="row-between mb-12">
           <div class="row gap-8" style="align-items:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 9,10 15,3" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">Preisverlauf — ${periodLabel}</span>
+            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.price_history')} — ${periodLabel}</span>
           </div>
           <div class="row gap-12" style="align-items:center">
             <span class="text-xs text-muted">Min: <strong style="color:var(--green)">${fmtEur(minPrice)}</strong></span>
@@ -1036,7 +1036,7 @@ const FlipcheckView = (() => {
           // Qty bars (background, right y-axis)
           ...(hasQty ? [{
             type: "bar",
-            label: "Verkäufe",
+            label: I18N.t('fc.chart.sales_label'),
             data: chartEntries.map(e => e.qty ?? 0),
             backgroundColor: "rgba(99,102,241,0.12)",
             borderColor: "transparent",
@@ -1047,7 +1047,7 @@ const FlipcheckView = (() => {
           // Price line (foreground)
           {
             type: "line",
-            label: "Ø Verkaufspreis",
+            label: I18N.t('fc.chart.avg_price'),
             data: chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null),
             borderColor: "#6366F1",
             backgroundColor: "rgba(99,102,241,0.06)",
@@ -1083,8 +1083,8 @@ const FlipcheckView = (() => {
             titleFont: { size: 10 },
             bodyFont: { size: 10 },
             callbacks: {
-              label: c => c.dataset.label === "Verkäufe"
-                ? ` Verkäufe: ${c.parsed.y}`
+              label: c => c.dataset.label === I18N.t('fc.chart.sales_label')
+                ? ` ${I18N.t('fc.chart.sales_label')}: ${c.parsed.y}`
                 : ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}`,
             },
           },
@@ -1134,7 +1134,7 @@ const FlipcheckView = (() => {
         <div class="row-between mb-12">
           <div class="row gap-8" style="align-items:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,5 9,9 15,2" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">BSR Verlauf — letzte 30 Tage (Keepa)</span>
+            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.bsr_history')} — ${I18N.t('fc.chart.last30')} (Keepa)</span>
           </div>
           <div class="row gap-12" style="align-items:center">
             <span class="text-xs text-muted">Best: <strong style="color:var(--green)">#${Number(minR).toLocaleString("de-DE")}</strong></span>
@@ -1144,7 +1144,7 @@ const FlipcheckView = (() => {
         <div style="height:80px;position:relative">
           <canvas id="fcBsrMiniChart"></canvas>
         </div>
-        <p class="text-xs text-muted" style="margin-top:6px">Niedrigere BSR = bessere Verkaufsposition · Drops = Verkaufsspitzen</p>
+        <p class="text-xs text-muted" style="margin-top:6px">${I18N.t('fc.chart.bsr_hint')}</p>
       </div>
     `;
 
@@ -1212,27 +1212,27 @@ const FlipcheckView = (() => {
     const body = `
       <div style="text-align:center">
         <p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px">
-          Öffne diese URL auf deinem Handy und scanne Barcodes direkt in Flipcheck.
+          ${I18N.t('fc.scanner.modal_sub')}
         </p>
         <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:10px;padding:16px 20px;margin-bottom:16px">
           <div style="font-family:monospace;font-size:16px;font-weight:700;color:var(--accent);letter-spacing:.02em;word-break:break-all">${esc(url)}</div>
         </div>
         <button class="btn btn-secondary btn-sm" id="scanUrlCopy" style="margin-bottom:12px">
-          📋 URL kopieren
+          📋 ${I18N.t('fc.scanner.copy_url')}
         </button>
         <p style="font-size:11px;color:var(--text-muted)">
-          Handy & PC müssen im selben WLAN sein.<br>
-          Gescannte EANs erscheinen automatisch im EAN-Feld.
+          ${I18N.t('fc.scanner.wifi_hint')}<br>
+          ${I18N.t('fc.scanner.ean_hint')}
         </p>
       </div>
     `;
     if (typeof Modal !== "undefined") {
-      Modal.open({ title: "📷 Handy-Scanner", body, buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }] });
+      Modal.open({ title: `📷 ${I18N.t('fc.scanner.modal_title')}`, body, buttons: [{ label: I18N.t('fc.scanner.close'), variant: "btn-ghost", value: false }] });
       // Copy button
       setTimeout(() => {
         document.getElementById("scanUrlCopy")?.addEventListener("click", () => {
           navigator.clipboard?.writeText(url).then(() => {
-            if (typeof Toast !== "undefined") Toast.success("Kopiert", url);
+            if (typeof Toast !== "undefined") Toast.success(I18N.t('fc.scanner.copied'), url);
           }).catch(() => {});
         });
       }, 50);
@@ -1277,7 +1277,7 @@ const FlipcheckView = (() => {
           hint = document.createElement("div");
           hint.id = "fcAsinHint";
           hint.style.cssText = "display:flex;align-items:center;gap:8px;margin-top:6px;padding:7px 10px;background:var(--accent-sub);border:1px solid var(--accent-bdr);border-radius:var(--r);font-size:12px;color:var(--accent)";
-          hint.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>ASIN erkannt — zu Amazon wechseln?</span><button id="fcSwitchAmz" class="btn btn-ghost btn-xs" style="font-size:11px;padding:2px 8px;margin-left:auto">→ Amazon</button>`;
+          hint.innerHTML = `<svg width="11" height="11" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.4"/><path d="M8 5v3.5M8 10.5v.5" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg><span>${I18N.t('fc.asin_hint')}</span><button id="fcSwitchAmz" class="btn btn-ghost btn-xs" style="font-size:11px;padding:2px 8px;margin-left:auto">→ Amazon</button>`;
           const inputGroup = e.target.closest(".input-group");
           if (inputGroup) inputGroup.appendChild(hint);
           container.querySelector("#fcSwitchAmz")?.addEventListener("click", () => {
@@ -1297,12 +1297,12 @@ const FlipcheckView = (() => {
       const ean = container.querySelector("#fcEan")?.value.trim();
       const ek  = container.querySelector("#fcEk")?.value.trim() || "0";
       const cat = container.querySelector("#fcCategory")?.value || "sonstiges";
-      if (!ean) { Toast.error("EAN fehlt", "Bitte EAN eingeben."); return; }
+      if (!ean) { Toast.error(I18N.t('fc.err.ean_missing'), I18N.t('fc.err.ean_missing_sub')); return; }
       const params = new URLSearchParams({ ean, ek, market: selectedMarket, cat });
       const url = `https://gate.joinflipcheck.app/check?${params}`;
       navigator.clipboard.writeText(url).then(() => {
-        Toast.success("Link kopiert!", "Füge den Link in Discord ein — Klick öffnet Flipcheck direkt mit diesen Werten.");
-      }).catch(() => Toast.error("Kopieren fehlgeschlagen", url));
+        Toast.success(I18N.t('fc.link.copied'), I18N.t('fc.link.copied_sub'));
+      }).catch(() => Toast.error(I18N.t('fc.link.copy_fail'), url));
     });
 
     // Amazon mode: auto-resolve EAN↔ASIN in converter box (debounced)
@@ -1353,8 +1353,8 @@ const FlipcheckView = (() => {
               copyBtn.onclick = () => {
                 if (!copyVal) return;
                 navigator.clipboard.writeText(copyVal).then(() => {
-                  copyBtn.textContent = "✓ Kopiert";
-                  setTimeout(() => { copyBtn.textContent = "Kopieren"; }, 1500);
+                  copyBtn.textContent = "✓ " + I18N.t('fc.converter.copied');
+                  setTimeout(() => { copyBtn.textContent = I18N.t('fc.converter.copy'); }, 1500);
                 }).catch(() => {});
               };
             }
@@ -1371,8 +1371,8 @@ const FlipcheckView = (() => {
     const ek         = parseFloat(ekRaw);
     const mode       = "mid"; // fixed — verdict uses margin>=15% & DTC<=15 thresholds
 
-    if (!identifier) { Toast.error("EAN fehlt", "Bitte EAN / ASIN eingeben."); return; }
-    if (!ekRaw || isNaN(ek) || ek <= 0) { Toast.error("EK fehlt", "Bitte einen gültigen Einkaufspreis eingeben."); return; }
+    if (!identifier) { Toast.error(I18N.t('fc.err.ean_missing'), I18N.t('fc.err.ean_asin_sub')); return; }
+    if (!ekRaw || isNaN(ek) || ek <= 0) { Toast.error(I18N.t('fc.err.ek_missing'), I18N.t('fc.err.ek_missing_sub')); return; }
 
     const resultEl = container.querySelector("#fcResult");
     resultEl.innerHTML = renderLoading(selectedMarket);
@@ -1452,7 +1452,7 @@ const FlipcheckView = (() => {
             ean = adata.ean;
             const eanInp = container.querySelector("#fcEan");
             if (eanInp) eanInp.value = ean;
-            Toast.info("ASIN → EAN", `${identifier.toUpperCase()} → EAN ${ean}`);
+            Toast.info("ASIN → EAN", `${identifier.toUpperCase()} → EAN ${ean}`); // technical label — not translated
             resultEl.innerHTML = renderLoading("ebay");
           } else {
             resultEl.innerHTML = renderErrorCard(
@@ -1518,10 +1518,10 @@ const FlipcheckView = (() => {
   async function addToInventory(identifier, ek, data, market = "ebay") {
     try {
       await Storage.upsertItem({ ean: identifier, title: data.title || identifier, ek, market, status: "IN_STOCK", qty: 1 });
-      Toast.success("Hinzugefügt", `${data.title || identifier} wurde zum Inventory hinzugefügt.`);
+      Toast.success(I18N.t('fc.inv.added'), `${data.title || identifier} ${I18N.t('fc.inv.added_sub')}`);
     } catch (err) {
       ErrorReporter.report(err, "addToInventory");
-      Toast.error("Inventory-Fehler", "Artikel konnte nicht gespeichert werden. Bitte erneut versuchen.");
+      Toast.error(I18N.t('fc.inv.err_title'), I18N.t('fc.inv.err_sub'));
     }
   }
 
