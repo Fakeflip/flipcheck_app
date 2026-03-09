@@ -287,9 +287,12 @@ const API = {
     return this.call("/health");
   },
 
-  /** Creates a Stripe Checkout Session and returns { checkout_url }. */
-  async createCheckoutSession() {
-    return this.call("/create-checkout-session", { method: "POST", body: {} });
+  /**
+   * Creates a Stripe Checkout Session and returns { checkout_url }.
+   * @param {number} [trialDays] - Number of free trial days (0 = no trial)
+   */
+  async createCheckoutSession(trialDays = 0) {
+    return this.call("/create-checkout-session", { method: "POST", body: { trial_days: trialDays } });
   },
 
   /**
@@ -513,6 +516,42 @@ function showGate(message) {
   if (hint && message) hint.textContent = message;
 }
 
+/**
+ * Bind buttons inside #license-gate and show the gate.
+ * @param {HTMLElement} licGate
+ */
+function showLicenseGate(licGate) {
+  if (!licGate) return;
+  licGate.style.display = "flex";
+  document.getElementById("app").style.display = "none";
+
+  /** @param {HTMLElement|null} btn @param {string} label @param {string} resetHtml */
+  async function handleCheckout(btn, trialDays, resetHtml) {
+    if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
+    try {
+      const r = await API.createCheckoutSession(trialDays);
+      if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
+      else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+    } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+    if (btn) { btn.disabled = false; btn.innerHTML = resetHtml; }
+  }
+
+  const trialBtn = document.getElementById("btnLicenseTrial");
+  const buyBtn   = document.getElementById("btnLicenseUpgrade");
+  const arrowSvg14 = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+  const arrowSvg12 = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+
+  trialBtn?.addEventListener("click", () =>
+    handleCheckout(trialBtn, 7, `7 Tage kostenlos testen ${arrowSvg14}`));
+  buyBtn?.addEventListener("click", () =>
+    handleCheckout(buyBtn, 0, `Direkt kaufen ${arrowSvg12}`));
+  document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
+    window.fc?.logout?.();
+    showGate();
+    licGate.style.display = "none";
+  });
+}
+
 // ─── Boot ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -623,24 +662,7 @@ async function boot() {
       try {
         const { ok, data } = await API.call("/auth/me");
         if (ok && data && !data.license_ok) {
-          const licGate = document.getElementById("license-gate");
-          if (licGate) licGate.style.display = "flex";
-          document.getElementById("app").style.display = "none";
-          document.getElementById("btnLicenseUpgrade")?.addEventListener("click", async () => {
-            const btn = document.getElementById("btnLicenseUpgrade");
-            if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
-            try {
-              const r = await API.createCheckoutSession();
-              if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
-              else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
-            } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
-            if (btn) { btn.disabled = false; btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`; }
-          });
-          document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
-            window.fc?.logout?.();
-            showGate();
-            if (licGate) licGate.style.display = "none";
-          });
+          showLicenseGate(document.getElementById("license-gate"));
           return;
         }
       } catch {}
@@ -736,24 +758,7 @@ async function boot() {
   try {
     const { ok, data } = await API.call("/auth/me");
     if (ok && data && !data.license_ok) {
-      const licGate = document.getElementById("license-gate");
-      if (licGate) licGate.style.display = "flex";
-      document.getElementById("app").style.display = "none";
-      document.getElementById("btnLicenseUpgrade")?.addEventListener("click", async () => {
-        const btn = document.getElementById("btnLicenseUpgrade");
-        if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
-        try {
-          const r = await API.createCheckoutSession();
-          if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
-          else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
-        } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
-        if (btn) { btn.disabled = false; btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`; }
-      });
-      document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
-        window.fc?.logout?.();
-        showGate();
-        if (licGate) licGate.style.display = "none";
-      });
+      showLicenseGate(document.getElementById("license-gate"));
       return;
     }
   } catch {}

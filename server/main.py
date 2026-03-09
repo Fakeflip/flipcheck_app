@@ -96,25 +96,30 @@ def license_ok(profile: Dict[str, Any]) -> bool:
     return bool(profile.get("beta_whitelist")) or (profile.get("license_status") == "active")
 
 
-async def stripe_create_checkout_session(discord_id: str, discord_username: str = "") -> str:
+async def stripe_create_checkout_session(discord_id: str, discord_username: str = "", trial_days: int = 0) -> str:
     """
     Creates a Stripe Checkout Session and returns the session URL.
     discord_id is stored in metadata so the webhook can activate the license.
+    Pass trial_days > 0 to add a free trial period.
     """
+    data: Dict[str, str] = {
+        "mode":                        "subscription",
+        "line_items[0][price]":        STRIPE_PRICE_ID,
+        "line_items[0][quantity]":     "1",
+        "metadata[discord_id]":        discord_id,
+        "metadata[discord_username]":  discord_username,
+        "success_url":                 STRIPE_SUCCESS_URL,
+        "cancel_url":                  STRIPE_CANCEL_URL,
+        "allow_promotion_codes":       "true",
+    }
+    if trial_days > 0:
+        data["subscription_data[trial_period_days]"] = str(trial_days)
+
     async with httpx.AsyncClient(timeout=15) as client:
         r = await client.post(
             "https://api.stripe.com/v1/checkout/sessions",
             auth=(STRIPE_SECRET_KEY, ""),
-            data={
-                "mode":                        "subscription",
-                "line_items[0][price]":        STRIPE_PRICE_ID,
-                "line_items[0][quantity]":     "1",
-                "metadata[discord_id]":        discord_id,
-                "metadata[discord_username]":  discord_username,
-                "success_url":                 STRIPE_SUCCESS_URL,
-                "cancel_url":                  STRIPE_CANCEL_URL,
-                "allow_promotion_codes":       "true",
-            },
+            data=data,
         )
         if r.status_code != 200:
             print(f"[STRIPE] create_session error {r.status_code}: {r.text}")
@@ -589,20 +594,26 @@ async def web_callback(code: str, state: Optional[str] = None):
 # STRIPE CHECKOUT SESSION
 # =========================================================
 
+class CheckoutSessionRequest(BaseModel):
+    trial_days: int = 0
+
+
 @app.post("/create-checkout-session")
-async def create_checkout_session(user=Depends(require_auth)):
+async def create_checkout_session(body: CheckoutSessionRequest = CheckoutSessionRequest(), user=Depends(require_auth)):
     """
     Creates a Stripe Checkout Session for the authenticated user.
     Returns { checkout_url: "https://checkout.stripe.com/..." }
     The discord_id is embedded in metadata so the webhook can activate the license.
+    Pass trial_days > 0 to add a free trial period (max 30 days enforced server-side).
     """
     user_id          = str(user.get("sub") or "")
     discord_username = str(user.get("discord_username") or "")
+    trial_days       = max(0, min(int(body.trial_days or 0), 30))  # cap at 30 days
 
     if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
         raise HTTPException(status_code=503, detail="Stripe nicht konfiguriert")
 
-    checkout_url = await stripe_create_checkout_session(user_id, discord_username)
+    checkout_url = await stripe_create_checkout_session(user_id, discord_username, trial_days)
     return {"ok": True, "checkout_url": checkout_url}
 
 
