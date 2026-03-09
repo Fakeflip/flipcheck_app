@@ -432,12 +432,6 @@ const SettingsView = (() => {
         "Preisalerts & Webhooks",
         "Multi-Device Sync (2 Geräte)",
       ];
-      const freeLockedFeatures = [
-        "Batch-Analyse & CSV",
-        "Analytics-Dashboard",
-        "Preisalerts & Webhooks",
-        "Multi-Device Sync",
-      ];
 
       const avatarHtml = u.avatar_url
         ? `<img src="${esc(u.avatar_url)}" class="profile-avatar" alt="" onerror="this.style.display='none'" />`
@@ -462,14 +456,13 @@ const SettingsView = (() => {
               style="background:${pm.bg};color:${pm.color};border-color:${pm.border}">
               ${plan}
             </span>
-            ${plan === "FREE"
-              ? `<button class="btn btn-primary btn-sm" style="font-size:11px"
-                   onclick="if(typeof navigateTo==='function')navigateTo('upgrade')">Upgrade auf Pro →</button>`
+            ${!u.license_ok
+              ? `<button class="btn btn-primary btn-sm" style="font-size:11px" id="btnSettingsUpgrade">Upgrade auf Pro →</button>`
               : ""}
           </div>
         </div>
         <div class="st-plan-grid">
-          ${plan !== "FREE"
+          ${u.license_ok
             ? proFeatures.map(f => `
                 <div class="st-plan-feat st-plan-feat--active">
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
@@ -477,23 +470,30 @@ const SettingsView = (() => {
                   </svg>
                   ${f}
                 </div>`).join("")
-            : `<div class="st-plan-feat st-plan-feat--active">
-                 <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                   <path d="M2 6l3 3 5-5" stroke="var(--green)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-                 </svg>
-                 50 Checks / Tag
-               </div>
-               ${freeLockedFeatures.map(f => `
-                 <div class="st-plan-feat st-plan-feat--locked">
-                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
-                     <path d="M3 3l6 6M9 3l-6 6" stroke="var(--text-muted)" stroke-width="1.4" stroke-linecap="round"/>
-                   </svg>
-                   ${f}
-                 </div>`).join("")}
-              `
+            : proFeatures.map(f => `
+                <div class="st-plan-feat st-plan-feat--locked">
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="var(--text-muted)" stroke-width="1.4" stroke-linecap="round"/>
+                  </svg>
+                  ${f}
+                </div>`).join("")
           }
         </div>
       `;
+      // Bind upgrade button in settings
+      const upgBtn = profileSection.querySelector("#btnSettingsUpgrade");
+      if (upgBtn) {
+        upgBtn.addEventListener("click", async () => {
+          upgBtn.disabled = true;
+          upgBtn.textContent = "Lade…";
+          try {
+            const { ok, data } = await API.createCheckoutSession();
+            if (ok && data?.checkout_url) window.open(data.checkout_url, "_blank");
+            else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+          } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+          finally { upgBtn.disabled = false; upgBtn.textContent = "Upgrade auf Pro →"; }
+        });
+      }
     } catch {
       // If /auth/me fails but we still have a valid token, show basic info from JWT claims.
       // Only show the "not logged in" state if there are no claims at all.
