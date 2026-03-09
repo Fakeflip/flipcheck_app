@@ -53,16 +53,10 @@ DISCORD_REDIRECT_URI      = os.environ["DISCORD_REDIRECT_URI"]
 DISCORD_WEB_REDIRECT_URI  = os.environ.get("DISCORD_WEB_REDIRECT_URI", "https://gate.joinflipcheck.app/auth/web/callback")
 WEB_APP_URL               = os.environ.get("WEB_APP_URL", "https://app.joinflipcheck.app")
 
-# ── Whop Payment ──────────────────────────────────────────────────────────────
-# Set these in server/.env  (get values from Whop developer dashboard)
-WHOP_WEBHOOK_SECRET   = os.environ.get("WHOP_WEBHOOK_SECRET", "")
-WHOP_PRO_PLAN_ID      = os.environ.get("WHOP_PRO_PLAN_ID", "")
-WHOP_LIFETIME_PLAN_ID = os.environ.get("WHOP_LIFETIME_PLAN_ID", "")
-WHOP_TEAM_PLAN_ID     = os.environ.get("WHOP_TEAM_PLAN_ID", "")
-WHOP_UPGRADE_URL      = os.environ.get("WHOP_UPGRADE_URL", "https://whop.com/flipcheck")
-
-# Free plan: daily check limit
-FREE_DAILY_LIMIT = int(os.environ.get("FREE_DAILY_LIMIT", "20"))
+# ── Stripe Payment ────────────────────────────────────────────────────────────
+# Set these in server/.env
+STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CHECKOUT_URL   = os.environ.get("STRIPE_CHECKOUT_URL", "https://buy.stripe.com/flipcheck")
 
 # Backend service (internal)
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8001")
@@ -76,17 +70,8 @@ def hash_device_id(fp: str) -> str:
 
 
 def license_ok(profile: Dict[str, Any]) -> bool:
-    """Returns True for paid users (active Whop membership) or beta-whitelisted users."""
+    """Returns True for paid users (active Stripe subscription) or beta-whitelisted users."""
     return bool(profile.get("beta_whitelist")) or (profile.get("license_status") == "active")
-
-
-def _whop_plan_tier(plan_id: str) -> str:
-    """Map a Whop plan ID to our internal tier name."""
-    if plan_id and plan_id == WHOP_LIFETIME_PLAN_ID:
-        return "lifetime"
-    if plan_id and plan_id == WHOP_TEAM_PLAN_ID:
-        return "team"
-    return "pro"
 
 
 def supabase_admin_headers() -> Dict[str, str]:
@@ -392,10 +377,8 @@ async def auth_me(user=Depends(require_auth)):
     if profile is None:
         profile = await sb_admin_create_profile(user_id=user_id, plan="free", role="user")
 
-    plan         = profile.get("plan", "free") or "free"
-    is_paid      = license_ok(profile)
-    daily_checks = int(profile.get("daily_checks") or 0)
-    daily_limit  = FREE_DAILY_LIMIT if not is_paid else None
+    plan    = profile.get("plan", "free") or "free"
+    is_paid = license_ok(profile)
 
     discord_username = (
         profile.get("discord_username")
@@ -419,9 +402,7 @@ async def auth_me(user=Depends(require_auth)):
         "beta_whitelist": bool(profile.get("beta_whitelist")),
         "license_status": profile.get("license_status"),
         "device_limit":   DEVICE_LIMIT,
-        "daily_checks":   daily_checks,
-        "daily_limit":    daily_limit,
-        "upgrade_url":    WHOP_UPGRADE_URL,
+        "checkout_url":   STRIPE_CHECKOUT_URL,
     }
 
 
@@ -517,71 +498,95 @@ async def web_callback(code: str, state: Optional[str] = None):
 #
 # Required .env vars:
 #   WHOP_WEBHOOK_SECRET   — copy from Whop developer dashboard → Webhooks
-#   WHOP_PRO_PLAN_ID      — Whop plan ID for PRO tier
-#   WHOP_LIFETIME_PLAN_ID — Whop plan ID for LIFETIME tier
-#   WHOP_TEAM_PLAN_ID     — Whop plan ID for TEAM tier  (optional)
-#   WHOP_UPGRADE_URL      — default: https://whop.com/flipcheck
-#   FREE_DAILY_LIMIT      — default: 20
+#   STRIPE_WEBHOOK_SECRET  — copy from Stripe Dashboard → Webhooks → Signing secret
+#   STRIPE_CHECKOUT_URL    — your Stripe payment link (buy.stripe.com/...)
+#
+# Stripe webhook events to enable in Dashboard:
+#   - checkout.session.completed
+#   - customer.subscription.deleted
+#   - customer.subscription.updated
 
-@app.post("/webhooks/whop")
-async def whop_webhook(request: Request):
+@app.post("/webhooks/stripe")
+async def stripe_webhook(request: Request):
     body = await request.body()
 
-    # ── HMAC-SHA256 signature verification ────────────────────────────────────
-    if WHOP_WEBHOOK_SECRET:
-        sig_header = (
-            request.headers.get("x-whop-signature-256")
-            or request.headers.get("x-whop-signature", "")
-        )
-        sig      = sig_header.removeprefix("sha256=")
+    # ── Stripe signature verification ─────────────────────────────────────────
+    if STRIPE_WEBHOOK_SECRET:
+        sig_header = request.headers.get("stripe-signature", "")
+        # Parse timestamp and signatures from header (t=...,v1=...)
+        ts_str, sig_v1 = "", ""
+        for part in sig_header.split(","):
+            k, _, v = part.partition("=")
+            if k.strip() == "t":
+                ts_str = v.strip()
+            elif k.strip() == "v1":
+                sig_v1 = v.strip()
+        signed_payload = f"{ts_str}.".encode() + body
         expected = hmac.new(
-            WHOP_WEBHOOK_SECRET.encode("utf-8"),
-            body,
+            STRIPE_WEBHOOK_SECRET.encode("utf-8"),
+            signed_payload,
             hashlib.sha256,
         ).hexdigest()
-        if not hmac.compare_digest(sig, expected):
-            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+        if not hmac.compare_digest(sig_v1, expected):
+            raise HTTPException(status_code=401, detail="Invalid Stripe webhook signature")
 
-    import json as _json
     try:
-        payload = _json.loads(body)
+        payload = json.loads(body)
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid JSON body")
 
-    action     = payload.get("action", "")
-    data       = payload.get("data", {})
-    user_data  = data.get("user", {})
-    discord_id = str(user_data.get("discord_id", "") or "").strip()
+    event_type = payload.get("type", "")
+    obj        = payload.get("data", {}).get("object", {})
 
-    if not discord_id:
-        print(f"[WHOP] No discord_id in payload for action={action}")
-        return {"ok": True, "skipped": "no discord_id in payload"}
-
-    profile = await sb_admin_get_profile(discord_id)
-    if profile is None:
-        print(f"[WHOP] Profile not found: discord_id={discord_id}, action={action}")
-        return {"ok": True, "skipped": "profile not found — user may not have logged in yet"}
-
-    if action in ("membership.went_valid", "membership.went_active"):
-        plan_id = (data.get("plan") or {}).get("id", "")
-        tier    = _whop_plan_tier(plan_id)
+    # ── checkout.session.completed → activate license ─────────────────────────
+    if event_type == "checkout.session.completed":
+        discord_id       = (obj.get("metadata") or {}).get("discord_id", "").strip()
+        stripe_customer  = obj.get("customer", "")
+        if not discord_id:
+            print(f"[STRIPE] checkout.session.completed — no discord_id in metadata")
+            return {"ok": True, "skipped": "no discord_id in metadata"}
+        profile = await sb_admin_get_profile(discord_id)
+        if profile is None:
+            print(f"[STRIPE] Profile not found: {discord_id}")
+            return {"ok": True, "skipped": "profile not found"}
         await sb_admin_update_profile(discord_id, {
-            "plan":           tier,
-            "license_status": "active",
+            "plan":              "pro",
+            "license_status":    "active",
+            "stripe_customer_id": stripe_customer,
         })
-        print(f"[WHOP] ✓ {discord_id} → plan={tier}, license=active  (action={action})")
+        print(f"[STRIPE] ✓ {discord_id} → license=active (checkout.session.completed)")
 
-    elif action in ("membership.went_invalid", "membership.expired", "membership.cancelled"):
-        await sb_admin_update_profile(discord_id, {
-            "plan":           "free",
-            "license_status": "inactive",
-        })
-        print(f"[WHOP] ✗ {discord_id} → plan=free, license=inactive  (action={action})")
+    # ── subscription deleted/cancelled → deactivate ───────────────────────────
+    elif event_type == "customer.subscription.deleted":
+        stripe_customer = obj.get("customer", "")
+        if stripe_customer:
+            await sb_admin_update_profile_by_stripe(stripe_customer, {
+                "plan":           "free",
+                "license_status": "inactive",
+            })
+            print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (subscription.deleted)")
 
+    # ── subscription updated → check status ───────────────────────────────────
+    elif event_type == "customer.subscription.updated":
+        stripe_customer = obj.get("customer", "")
+        status          = obj.get("status", "")
+        if stripe_customer:
+            if status == "active":
+                await sb_admin_update_profile_by_stripe(stripe_customer, {
+                    "plan":           "pro",
+                    "license_status": "active",
+                })
+                print(f"[STRIPE] ✓ customer={stripe_customer} → license=active (subscription.updated)")
+            elif status in ("canceled", "unpaid", "past_due", "paused"):
+                await sb_admin_update_profile_by_stripe(stripe_customer, {
+                    "plan":           "free",
+                    "license_status": "inactive",
+                })
+                print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (status={status})")
     else:
-        print(f"[WHOP] Unhandled action={action} for discord_id={discord_id}")
+        print(f"[STRIPE] Unhandled event: {event_type}")
 
-    return {"ok": True, "action": action, "discord_id": discord_id}
+    return {"ok": True, "type": event_type}
 
 
 # =========================================================
@@ -643,51 +648,19 @@ async def sb_admin_update_profile(user_id: str, updates: Dict[str, Any]) -> None
             print("[SB-ERR][update_profile]", r.status_code, r.text)
 
 
-async def sb_admin_check_and_increment_daily(user_id: str) -> bool:
-    """
-    Returns True  → check is allowed (counter incremented).
-    Returns False → daily limit exceeded, deny the request.
-
-    Requires Supabase columns (safe to deploy before migration — update errors
-    are swallowed and the check is allowed through):
-        daily_checks   integer     DEFAULT 0
-        daily_reset_at timestamptz DEFAULT NULL
-    """
-    profile = await sb_admin_get_profile(user_id)
-    if not profile:
-        return False
-
-    daily_checks   = int(profile.get("daily_checks") or 0)
-    daily_reset_at = profile.get("daily_reset_at")
-    now            = datetime.utcnow()
-
-    # Reset counter if the saved date is from a previous calendar day
-    needs_reset = True
-    if daily_reset_at:
-        try:
-            ts_str   = daily_reset_at.replace("Z", "").split("+")[0]
-            reset_dt = datetime.fromisoformat(ts_str)
-            if reset_dt.date() >= now.date():
-                needs_reset = False
-        except Exception:
-            pass
-
-    if needs_reset:
-        daily_checks = 0
-
-    if daily_checks >= FREE_DAILY_LIMIT:
-        return False
-
-    # Increment — fire-and-forget; columns may not exist yet (safe)
-    try:
-        await sb_admin_update_profile(user_id, {
-            "daily_checks":   daily_checks + 1,
-            "daily_reset_at": now.isoformat(),
-        })
-    except Exception as exc:
-        print(f"[SB-WARN][daily_increment] {exc}")
-
-    return True
+async def sb_admin_update_profile_by_stripe(stripe_customer_id: str, updates: Dict[str, Any]) -> None:
+    """PATCH profiles row by stripe_customer_id (used in Stripe webhook)."""
+    url    = f"{SUPABASE_URL}/rest/v1/profiles"
+    params = {"stripe_customer_id": f"eq.{stripe_customer_id}"}
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.patch(
+            url,
+            headers={**SUPABASE_ADMIN_HEADERS, "Content-Type": "application/json"},
+            params=params,
+            json=updates,
+        )
+        if r.status_code >= 400:
+            print("[SB-ERR][update_profile_by_stripe]", r.status_code, r.text)
 
 
 async def sb_admin_get_device(user_id: str, device_hash: str) -> Optional[Dict[str, Any]]:
@@ -802,19 +775,16 @@ async def flipcheck(
     is_paid = license_ok(profile)
 
     if not is_paid:
-        allowed = await sb_admin_check_and_increment_daily(user_id)
-        if not allowed:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "ok":          False,
-                    "error":       "plan_limit",
-                    "error_code":  "FREE_LIMIT_REACHED",
-                    "message":     f"Kostenloses Limit: {FREE_DAILY_LIMIT} Checks/Tag erreicht.",
-                    "daily_limit": FREE_DAILY_LIMIT,
-                    "upgrade_url": WHOP_UPGRADE_URL,
-                },
-            )
+        return JSONResponse(
+            status_code=402,
+            content={
+                "ok":           False,
+                "error":        "no_plan",
+                "error_code":   "NO_ACTIVE_PLAN",
+                "message":      "Kein aktiver Plan. Bitte upgraden um Flipcheck zu nutzen.",
+                "checkout_url": STRIPE_CHECKOUT_URL,
+            },
+        )
 
     if x_device:
         device_hash = hash_device_id(x_device)
@@ -869,19 +839,16 @@ async def amazon_check(
     is_paid = license_ok(profile)
 
     if not is_paid:
-        allowed = await sb_admin_check_and_increment_daily(user_id)
-        if not allowed:
-            return JSONResponse(
-                status_code=429,
-                content={
-                    "ok":          False,
-                    "error":       "plan_limit",
-                    "error_code":  "FREE_LIMIT_REACHED",
-                    "message":     f"Kostenloses Limit: {FREE_DAILY_LIMIT} Checks/Tag erreicht.",
-                    "daily_limit": FREE_DAILY_LIMIT,
-                    "upgrade_url": WHOP_UPGRADE_URL,
-                },
-            )
+        return JSONResponse(
+            status_code=402,
+            content={
+                "ok":           False,
+                "error":        "no_plan",
+                "error_code":   "NO_ACTIVE_PLAN",
+                "message":      "Kein aktiver Plan. Bitte upgraden um Flipcheck zu nutzen.",
+                "checkout_url": STRIPE_CHECKOUT_URL,
+            },
+        )
 
     # ── Proxy to Amazon backend service ──────────────────────────────────────
     try:
