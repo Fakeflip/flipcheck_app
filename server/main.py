@@ -92,8 +92,8 @@ def hash_device_id(fp: str) -> str:
 
 
 def license_ok(profile: Dict[str, Any]) -> bool:
-    """Returns True for paid users (active Stripe subscription) or beta-whitelisted users."""
-    return bool(profile.get("beta_whitelist")) or (profile.get("license_status") == "active")
+    """Returns True for paid users (active/trialing Stripe subscription) or beta-whitelisted users."""
+    return bool(profile.get("beta_whitelist")) or (profile.get("license_status") in ("active", "trialing"))
 
 
 async def stripe_create_checkout_session(discord_id: str, discord_username: str = "", trial_days: int = 0) -> str:
@@ -130,7 +130,10 @@ async def stripe_create_checkout_session(discord_id: str, discord_username: str 
 async def discord_add_paid_role(discord_user_id: str) -> None:
     """Assigns the DISCORD_PAID_ROLE_ID to the user in the guild."""
     if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID or not DISCORD_PAID_ROLE_ID:
-        print("[DISCORD] Paid-Rolle nicht konfiguriert — übersprungen")
+        print(f"[DISCORD] Paid-Rolle nicht konfiguriert — übersprungen "
+              f"(BOT_TOKEN={'✓' if DISCORD_BOT_TOKEN else '✗'}, "
+              f"GUILD_ID={'✓' if DISCORD_GUILD_ID else '✗'}, "
+              f"PAID_ROLE_ID={'✓' if DISCORD_PAID_ROLE_ID else '✗'})")
         return
     url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/members/{discord_user_id}/roles/{DISCORD_PAID_ROLE_ID}"
     async with httpx.AsyncClient(timeout=10) as client:
@@ -755,6 +758,9 @@ async def stripe_webhook(request: Request):
     if event_type == "checkout.session.completed":
         discord_id       = (obj.get("metadata") or {}).get("discord_id", "").strip()
         stripe_customer  = obj.get("customer", "")
+        # payment_status == "no_payment_required" means a free trial was started
+        payment_status   = obj.get("payment_status", "paid")
+        lic_status       = "trialing" if payment_status == "no_payment_required" else "active"
         if not discord_id:
             print(f"[STRIPE] checkout.session.completed — no discord_id in metadata")
             return {"ok": True, "skipped": "no discord_id in metadata"}
@@ -764,10 +770,10 @@ async def stripe_webhook(request: Request):
             return {"ok": True, "skipped": "profile not found"}
         await sb_admin_update_profile(discord_id, {
             "plan":               "pro",
-            "license_status":     "active",
+            "license_status":     lic_status,
             "stripe_customer_id": stripe_customer,
         })
-        print(f"[STRIPE] ✓ {discord_id} → license=active (checkout.session.completed)")
+        print(f"[STRIPE] ✓ {discord_id} → license={lic_status} (checkout.session.completed)")
         await discord_add_paid_role(discord_id)
 
     # ── subscription deleted/cancelled → deactivate ───────────────────────────
@@ -795,6 +801,14 @@ async def stripe_webhook(request: Request):
                     "license_status": "active",
                 })
                 print(f"[STRIPE] ✓ customer={stripe_customer} → license=active (subscription.updated)")
+                if profile:
+                    await discord_add_paid_role(profile.get("user_id", ""))
+            elif status == "trialing":
+                await sb_admin_update_profile_by_stripe(stripe_customer, {
+                    "plan":           "pro",
+                    "license_status": "trialing",
+                })
+                print(f"[STRIPE] ~ customer={stripe_customer} → license=trialing (subscription.updated)")
                 if profile:
                     await discord_add_paid_role(profile.get("user_id", ""))
             elif status in ("canceled", "unpaid", "past_due", "paused"):
