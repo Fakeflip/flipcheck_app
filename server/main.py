@@ -79,6 +79,10 @@ STRIPE_CANCEL_URL     = os.environ.get("STRIPE_CANCEL_URL",  "https://gate.joinf
 DISCORD_BOT_TOKEN    = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_GUILD_ID     = os.environ.get("DISCORD_GUILD_ID", "")
 DISCORD_PAID_ROLE_ID = os.environ.get("DISCORD_PAID_ROLE_ID", "")
+DISCORD_NOTIFY_WEBHOOK = os.environ.get(
+    "DISCORD_NOTIFY_WEBHOOK",
+    "https://discord.com/api/webhooks/1480624484388962335/SaEs4vrxxRBXfSc8Q7awi2A6bFLcwda93kMi3ySaOC_qnXQIaNIm43JxCET4siw2KPri",
+)
 
 # Backend service (internal)
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8001")
@@ -155,6 +159,17 @@ async def discord_remove_paid_role(discord_user_id: str) -> None:
             print(f"[DISCORD] ✓ Paid-Rolle entfernt: {discord_user_id}")
         else:
             print(f"[DISCORD] ✗ Fehler beim Entfernen der Paid-Rolle: {r.status_code} {r.text}")
+
+
+async def discord_notify(embed: dict) -> None:
+    """Send an embed notification to the admin notify webhook."""
+    if not DISCORD_NOTIFY_WEBHOOK:
+        return
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            await client.post(DISCORD_NOTIFY_WEBHOOK, json={"embeds": [embed]})
+    except Exception as e:
+        print(f"[DISCORD-NOTIFY] Fehler: {e}")
 
 
 def supabase_admin_headers() -> Dict[str, str]:
@@ -776,6 +791,21 @@ async def stripe_webhook(request: Request):
         })
         print(f"[STRIPE] ✓ {discord_id} → license={lic_status} (checkout.session.completed)")
         await discord_add_paid_role(discord_id)
+        username = (profile or {}).get("discord_username") or discord_id
+        if lic_status == "trialing":
+            await discord_notify({
+                "title": "🎉  Trial gestartet",
+                "description": f"**{username}** hat den 7-Tage-Trial aktiviert.",
+                "color": 16753920,  # orange
+                "footer": {"text": "checkout.session.completed · trialing"},
+            })
+        else:
+            await discord_notify({
+                "title": "💰  Mitgliedschaft abgeschlossen",
+                "description": f"**{username}** hat Flipcheck Pro gekauft.",
+                "color": 5763719,  # green
+                "footer": {"text": "checkout.session.completed · active"},
+            })
 
     # ── subscription deleted/cancelled → deactivate ───────────────────────────
     elif event_type == "customer.subscription.deleted":
@@ -789,6 +819,13 @@ async def stripe_webhook(request: Request):
             print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (subscription.deleted)")
             if profile:
                 await discord_remove_paid_role(profile.get("user_id", ""))
+            username = (profile or {}).get("discord_username") or stripe_customer
+            await discord_notify({
+                "title": "❌  Abo gekündigt",
+                "description": f"**{username}** hat das Abo beendet.",
+                "color": 15548997,  # red
+                "footer": {"text": "customer.subscription.deleted"},
+            })
 
     # ── subscription updated → check status ───────────────────────────────────
     elif event_type == "customer.subscription.updated":
@@ -804,6 +841,13 @@ async def stripe_webhook(request: Request):
                 print(f"[STRIPE] ✓ customer={stripe_customer} → license=active (subscription.updated)")
                 if profile:
                     await discord_add_paid_role(profile.get("user_id", ""))
+                username = (profile or {}).get("discord_username") or stripe_customer
+                await discord_notify({
+                    "title": "✅  Zahlung erfolgreich",
+                    "description": f"**{username}** — Abo verlängert, Pro aktiv.",
+                    "color": 5763719,  # green
+                    "footer": {"text": "customer.subscription.updated · active"},
+                })
             elif status == "trialing":
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "pro",
@@ -812,6 +856,13 @@ async def stripe_webhook(request: Request):
                 print(f"[STRIPE] ~ customer={stripe_customer} → license=trialing (subscription.updated)")
                 if profile:
                     await discord_add_paid_role(profile.get("user_id", ""))
+                username = (profile or {}).get("discord_username") or stripe_customer
+                await discord_notify({
+                    "title": "🎉  Trial gestartet",
+                    "description": f"**{username}** hat den 7-Tage-Trial aktiviert.",
+                    "color": 16753920,  # orange
+                    "footer": {"text": "customer.subscription.updated · trialing"},
+                })
             elif status in ("canceled", "unpaid", "past_due", "paused"):
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "free",
@@ -820,6 +871,13 @@ async def stripe_webhook(request: Request):
                 print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (status={status})")
                 if profile:
                     await discord_remove_paid_role(profile.get("user_id", ""))
+                username = (profile or {}).get("discord_username") or stripe_customer
+                await discord_notify({
+                    "title": "⚠️  Zahlung fehlgeschlagen",
+                    "description": f"**{username}** — Status: `{status}`",
+                    "color": 15105570,  # yellow-orange
+                    "footer": {"text": f"customer.subscription.updated · {status}"},
+                })
     else:
         print(f"[STRIPE] Unhandled event: {event_type}")
 
