@@ -36,7 +36,7 @@ try {
 } catch {}
 
 const MODE = IS_PROD ? "remote" : (process.env.FLIPCHECK_MODE || "local").toLowerCase();
-const REMOTE_BASE = (process.env.FLIPCHECK_BACKEND_BASE || "https://api.joinflipcheck.app").replace(/\/+$/, "");
+const REMOTE_BASE = (process.env.FLIPCHECK_BACKEND_BASE || "https://gate.joinflipcheck.app").replace(/\/+$/, "");
 const AUTH_URL = process.env.FLIPCHECK_AUTH_URL || "https://gate.joinflipcheck.app/auth/discord/login";
 const APP_VERSION = process.env.FLIPCHECK_VERSION || app.getVersion() || "2.0.0";
 const DISCORD_CLIENT_ID = process.env.DISCORD_CLIENT_ID || "1453059455641063645";
