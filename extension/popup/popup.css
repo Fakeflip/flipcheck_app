@@ -1,5 +1,53 @@
 /* Flipcheck Extension — Popup v2 (synchronized with v2 app design system) */
 
+/* ── License Gate ──────────────────────────────────────────────────────────── */
+.fc-license-gate {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 32px 24px;
+  text-align: center;
+  min-height: 220px;
+}
+.fc-license-icon {
+  font-size: 32px;
+  color: var(--accent);
+  font-weight: 900;
+  line-height: 1;
+}
+.fc-license-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+.fc-license-sub {
+  font-size: 12px;
+  color: var(--text2);
+  max-width: 240px;
+  line-height: 1.5;
+}
+.fc-license-btn {
+  margin-top: 4px;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: var(--r);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 20px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+.fc-license-btn:hover { background: var(--accent-hover); }
+.fc-license-hint {
+  font-size: 11px;
+  color: var(--dim);
+}
+.fc-license-hint a { color: var(--text2); }
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -674,7 +722,33 @@ select.fc-inp {
 .fc-result-actions {
   display: flex;
   gap: 6px;
-  padding: 10px 14px;
+  padding: 10px 14px 4px;
+}
+.fc-result-links {
+  display: flex;
+  gap: 6px;
+  padding: 0 14px 10px;
+}
+.fc-link-btn {
+  flex: 1;
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  background: transparent;
+  color: var(--text-muted, #64748b);
+  border: 1px solid var(--border2);
+  border-radius: var(--r);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 5px 6px;
+  cursor: pointer;
+  transition: background .15s, border-color .15s, color .15s;
+  white-space: nowrap;
+}
+.fc-link-btn:hover {
+  border-color: var(--accent-bdr);
+  color: var(--text);
+  background: var(--hover);
 }
 .fc-act-btn {
   flex: 1;

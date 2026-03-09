@@ -492,6 +492,20 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           reply({ ok: true, token: await getToken() });
           break;
 
+        case 'AUTH_ME': {
+          const tok = await getToken();
+          if (!tok) { reply({ ok: false, data: null }); break; }
+          try {
+            const r = await fetch('https://api.joinflipcheck.app/auth/me', {
+              headers: { 'Authorization': `Bearer ${tok}` },
+              signal: AbortSignal.timeout(8000),
+            });
+            const data = r.ok ? await r.json() : null;
+            reply({ ok: r.ok, data });
+          } catch { reply({ ok: false, data: null }); }
+          break;
+        }
+
         case 'AUTH_SET_TOKEN':
           _token = msg.token;
           await _cr.storage.local.set({

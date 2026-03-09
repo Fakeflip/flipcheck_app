@@ -74,13 +74,30 @@ async function loadSettings() {
   });
 }
 
-// ── Token ─────────────────────────────────────────────────────────────────────
+// ── Token + License Check ─────────────────────────────────────────────────────
 async function checkToken() {
   return new Promise(resolve => {
-    chrome.runtime.sendMessage({ type: 'AUTH_GET_TOKEN' }, res => {
+    chrome.runtime.sendMessage({ type: 'AUTH_GET_TOKEN' }, async res => {
       _hasToken = !!(res?.token);
       $('authBanner').style.display = _hasToken ? 'none' : '';
-      resolve();
+
+      if (!_hasToken) { resolve(); return; }
+
+      // License check — hide main UI if no active plan
+      chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
+        const licenseOk = meRes?.data?.license_ok;
+        const gate = $('licenseGate');
+        const tabs = document.querySelector('.fc-tabs');
+        const panels = document.querySelectorAll('.fc-panel');
+        if (!licenseOk) {
+          if (gate)   gate.style.display   = 'flex';
+          if (tabs)   tabs.style.display   = 'none';
+          panels.forEach(p => p.style.display = 'none');
+        } else {
+          if (gate) gate.style.display = 'none';
+        }
+        resolve();
+      });
     });
   });
 }
@@ -595,6 +612,14 @@ function renderSingleResult(d) {
         <button class="fc-act-btn" id="fcAlertBtn">Alarm</button>
         ${isAmz && d.ean ? `<button class="fc-act-btn" id="fcEanCopyBtn" title="${esc(d.ean)}">EAN kopieren</button>` : ''}
       </div>
+      <div class="fc-result-links">
+        <a class="fc-link-btn" id="fcEbayVkBtn" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener">
+          🛒 eBay Verkäufe ↗
+        </a>
+        <a class="fc-link-btn" id="fcIdealoBtn" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(d.ean || _currentEan || '')}" target="_blank" rel="noopener">
+          🏷 Idealo ↗
+        </a>
+      </div>
     </div>`;
 
   const resultEl = $('fcResult');
@@ -607,6 +632,12 @@ function renderSingleResult(d) {
     navigator.clipboard.writeText(d.ean).then(() => {
       const btn = resultEl.querySelector('#fcEanCopyBtn');
       if (btn) { btn.textContent = '✓ Kopiert'; setTimeout(() => { btn.textContent = 'EAN kopieren'; }, 1500); }
+    });
+  });
+  resultEl.querySelectorAll('.fc-link-btn').forEach(a => {
+    a.addEventListener('click', e => {
+      e.preventDefault();
+      chrome.tabs.create({ url: a.href, active: true });
     });
   });
 }
