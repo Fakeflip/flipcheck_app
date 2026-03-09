@@ -62,6 +62,7 @@ WEB_APP_URL               = os.environ.get("WEB_APP_URL", "https://app.joinflipc
 #   STRIPE_CANCEL_URL      — where to redirect on cancel   (default: gate.joinflipcheck.app/checkout/cancel)
 STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_CHECKOUT_URL   = os.environ.get("STRIPE_CHECKOUT_URL", "")
 STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "")
 STRIPE_SUCCESS_URL    = os.environ.get("STRIPE_SUCCESS_URL", "https://gate.joinflipcheck.app/checkout/success")
 STRIPE_CANCEL_URL     = os.environ.get("STRIPE_CANCEL_URL",  "https://gate.joinflipcheck.app/checkout/cancel")
