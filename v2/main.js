@@ -675,6 +675,7 @@ ipcMain.handle("auth:getToken", async () => {
 });
 ipcMain.handle("auth:login", () => shell.openExternal(AUTH_URL));
 ipcMain.handle("auth:logout", async () => { await deleteToken(); return { ok: true }; });
+ipcMain.handle("app:relaunch", () => { app.relaunch(); app.exit(0); });
 
 // ─── IPC: Settings ────────────────────────────────────────────────────────────
 ipcMain.handle("settings:get", () => loadSettings());

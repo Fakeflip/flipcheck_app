@@ -63,6 +63,10 @@ WEB_APP_URL               = os.environ.get("WEB_APP_URL", "https://app.joinflipc
 STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
 STRIPE_CHECKOUT_URL   = os.environ.get("STRIPE_CHECKOUT_URL", "")
+
+# ── Minimum supported client version ─────────────────────────────────────────
+# Set MIN_APP_VERSION in .env to block older clients (e.g. "2.2.0")
+MIN_APP_VERSION = os.environ.get("MIN_APP_VERSION", "")
 STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "")
 STRIPE_SUCCESS_URL    = os.environ.get("STRIPE_SUCCESS_URL", "https://gate.joinflipcheck.app/checkout/success")
 STRIPE_CANCEL_URL     = os.environ.get("STRIPE_CANCEL_URL",  "https://gate.joinflipcheck.app/checkout/cancel")
@@ -201,11 +205,14 @@ async def basic_gate(request: Request, call_next):
 # =========================================================
 @app.get("/health")
 def health():
-    return {
+    r = {
         "ok":      True,
         "service": "flipcheck-gate",
         "time":    datetime.utcnow().isoformat(),
     }
+    if MIN_APP_VERSION:
+        r["min_version"] = MIN_APP_VERSION
+    return r
 
 
 # =========================================================

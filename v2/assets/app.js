@@ -683,7 +683,55 @@ async function boot() {
 
   // Check auth
   const authed = await checkAuth();
-  if (authed) initApp();
+  if (!authed) return;
+
+  // Check min version — server can block outdated clients
+  try {
+    const { ok, data } = await API.health();
+    if (ok && data?.min_version) {
+      const cur = (v || "0.0.0").split(".").map(Number);
+      const min = data.min_version.split(".").map(Number);
+      const outdated = cur[0] < min[0] || (cur[0] === min[0] && cur[1] < min[1]) ||
+                       (cur[0] === min[0] && cur[1] === min[1] && (cur[2] || 0) < min[2]);
+      if (outdated) {
+        const gate = document.getElementById("update-gate");
+        const msg  = document.getElementById("updateGateMsg");
+        if (msg) msg.textContent = `Version ${v} wird nicht mehr unterstützt. Starte die App neu — das Update wird automatisch installiert.`;
+        if (gate) { gate.style.display = "flex"; }
+        document.getElementById("app").style.display = "none";
+        document.getElementById("btnUpdateRestart")?.addEventListener("click", () => window.fc?.relaunch?.());
+        return;
+      }
+    }
+  } catch {}
+
+  // Check license — block entire app without active plan
+  try {
+    const { ok, data } = await API.call("/auth/me");
+    if (ok && data && !data.license_ok) {
+      const licGate = document.getElementById("license-gate");
+      if (licGate) licGate.style.display = "flex";
+      document.getElementById("app").style.display = "none";
+      document.getElementById("btnLicenseUpgrade")?.addEventListener("click", async () => {
+        const btn = document.getElementById("btnLicenseUpgrade");
+        if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
+        try {
+          const r = await API.createCheckoutSession();
+          if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
+          else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+        } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+        if (btn) { btn.disabled = false; btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`; }
+      });
+      document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
+        window.fc?.logout?.();
+        showGate();
+        if (licGate) licGate.style.display = "none";
+      });
+      return;
+    }
+  } catch {}
+
+  initApp();
 }
 
 /**

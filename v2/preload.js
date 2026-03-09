@@ -68,6 +68,8 @@ contextBridge.exposeInMainWorld("fc", {
   login:    () => ipcRenderer.invoke("auth:login"),
   /** @returns {Promise<{ok: boolean}>} */
   logout:   () => ipcRenderer.invoke("auth:logout"),
+  /** Relaunch the app (used for forced updates). */
+  relaunch: () => ipcRenderer.invoke("app:relaunch"),
   /**
    * Register a listener for deep-link auth token events (fired after Discord OAuth redirect).
    * @param {(token: string) => void} fn
