@@ -124,7 +124,6 @@ class CloseTicketView(discord.ui.View):
 
 intents = discord.Intents.default()
 intents.guilds = True
-intents.members = True
 
 bot = discord.Client(intents=intents)
 
