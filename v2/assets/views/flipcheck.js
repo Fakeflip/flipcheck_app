@@ -593,7 +593,7 @@ const FlipcheckView = (() => {
   }
 
   // ─── Amazon Result Card — SaaS redesign ──────────────────────────────────
-  function renderResultAmazon(data, identifier, ek) {
+  function renderResultAmazon(data, identifier, ek, shipInRaw = 0) {
     const v         = data.verdict || "SKIP";
     const vc        = v.toLowerCase();
     const profit    = data.profit_median ?? 0;
@@ -617,6 +617,9 @@ const FlipcheckView = (() => {
     const refPct    = data.referral_pct != null ? `${Number(data.referral_pct).toFixed(0)}%` : "—";
     const fbaFee    = data.fba_fee ?? 0;
     const prepFeeV  = data.prep_fee ?? 0;
+    const shipInV   = data.ship_in ?? 0;                          // net ship_in from backend
+    const ekDisp    = data.ek_net  ?? ek;                         // net EK (after VAT if active)
+    const isVatAmz  = ekDisp !== ek && Math.abs(ekDisp - ek) > 0.01; // VAT was applied
 
     const profitColor = profit > 0 ? "text-green" : profit < 0 ? "text-red" : "";
     const marginColor = margin >= 20 ? "text-green" : margin >= 10 ? "text-yellow" : "text-red";
@@ -709,8 +712,9 @@ const FlipcheckView = (() => {
             ${(bsrMin != null && bsrMax != null) ? _brkRow("BSR Range 30T", `#${Number(bsrMin).toLocaleString("de-DE")} → #${Number(bsrMax).toLocaleString("de-DE")}`, "text-muted") : ""}
             ${_brkRow(`Referral Fee (${refPct})`, "−" + fmtEur(refFee), "text-red")}
             ${fbaFee > 0 ? _brkRow("FBA Fee", "−" + fmtEur(fbaFee), "text-red") : ""}
+            ${shipInV > 0 ? _brkRow("Versandkosten EK", "−" + fmtEur(shipInV), "text-red") : ""}
             ${prepFeeV > 0 ? _brkRow("PREP Gebühr", "−" + fmtEur(prepFeeV), "text-red") : ""}
-            ${_brkRow("Einkaufspreis (EK)", "−" + fmtEur(ek), "text-red")}
+            ${_brkRow(isVatAmz ? `EK (netto, inkl. VSt.)` : "Einkaufspreis (EK)", "−" + fmtEur(ekDisp), "text-red")}
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-elevated)">
               <span class="text-sm font-semibold text-primary">Profit</span>
               <span class="text-sm font-semibold ${profitColor}">${fmtEur(profit)}</span>
@@ -1345,11 +1349,11 @@ const FlipcheckView = (() => {
         const asin   = isAsin ? identifier.toUpperCase() : null;
         const ean    = isAsin ? null : identifier;
 
-        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee);
+        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode);
         if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
         lastResult = data; lastEan = identifier; lastEk = ek;
-        resultEl.innerHTML = renderResultAmazon(data, identifier, ek);
+        resultEl.innerHTML = renderResultAmazon(data, identifier, ek, shipIn);
 
         // Update EAN↔ASIN converter box with resolved values
         const box = container.querySelector("#fcConverterBox");
