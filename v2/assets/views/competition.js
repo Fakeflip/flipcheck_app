@@ -289,8 +289,7 @@ const CompetitionView = (() => {
       <tr>
         <td>
           <div class="row gap-8">
-            ${it.image_url ? `<img src="${esc(it.image_url)}" style="width:30px;height:30px;object-fit:contain;border-radius:4px;flex-shrink:0" loading="lazy">` : ""}
-            <span class="comp-listing-title" title="${esc(it.title)}">${esc(it.title)}</span>
+            <span class="comp-listing-title" title="${esc(it.title)}">${esc(it.title.length > 40 ? it.title.slice(0, 40) + '…' : it.title)}</span>
           </div>
         </td>
         <td class="text-right font-bold" style="font-variant-numeric:tabular-nums;white-space:nowrap">${fmtEur(it.price)}</td>
