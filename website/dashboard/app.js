@@ -176,10 +176,34 @@ async function createCheckoutSession(trialDays = 0) {
   });
 }
 
-async function createPortalSession() {
-  return API.call("/create-portal-session", { method: "POST" });
-}
+function showLicenseGate() {
+  document.getElementById("login-screen").style.display  = "none";
+  document.getElementById("app-shell").style.display     = "none";
+  document.getElementById("license-gate").style.display  = "flex";
 
+  const arrowSvg = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+
+  async function handleCheckout(btn, trialDays, resetLabel) {
+    if (!btn) return;
+    btn.disabled = true; btn.textContent = "Lade…";
+    try {
+      const data = await createCheckoutSession(trialDays);
+      if (data?.checkout_url) window.open(data.checkout_url, "_blank");
+      else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+    } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
+    btn.disabled = false; btn.innerHTML = resetLabel + " " + arrowSvg;
+  }
+
+  document.getElementById("btnLicenseTrial")?.addEventListener("click", () =>
+    handleCheckout(document.getElementById("btnLicenseTrial"), 7, "7 Tage kostenlos testen"));
+  document.getElementById("btnLicenseUpgrade")?.addEventListener("click", () =>
+    handleCheckout(document.getElementById("btnLicenseUpgrade"), 0, "Direkt kaufen"));
+  document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
+    Auth.clear();
+    document.getElementById("license-gate").style.display = "none";
+    document.getElementById("login-screen").style.display = "flex";
+  });
+}
 
 const App = {
   _navId:      0,
@@ -193,28 +217,33 @@ const App = {
       this.showLogin();
       return;
     }
-    // Verify token + load profile
+    // Verify token + check license
     try {
       const me = await API.call("/auth/me");
       if (!me) return; // 401 → showLogin() already called
       this._me = me;
+      if (!me.license_ok) {
+        showLicenseGate();
+        return;
+      }
     } catch {
       // continue even if /auth/me fails (network issue etc.)
     }
     this.showApp();
     this.bindNav();
-    // Send unlicensed users to Settings to subscribe
-    this.navigateTo(this._me?.license_ok ? "flipcheck" : "settings");
+    this.navigateTo("flipcheck");
   },
 
   showLogin() {
     document.getElementById("login-screen").style.display = "flex";
     document.getElementById("app-shell").style.display    = "none";
+    document.getElementById("license-gate").style.display = "none";
   },
 
   showApp() {
     document.getElementById("login-screen").style.display = "none";
     document.getElementById("app-shell").style.display    = "flex";
+    document.getElementById("license-gate").style.display = "none";
   },
 
   bindNav() {

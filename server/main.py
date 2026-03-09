@@ -644,39 +644,6 @@ async def create_checkout_session(body: CheckoutSessionRequest = CheckoutSession
     return {"ok": True, "checkout_url": checkout_url}
 
 
-# ── Stripe Billing Portal ────────────────────────────────────────────────────
-
-@app.post("/create-portal-session")
-async def create_portal_session(user=Depends(require_auth)):
-    """Creates a Stripe Billing Portal session so the user can manage their subscription."""
-    user_id = str(user.get("sub") or "")
-
-    profile = await sb_admin_get_profile(user_id)
-    if not profile:
-        raise HTTPException(status_code=404, detail="Profil nicht gefunden")
-
-    stripe_customer_id = profile.get("stripe_customer_id")
-    if not stripe_customer_id:
-        raise HTTPException(status_code=400, detail="Kein Stripe-Konto gefunden")
-
-    if not STRIPE_SECRET_KEY:
-        raise HTTPException(status_code=503, detail="Stripe nicht konfiguriert")
-
-    async with httpx.AsyncClient() as client:
-        r = await client.post(
-            "https://api.stripe.com/v1/billing_portal/sessions",
-            data={
-                "customer":   stripe_customer_id,
-                "return_url": f"{WEB_APP_URL}/dashboard",
-            },
-            headers={"Authorization": f"Bearer {STRIPE_SECRET_KEY}"},
-        )
-    if not r.is_success:
-        raise HTTPException(status_code=502, detail=f"Stripe Fehler: {r.text[:200]}")
-
-    return {"ok": True, "portal_url": r.json()["url"]}
-
-
 # ── Checkout success/cancel pages ────────────────────────────────────────────
 
 @app.get("/checkout/success", response_class=HTMLResponse)
