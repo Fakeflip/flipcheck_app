@@ -355,6 +355,14 @@
               <a class="fc-upgrade-btn" id="fcUpgradeBtn" href="https://whop.com/flipcheck" target="_blank" rel="noopener">⚡ Upgrade auf PRO</a>
             </div>
           </div>
+          <div class="fc-state" id="stProRequired">
+            <div class="fc-upgrade-wrap">
+              <div class="fc-upgrade-icon">▲</div>
+              <div class="fc-upgrade-title">Flipcheck Pro</div>
+              <div class="fc-upgrade-text">Für die Extension benötigst du einen aktiven Pro-Plan.</div>
+              <a class="fc-upgrade-btn" href="https://joinflipcheck.app/account" target="_blank" rel="noopener">7 Tage gratis testen →</a>
+            </div>
+          </div>
         </div>
 
         <!-- ── CHART TAB ── -->
@@ -479,9 +487,24 @@
       if (market) this._setMarket(market, false);
       this._identifier = identifier;
       this._shadow.getElementById('fcIdTag').textContent = identifier || '';
+
+      // License check — once per page session, fail-open on network errors
+      if (this._licenseChecked) {
+        if (!this._licenseOk) { this._setState('pro-required'); return; }
+        this._setState('loading');
+        this._fetchResult();
+        this._autoFillPagePrice();
+        return;
+      }
       this._setState('loading');
-      this._fetchResult();
-      this._autoFillPagePrice();
+      chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
+        this._licenseChecked = true;
+        const gotResponse = meRes?.ok === true || meRes?.ok === false;
+        this._licenseOk = !gotResponse || meRes?.data?.license_ok !== false;
+        if (!this._licenseOk) { this._setState('pro-required'); return; }
+        this._fetchResult();
+        this._autoFillPagePrice();
+      });
     }
 
     _autoFillPagePrice() {
@@ -1058,6 +1081,7 @@
       const map = {
         idle: 'stIdle', loading: 'stLoading', result: 'stResult',
         error: 'stError', 'no-ean': 'stNoEan', 'plan-limit': 'stPlanLimit',
+        'pro-required': 'stProRequired',
       };
       for (const [key, id] of Object.entries(map)) {
         const el = this._shadow.getElementById(id);
