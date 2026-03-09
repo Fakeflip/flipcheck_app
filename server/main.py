@@ -174,6 +174,7 @@ app.add_middleware(
     allow_origins=[
         "http://127.0.0.1:8000",
         "http://localhost:8000",
+        "https://joinflipcheck.app",
         "https://gate.joinflipcheck.app",
         "https://api.joinflipcheck.app",
         "https://app.joinflipcheck.app",
@@ -573,11 +574,10 @@ async def web_callback(code: str, state: Optional[str] = None):
     if profile is None:
         profile = await sb_admin_create_profile(user_id=str(discord_id), plan="free", role="user")
 
-    # Persist Discord username/avatar for display in web app
+    # Persist Discord username for display in web app
     try:
         await sb_admin_update_profile(str(discord_id), {
             "discord_username": username,
-            "discord_avatar":   avatar,
         })
     except Exception:
         pass
