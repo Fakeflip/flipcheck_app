@@ -54,9 +54,26 @@ DISCORD_WEB_REDIRECT_URI  = os.environ.get("DISCORD_WEB_REDIRECT_URI", "https://
 WEB_APP_URL               = os.environ.get("WEB_APP_URL", "https://app.joinflipcheck.app")
 
 # ── Stripe Payment ────────────────────────────────────────────────────────────
-# Set these in server/.env
+# Set these in server/.env:
+#   STRIPE_SECRET_KEY      — sk_live_... (from Stripe Dashboard → Developers → API keys)
+#   STRIPE_WEBHOOK_SECRET  — whsec_... (from Stripe Dashboard → Webhooks → Signing secret)
+#   STRIPE_PRICE_ID        — price_... (from Stripe Dashboard → Products → your product → Price ID)
+#   STRIPE_SUCCESS_URL     — where to redirect after payment (default: gate.joinflipcheck.app/checkout/success)
+#   STRIPE_CANCEL_URL      — where to redirect on cancel   (default: gate.joinflipcheck.app/checkout/cancel)
+STRIPE_SECRET_KEY     = os.environ.get("STRIPE_SECRET_KEY", "")
 STRIPE_WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "")
-STRIPE_CHECKOUT_URL   = os.environ.get("STRIPE_CHECKOUT_URL", "https://buy.stripe.com/flipcheck")
+STRIPE_PRICE_ID       = os.environ.get("STRIPE_PRICE_ID", "")
+STRIPE_SUCCESS_URL    = os.environ.get("STRIPE_SUCCESS_URL", "https://gate.joinflipcheck.app/checkout/success")
+STRIPE_CANCEL_URL     = os.environ.get("STRIPE_CANCEL_URL",  "https://gate.joinflipcheck.app/checkout/cancel")
+
+# ── Discord Bot (für automatische Paid-Rolle) ─────────────────────────────────
+# Set these in server/.env:
+#   DISCORD_BOT_TOKEN   — Bot Token aus Discord Developer Portal
+#   DISCORD_GUILD_ID    — Server-ID (Rechtsklick auf Server → ID kopieren)
+#   DISCORD_PAID_ROLE_ID — Role-ID der "Paid"-Rolle (Rechtsklick auf Rolle → ID kopieren)
+DISCORD_BOT_TOKEN    = os.environ.get("DISCORD_BOT_TOKEN", "")
+DISCORD_GUILD_ID     = os.environ.get("DISCORD_GUILD_ID", "")
+DISCORD_PAID_ROLE_ID = os.environ.get("DISCORD_PAID_ROLE_ID", "")
 
 # Backend service (internal)
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8001")
@@ -72,6 +89,59 @@ def hash_device_id(fp: str) -> str:
 def license_ok(profile: Dict[str, Any]) -> bool:
     """Returns True for paid users (active Stripe subscription) or beta-whitelisted users."""
     return bool(profile.get("beta_whitelist")) or (profile.get("license_status") == "active")
+
+
+async def stripe_create_checkout_session(discord_id: str, discord_username: str = "") -> str:
+    """
+    Creates a Stripe Checkout Session and returns the session URL.
+    discord_id is stored in metadata so the webhook can activate the license.
+    """
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.post(
+            "https://api.stripe.com/v1/checkout/sessions",
+            auth=(STRIPE_SECRET_KEY, ""),
+            data={
+                "mode":                        "subscription",
+                "line_items[0][price]":        STRIPE_PRICE_ID,
+                "line_items[0][quantity]":     "1",
+                "metadata[discord_id]":        discord_id,
+                "metadata[discord_username]":  discord_username,
+                "success_url":                 STRIPE_SUCCESS_URL,
+                "cancel_url":                  STRIPE_CANCEL_URL,
+                "allow_promotion_codes":       "true",
+            },
+        )
+        if r.status_code != 200:
+            print(f"[STRIPE] create_session error {r.status_code}: {r.text}")
+            raise HTTPException(status_code=502, detail="Stripe checkout konnte nicht erstellt werden")
+        return r.json()["url"]
+
+
+async def discord_add_paid_role(discord_user_id: str) -> None:
+    """Assigns the DISCORD_PAID_ROLE_ID to the user in the guild."""
+    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID or not DISCORD_PAID_ROLE_ID:
+        print("[DISCORD] Paid-Rolle nicht konfiguriert — übersprungen")
+        return
+    url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/members/{discord_user_id}/roles/{DISCORD_PAID_ROLE_ID}"
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.put(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}", "Content-Length": "0"})
+        if r.status_code in (204, 200):
+            print(f"[DISCORD] ✓ Paid-Rolle zugewiesen: {discord_user_id}")
+        else:
+            print(f"[DISCORD] ✗ Fehler beim Zuweisen der Paid-Rolle: {r.status_code} {r.text}")
+
+
+async def discord_remove_paid_role(discord_user_id: str) -> None:
+    """Removes the DISCORD_PAID_ROLE_ID from the user in the guild."""
+    if not DISCORD_BOT_TOKEN or not DISCORD_GUILD_ID or not DISCORD_PAID_ROLE_ID:
+        return
+    url = f"https://discord.com/api/v10/guilds/{DISCORD_GUILD_ID}/members/{discord_user_id}/roles/{DISCORD_PAID_ROLE_ID}"
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.delete(url, headers={"Authorization": f"Bot {DISCORD_BOT_TOKEN}"})
+        if r.status_code in (204, 200):
+            print(f"[DISCORD] ✓ Paid-Rolle entfernt: {discord_user_id}")
+        else:
+            print(f"[DISCORD] ✗ Fehler beim Entfernen der Paid-Rolle: {r.status_code} {r.text}")
 
 
 def supabase_admin_headers() -> Dict[str, str]:
@@ -506,6 +576,70 @@ async def web_callback(code: str, state: Optional[str] = None):
 #   - customer.subscription.deleted
 #   - customer.subscription.updated
 
+
+# =========================================================
+# STRIPE CHECKOUT SESSION
+# =========================================================
+
+@app.post("/create-checkout-session")
+async def create_checkout_session(user=Depends(require_auth)):
+    """
+    Creates a Stripe Checkout Session for the authenticated user.
+    Returns { checkout_url: "https://checkout.stripe.com/..." }
+    The discord_id is embedded in metadata so the webhook can activate the license.
+    """
+    user_id          = str(user.get("sub") or "")
+    discord_username = str(user.get("discord_username") or "")
+
+    if not STRIPE_SECRET_KEY or not STRIPE_PRICE_ID:
+        raise HTTPException(status_code=503, detail="Stripe nicht konfiguriert")
+
+    checkout_url = await stripe_create_checkout_session(user_id, discord_username)
+    return {"ok": True, "checkout_url": checkout_url}
+
+
+# ── Checkout success/cancel pages ────────────────────────────────────────────
+
+@app.get("/checkout/success", response_class=HTMLResponse)
+async def checkout_success():
+    return HTMLResponse("""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Zahlung erfolgreich</title>
+<style>
+  body{font-family:Inter,sans-serif;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+  .box{text-align:center;max-width:380px;padding:40px 32px}
+  .icon{font-size:48px;margin-bottom:16px}
+  h1{font-size:22px;font-weight:700;margin:0 0 10px}
+  p{font-size:14px;color:#888;line-height:1.6;margin:0 0 24px}
+  .btn{display:inline-block;padding:10px 24px;background:#6366f1;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;font-weight:600}
+</style></head><body>
+<div class="box">
+  <div class="icon">✅</div>
+  <h1>Zahlung erfolgreich!</h1>
+  <p>Dein Flipcheck Pro Plan ist jetzt aktiv.<br>Starte die App neu um loszulegen.</p>
+  <a class="btn" href="flipcheck://reload">App neu starten</a>
+</div>
+</body></html>""")
+
+
+@app.get("/checkout/cancel", response_class=HTMLResponse)
+async def checkout_cancel():
+    return HTMLResponse("""<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Zahlung abgebrochen</title>
+<style>
+  body{font-family:Inter,sans-serif;background:#0a0a0a;color:#fff;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0}
+  .box{text-align:center;max-width:380px;padding:40px 32px}
+  .icon{font-size:48px;margin-bottom:16px}
+  h1{font-size:22px;font-weight:700;margin:0 0 10px}
+  p{font-size:14px;color:#888;line-height:1.6;margin:0 0 24px}
+</style></head><body>
+<div class="box">
+  <div class="icon">↩️</div>
+  <h1>Zahlung abgebrochen</h1>
+  <p>Kein Problem — du kannst jederzeit upgraden.</p>
+</div>
+</body></html>""")
+
+
 @app.post("/webhooks/stripe")
 async def stripe_webhook(request: Request):
     body = await request.body()
@@ -550,39 +684,48 @@ async def stripe_webhook(request: Request):
             print(f"[STRIPE] Profile not found: {discord_id}")
             return {"ok": True, "skipped": "profile not found"}
         await sb_admin_update_profile(discord_id, {
-            "plan":              "pro",
-            "license_status":    "active",
+            "plan":               "pro",
+            "license_status":     "active",
             "stripe_customer_id": stripe_customer,
         })
         print(f"[STRIPE] ✓ {discord_id} → license=active (checkout.session.completed)")
+        await discord_add_paid_role(discord_id)
 
     # ── subscription deleted/cancelled → deactivate ───────────────────────────
     elif event_type == "customer.subscription.deleted":
         stripe_customer = obj.get("customer", "")
         if stripe_customer:
+            profile = await sb_admin_get_profile_by_stripe(stripe_customer)
             await sb_admin_update_profile_by_stripe(stripe_customer, {
                 "plan":           "free",
                 "license_status": "inactive",
             })
             print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (subscription.deleted)")
+            if profile:
+                await discord_remove_paid_role(profile.get("user_id", ""))
 
     # ── subscription updated → check status ───────────────────────────────────
     elif event_type == "customer.subscription.updated":
         stripe_customer = obj.get("customer", "")
         status          = obj.get("status", "")
         if stripe_customer:
+            profile = await sb_admin_get_profile_by_stripe(stripe_customer)
             if status == "active":
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "pro",
                     "license_status": "active",
                 })
                 print(f"[STRIPE] ✓ customer={stripe_customer} → license=active (subscription.updated)")
+                if profile:
+                    await discord_add_paid_role(profile.get("user_id", ""))
             elif status in ("canceled", "unpaid", "past_due", "paused"):
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "free",
                     "license_status": "inactive",
                 })
                 print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (status={status})")
+                if profile:
+                    await discord_remove_paid_role(profile.get("user_id", ""))
     else:
         print(f"[STRIPE] Unhandled event: {event_type}")
 
@@ -646,6 +789,19 @@ async def sb_admin_update_profile(user_id: str, updates: Dict[str, Any]) -> None
         )
         if r.status_code >= 400:
             print("[SB-ERR][update_profile]", r.status_code, r.text)
+
+
+async def sb_admin_get_profile_by_stripe(stripe_customer_id: str) -> Optional[Dict[str, Any]]:
+    """GET profiles row by stripe_customer_id."""
+    url    = f"{SUPABASE_URL}/rest/v1/profiles"
+    params = {"stripe_customer_id": f"eq.{stripe_customer_id}", "select": "*", "limit": "1"}
+    async with httpx.AsyncClient(timeout=15) as client:
+        r = await client.get(url, headers=SUPABASE_ADMIN_HEADERS, params=params)
+        if r.status_code >= 400:
+            print("[SB-ERR][get_profile_by_stripe]", r.status_code, r.text)
+            return None
+        rows = r.json()
+        return rows[0] if rows else None
 
 
 async def sb_admin_update_profile_by_stripe(stripe_customer_id: str, updates: Dict[str, Any]) -> None:

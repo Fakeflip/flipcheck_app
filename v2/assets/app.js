@@ -287,6 +287,11 @@ const API = {
     return this.call("/health");
   },
 
+  /** Creates a Stripe Checkout Session and returns { checkout_url }. */
+  async createCheckoutSession() {
+    return this.call("/create-checkout-session", { method: "POST", body: {} });
+  },
+
   /**
    * Trigger a deal scan with profitability filters.
    * @param {number} budget

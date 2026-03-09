@@ -870,12 +870,11 @@ const FlipcheckView = (() => {
     return renderErrorCard(title, sub, { retryId: "btnReset", retryLabel: "Erneut versuchen" });
   }
 
-  function renderUpgradeWall(checkoutUrl) {
-    const url = checkoutUrl || "https://buy.stripe.com/flipcheck";
+  function renderUpgradeWall() {
     return `
       <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:48px 24px;text-align:center;gap:20px">
-        <div style="width:56px;height:56px;border-radius:14px;background:var(--accent-light,rgba(99,102,241,.12));display:flex;align-items:center;justify-content:center">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--accent,#6366f1)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <div style="width:56px;height:56px;border-radius:14px;background:rgba(99,102,241,.12);display:flex;align-items:center;justify-content:center">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#6366f1" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
           </svg>
         </div>
@@ -885,13 +884,36 @@ const FlipcheckView = (() => {
             Aktiviere dein Flipcheck-Abo für unbegrenzten Zugriff auf alle Checks &amp; Features.
           </div>
         </div>
-        <a href="${url}" target="_blank" rel="noopener noreferrer"
-           style="display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border-radius:8px;background:var(--accent,#6366f1);color:#fff;font-size:13px;font-weight:600;text-decoration:none;transition:opacity .15s"
+        <button id="btnUpgradeCheckout"
+           style="display:inline-flex;align-items:center;gap:6px;padding:10px 22px;border-radius:8px;background:#6366f1;color:#fff;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:opacity .15s"
            onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
           Jetzt upgraden
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-        </a>
+        </button>
       </div>`;
+  }
+
+  async function bindUpgradeButton(container) {
+    const btn = container.querySelector("#btnUpgradeCheckout");
+    if (!btn) return;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      btn.textContent = "Lade Checkout…";
+      try {
+        const { ok, data } = await API.createCheckoutSession();
+        if (ok && data?.checkout_url) {
+          // Opens in default browser via Electron setWindowOpenHandler
+          window.open(data.checkout_url, "_blank");
+        } else {
+          Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+        }
+      } catch {
+        Toast.error("Fehler", "Verbindung zum Server fehlgeschlagen.");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `Jetzt upgraden <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
+      }
+    });
   }
 
   // ─── Inline Price Chart ───────────────────────────────────────────────────
@@ -1376,7 +1398,7 @@ const FlipcheckView = (() => {
         const ean    = isAsin ? null : identifier;
 
         const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode);
-        if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(data.checkout_url); if (btn) btn.disabled = false; return; }
+        if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
         if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
         lastResult = data; lastEan = identifier; lastEk = ek;
@@ -1463,7 +1485,7 @@ const FlipcheckView = (() => {
         ek_mode:      _ekMode,
       });
 
-      if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(data.checkout_url); if (btn) btn.disabled = false; return; }
+      if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
       if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
       lastResult = data; lastEan = ean; lastEk = ek;
