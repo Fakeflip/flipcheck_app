@@ -619,7 +619,8 @@ const FlipcheckView = (() => {
     const prepFeeV  = data.prep_fee ?? 0;
     const shipInV   = data.ship_in ?? 0;                          // net ship_in from backend
     const ekDisp    = data.ek_net  ?? ek;                         // net EK (after VAT if active)
-    const isVatAmz  = ekDisp !== ek && Math.abs(ekDisp - ek) > 0.01; // VAT was applied
+    const sellNet   = data.sell_net ?? null;                      // net revenue (buy_box / 1.19)
+    const isVatAmz  = sellNet != null && buyBox != null && Math.abs(sellNet - buyBox) > 0.01;
 
     const profitColor = profit > 0 ? "text-green" : profit < 0 ? "text-red" : "";
     const marginColor = margin >= 20 ? "text-green" : margin >= 10 ? "text-yellow" : "text-red";
@@ -707,16 +708,17 @@ const FlipcheckView = (() => {
             ${_CHEV}
           </summary>
           <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
-            ${_brkRow("Buy Box (aktuell)", buyBox != null ? fmtEur(buyBox) : "—", "")}
+            ${_brkRow("Buy Box (brutto)", buyBox != null ? fmtEur(buyBox) : "—", "")}
+            ${isVatAmz && sellNet != null ? _brkRow("Netto Erlös (÷1.19)", fmtEur(sellNet), "text-muted") : ""}
             ${buyBox30 ? _brkRow("Ø 30T Buy Box", fmtEur(buyBox30), "text-muted") : ""}
             ${(bsrMin != null && bsrMax != null) ? _brkRow("BSR Range 30T", `#${Number(bsrMin).toLocaleString("de-DE")} → #${Number(bsrMax).toLocaleString("de-DE")}`, "text-muted") : ""}
             ${_brkRow(`Referral Fee (${refPct})`, "−" + fmtEur(refFee), "text-red")}
-            ${fbaFee > 0 ? _brkRow("FBA Fee", "−" + fmtEur(fbaFee), "text-red") : ""}
-            ${shipInV > 0 ? _brkRow("Versandkosten EK", "−" + fmtEur(shipInV), "text-red") : ""}
+            ${fbaFee > 0 ? _brkRow("FBA Fee (netto)", "−" + fmtEur(fbaFee), "text-red") : ""}
+            ${shipInV > 0 ? _brkRow("Versandkosten EK (netto)", "−" + fmtEur(shipInV), "text-red") : ""}
             ${prepFeeV > 0 ? _brkRow("PREP Gebühr", "−" + fmtEur(prepFeeV), "text-red") : ""}
-            ${_brkRow(isVatAmz ? `EK (netto, inkl. VSt.)` : "Einkaufspreis (EK)", "−" + fmtEur(ekDisp), "text-red")}
+            ${_brkRow(isVatAmz ? "EK (netto)" : "Einkaufspreis (EK)", "−" + fmtEur(ekDisp), "text-red")}
             <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;border-top:1px solid var(--border);background:var(--bg-elevated)">
-              <span class="text-sm font-semibold text-primary">Profit</span>
+              <span class="text-sm font-semibold text-primary">Profit (netto)</span>
               <span class="text-sm font-semibold ${profitColor}">${fmtEur(profit)}</span>
             </div>
           </div>

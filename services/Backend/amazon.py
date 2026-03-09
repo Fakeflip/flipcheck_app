@@ -475,34 +475,53 @@ def calc_amazon_profit(
     ek_mode:        str   = "gross",   # "gross" | "net"
 ) -> Dict[str, float]:
     """
-    Calculate Amazon profit.
-    Returns dict with fees, profit, margin, verdict inputs.
-    VAT: if vat_mode="ust_19" and ek_mode="gross", EK and ship_in are converted to net (÷1.19).
-    FBM fix: ship_in is the per-unit outbound cost → goes into total_fees only (not subtracted again).
-    FBA: ship_in is the inbound warehouse cost → subtracted separately (not in total_fees).
+    Amazon Revenue Calculator logic (matches Amazon's own calculator exactly):
+
+    vat_mode="ust_19" (USt.-pflichtig):
+      - sell_net  = sell_price / 1.19  (customer brutto → netto Erlös)
+      - ref_fee   = sell_net × ref_pct  (Referral auf NETTO, wie Amazon)
+      - fba_fee   = fba_fee / 1.19      (Amazon-Fees werden netto ausgewiesen)
+      - ek_net    = ek / 1.19           (wenn ek_mode="gross")
+      - ship_in   = ship_in / 1.19
+      - profit    = sell_net - ref_fee - fba_fee_net - ship_in_net - prep_fee - ek_net
+
+    vat_mode="no_vat" (Kleinunternehmer / kein Vorsteuerabzug):
+      - Alles bleibt brutto (keine Umrechnung), ref_fee auf Brutto-VK.
+
+    FBM fix: ship_in ist Versand pro Einheit → nur einmal in total_fees,
+    NICHT nochmal vom profit abgezogen.
     """
-    # VAT conversion: business buyers reclaim input VAT → work in net amounts
-    vat         = 1.19 if vat_mode == "ust_19" else 1.0
+    vat = 1.19 if vat_mode == "ust_19" else 1.0
+
+    # Netto-Erlös (Basis für alle Berechnungen bei USt.-Pflicht)
+    sell_net    = round(sell_price / vat, 2)
+
+    # EK und Versand → netto
     ek_net      = round((ek      / vat) if (vat_mode == "ust_19" and ek_mode == "gross") else ek, 2)
     ship_in_net = round((ship_in / vat) if vat_mode == "ust_19" else ship_in, 2)
 
+    # FBA-Fee: Amazon veröffentlicht Fees netto (zzgl. MwSt.) → netto umrechnen
+    fba_fee_net = round(fba_fee / vat, 2) if vat_mode == "ust_19" else fba_fee
+
     ref_pct = referral_pct if referral_pct is not None else AMAZON_REFERRAL_FEES.get(category, 0.15)
-    ref_fee = round(sell_price * ref_pct, 2)
+    # Referral Fee auf NETTO-VK (wie Amazon Revenue Calculator)
+    ref_fee = round(sell_net * ref_pct, 2)
 
     if method == "fba":
-        fulfillment_fee = fba_fee
-        ship_out_fee    = 0.0          # Amazon handles outbound shipping
-        inbound_cost    = ship_in_net  # FBA: cost to ship goods to Amazon warehouse (paid separately)
+        fulfillment_fee = fba_fee_net
+        ship_out_fee    = 0.0
+        inbound_cost    = ship_in_net  # FBA: Einlieferungskosten separat
     else:  # fbm
         fulfillment_fee = 0.0
-        ship_out_fee    = ship_in_net  # FBM: merchant pays outbound shipping per unit
-        inbound_cost    = 0.0          # already in total_fees — do NOT subtract again
+        ship_out_fee    = ship_in_net  # FBM: Versand pro Einheit in total_fees
+        inbound_cost    = 0.0          # bereits in total_fees — kein doppelter Abzug
 
     total_fees = ref_fee + fulfillment_fee + ship_out_fee + prep_fee
-    profit     = round(sell_price - total_fees - ek_net - inbound_cost, 2)
-    margin_pct = round((profit / sell_price * 100) if sell_price > 0 else 0, 1)
+    profit     = round(sell_net - total_fees - ek_net - inbound_cost, 2)
+    margin_pct = round((profit / sell_net * 100) if sell_net > 0 else 0, 1)
 
     return {
+        "sell_net":        sell_net,
         "referral_fee":    ref_fee,
         "referral_pct":    round(ref_pct * 100, 1),
         "fulfillment_fee": fulfillment_fee,
@@ -717,18 +736,22 @@ async def amazon_check(
 
     verdict = decide_amazon(calc["profit"], calc["margin_pct"], sales_30d, mode)
 
+    vat = 1.19 if vat_mode == "ust_19" else 1.0
+
     # ── Derived metrics ───────────────────────────────────────────────────────
-    roi_pct = round((calc["profit"] / ek * 100) if ek > 0 else 0, 1)
+    # ROI auf netto EK (investiertes Kapital)
+    roi_pct = round((calc["profit"] / calc["ek_net"] * 100) if calc["ek_net"] > 0 else 0, 1)
 
-    # Net payout: what Amazon deposits to seller (before EK / inbound costs)
-    net_payout = round(sell_price - calc["referral_fee"] - calc["fulfillment_fee"] - calc["prep_fee"], 2)
+    # Net payout: was Amazon auszahlt (netto Erlös minus Gebühren, ohne EK/Versand)
+    net_payout = round(calc["sell_net"] - calc["referral_fee"] - calc["fulfillment_fee"] - calc["prep_fee"], 2)
 
-    # Break-even: minimum sell price to cover all fees + net EK + net ship_in
+    # Break-even: minimaler BRUTTO-Listenpreis damit Profit ≥ 0
     ref_pct_dec = AMAZON_REFERRAL_FEES.get(category, 0.15)
     _denom      = 1.0 - ref_pct_dec
-    break_even  = round(
-        (calc["fulfillment_fee"] + calc["prep_fee"] + calc["ek_net"] + calc["ship_in_net"]) / _denom, 2
+    break_even_net = (
+        (calc["fulfillment_fee"] + calc["prep_fee"] + calc["ek_net"] + calc["ship_in_net"]) / _denom
     ) if _denom > 0 else 0.0
+    break_even = round(break_even_net * vat, 2)  # → brutto Listenpreis
 
     monthly_profit_est = round(calc["profit"] * sales_30d, 2) if sales_30d > 0 else 0.0
     days_to_cash       = round(30 / sales_30d, 1) if sales_30d > 0 else None
@@ -755,6 +778,7 @@ async def amazon_check(
         "sell_price_avg":    round(buy_box_avg90 or sell_price, 2),
         "buy_box":           buy_box_current,
         "buy_box_avg30":     buy_box_avg30,
+        "sell_net":          calc["sell_net"],  # netto Erlös (buy_box / 1.19 wenn USt.)
 
         # Fees
         "referral_fee":      calc["referral_fee"],
