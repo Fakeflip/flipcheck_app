@@ -88,7 +88,7 @@ async function checkToken() {
       chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
         console.log('[FC] AUTH_ME response:', JSON.stringify(meRes));
         const gotResponse = meRes?.ok === true || meRes?.ok === false;
-        const licenseOk   = !gotResponse || meRes?.data?.license_ok;
+        const licenseOk   = !gotResponse || meRes?.data?.license_ok !== false;
         const gate   = $('licenseGate');
         const tabs   = document.querySelector('.fc-tabs');
         const panels = document.querySelectorAll('.fc-panel');

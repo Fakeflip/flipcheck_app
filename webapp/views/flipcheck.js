@@ -72,8 +72,11 @@ const FlipcheckView = (() => {
       if (rem <= 0) break;
     }
     fee = Math.max(fee, 0.35);
-    const ekNet = _ekMode === "net" ? ekGross * 1.19 : ekGross;
-    return vkGross - fee - (shipIn || 0) - (shipOut || 0) - ekNet;
+    const vat    = _vatMode === "ust_19" ? 1.19 : 1.0;
+    const vkNet  = vkGross / vat;
+    const feeNet = fee / vat;
+    const ekNet  = (_vatMode === "ust_19" && _ekMode === "gross") ? ekGross / vat : ekGross;
+    return vkNet - feeNet - (shipIn || 0) - (shipOut || 0) - ekNet;
   }
 
   function _deriveScore(d) {

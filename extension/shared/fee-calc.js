@@ -53,15 +53,17 @@ function fcCalcEbayFee(priceGross, catId) {
  * @param {string} catId    - eBay category ID
  * @param {string} vatMode  - 'no_vat' | 'ust_19'
  * @param {string} ekMode   - 'gross' | 'net'
+ * @param {number} shipIn   - Inbound shipping cost (€)
+ * @param {number} shipOut  - Outbound shipping cost (€)
  * @returns {{ feeGross, feeNet, vkNet, ekNet, profit, margin }}
  */
-function fcCalcProfit(vkGross, ekGross, catId, vatMode = 'no_vat', ekMode = 'gross') {
+function fcCalcProfit(vkGross, ekGross, catId, vatMode = 'no_vat', ekMode = 'gross', shipIn = 0, shipOut = 0) {
   const vat    = vatMode === 'ust_19' ? 1.19 : 1.0;
   const feeGross = fcCalcEbayFee(vkGross, catId);
   const feeNet   = feeGross / vat;
   const vkNet    = vkGross / vat;
   const ekNet    = (vatMode === 'ust_19' && ekMode === 'gross') ? ekGross / vat : ekGross;
-  const profit   = vkNet - feeNet - ekNet;
+  const profit   = vkNet - feeNet - ekNet - (shipIn || 0) - (shipOut || 0);
   const margin   = vkGross > 0 ? (profit / vkGross * 100) : 0;
   return { feeGross, feeNet, vkNet, ekNet, profit, margin };
 }
