@@ -1759,6 +1759,20 @@ img { display: block; max-width: 100%; }
   text-align: center; border-radius: var(--r-full);
   display: inline-block; flex-shrink: 0;
 }
+.comp-filter-bar {
+  display: flex; gap: 6px; padding: 0 16px 8px;
+}
+.comp-filter-pill {
+  font-size: 11px; font-weight: 500;
+  padding: 3px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--card-border); background: transparent;
+  color: var(--text-secondary); cursor: pointer; transition: all .15s;
+}
+.comp-filter-pill:hover { border-color: var(--accent-border); color: var(--text-primary); }
+.comp-filter-pill.active {
+  background: var(--accent-dim); color: var(--accent);
+  border-color: var(--accent-border); font-weight: 600;
+}
 
 .badge-blue {
   background: var(--blue-subtle);

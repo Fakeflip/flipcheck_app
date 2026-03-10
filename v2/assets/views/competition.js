@@ -7,6 +7,8 @@ const CompetitionView = (() => {
   let _inventory      = [];
   let _invSelected    = null;
   let _debounce       = null;
+  let _listingFilter  = "all";     // "all" | "new" | "seen"
+  let _lastListings   = null;      // { username, total, items, q, fbScore, fbPct, seenSet }
   const _compCache    = new Map();  // itemId → { total, items, fetchedAt }
 
   // Webhook state (loaded from settings)
@@ -281,6 +283,8 @@ const CompetitionView = (() => {
         }
         rerenderSellerLeft();
       }
+      _listingFilter = "all";
+      _lastListings = { username, total: data.total, items, q, fbScore: feedbackScore, fbPct: feedbackPct, seenSet };
       if (right) right.innerHTML = renderSellerListings(username, data.total, items, q, feedbackScore, feedbackPct, seenSet);
       bindRightRefresh();
       // Mark all displayed listings as seen
@@ -292,7 +296,14 @@ const CompetitionView = (() => {
   }
 
   function renderSellerListings(username, total, items, activeQ = "", feedbackScore = null, feedbackPct = null, seenSet = null) {
-    const rows = items.map(it => {
+    // ── Filter items by seen/unseen ──
+    const newCount  = seenSet ? items.filter(it => it.item_id && !seenSet.has(it.item_id)).length : 0;
+    const seenCount = items.length - newCount;
+    const filtered  = _listingFilter === "all" ? items
+      : _listingFilter === "new"  ? items.filter(it => seenSet && it.item_id && !seenSet.has(it.item_id))
+      : /* seen */ items.filter(it => !seenSet || !it.item_id || seenSet.has(it.item_id));
+
+    const rows = filtered.map(it => {
       const isNew = seenSet && it.item_id && !seenSet.has(it.item_id);
       return `
       <tr class="${isNew ? "comp-listing-new" : ""}">
@@ -340,6 +351,12 @@ const CompetitionView = (() => {
           </button>
         </div>
       </div>
+      ${newCount > 0 ? `
+      <div class="comp-filter-bar">
+        <button class="comp-filter-pill ${_listingFilter === "all" ? "active" : ""}" data-listing-filter="all">${I18N.t('comp.filter.all')} (${items.length})</button>
+        <button class="comp-filter-pill ${_listingFilter === "new" ? "active" : ""}" data-listing-filter="new">${I18N.t('comp.badge.new')} (${newCount})</button>
+        <button class="comp-filter-pill ${_listingFilter === "seen" ? "active" : ""}" data-listing-filter="seen">${I18N.t('comp.filter.seen')} (${seenCount})</button>
+      </div>` : ""}
       <div class="comp-table-wrap">
         <table class="comp-table">
           <thead><tr>
@@ -1002,6 +1019,19 @@ const CompetitionView = (() => {
 
   function bindRightRefresh() {
     const c = _container;
+
+    // Listing filter pills (Alle / Neu / Gesehen)
+    c?.querySelectorAll("[data-listing-filter]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        _listingFilter = btn.dataset.listingFilter;
+        if (_lastListings) {
+          const d = _lastListings;
+          const right = c?.querySelector("#compRight");
+          if (right) right.innerHTML = renderSellerListings(d.username, d.total, d.items, d.q, d.fbScore, d.fbPct, d.seenSet);
+          bindRightRefresh();
+        }
+      });
+    });
 
     c?.querySelector("[data-refresh-seller]")?.addEventListener("click", e => {
       const username = e.currentTarget.dataset.refreshSeller;

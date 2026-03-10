@@ -1136,6 +1136,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NEU',
       'comp.badge.new_count':        '{n} neue',
+      'comp.filter.all':             'Alle',
+      'comp.filter.seen':            'Gesehen',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Flipcheck Felder',
@@ -2280,6 +2282,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NEW',
       'comp.badge.new_count':        '{n} new',
+      'comp.filter.all':             'All',
+      'comp.filter.seen':            'Seen',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Flipcheck Fields',
@@ -3406,6 +3410,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NUOVO',
       'comp.badge.new_count':        '{n} nuovi',
+      'comp.filter.all':             'Tutti',
+      'comp.filter.seen':            'Visti',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Campi Flipcheck',
@@ -4532,6 +4538,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NUEVO',
       'comp.badge.new_count':        '{n} nuevos',
+      'comp.filter.all':             'Todos',
+      'comp.filter.seen':            'Vistos',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Campos Flipcheck',
@@ -5658,6 +5666,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NIEUW',
       'comp.badge.new_count':        '{n} nieuwe',
+      'comp.filter.all':             'Alle',
+      'comp.filter.seen':            'Gezien',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Flipcheck Velden',
@@ -6784,6 +6794,8 @@ const I18N = (() => {
       // Competition read/unread
       'comp.badge.new':              'NOUVEAU',
       'comp.badge.new_count':        '{n} nouveaux',
+      'comp.filter.all':             'Tous',
+      'comp.filter.seen':            'Vus',
 
       // Flipcheck fields settings
       'st.section.fc_fields':        'Champs Flipcheck',
