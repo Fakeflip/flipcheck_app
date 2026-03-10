@@ -1,6 +1,7 @@
-/* Flipcheck Extension — Floating Panel v3 (Shadow DOM Custom Element)
- * v3: Market toggle (eBay/Amazon), 3 inner tabs (Check/Chart/Details),
- *     canvas price chart, Amazon FBA details, drag + minimize.
+/* Flipcheck Extension — Floating Panel v4 (Shadow DOM Custom Element)
+ * v4: Market toggle (eBay/Amazon), 4 inner tabs (Check/Chart/Details/Settings),
+ *     canvas price chart, Amazon FBA details, drag + minimize,
+ *     default settings (shipping, category, marketplace), dual-market pre-fetch.
  */
 
 (function () {
@@ -258,6 +259,38 @@
     }
     .fc-det-recalc-btn:hover { border-color: #6366F1; color: #F1F5F9; }
     .fc-det-empty { color: #334155; font-size: 11px; text-align: center; padding: 24px 0; }
+
+    /* ── SETTINGS TAB ── */
+    .fc-set-section { margin-bottom: 12px; }
+    .fc-set-title { font-size: 10px; color: #475569; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .fc-set-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+    .fc-set-label { font-size: 10px; color: #94A3B8; flex-shrink: 0; min-width: 80px; }
+    .fc-set-inp {
+      flex: 1; background: #16161F; border: 1px solid #2E2E42; border-radius: 5px;
+      color: #F1F5F9; font-size: 12px; padding: 4px 8px; outline: none; transition: border-color .15s;
+    }
+    .fc-set-inp:focus { border-color: #6366F1; }
+    .fc-set-inp::placeholder { color: #334155; }
+    .fc-set-select {
+      flex: 1; background: #16161F; border: 1px solid #2E2E42; border-radius: 5px;
+      color: #F1F5F9; font-size: 11px; padding: 4px 6px; outline: none;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23475569'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 6px center;
+      padding-right: 20px; cursor: pointer;
+    }
+    .fc-set-select:focus { border-color: #6366F1; }
+    .fc-set-select optgroup { color: #475569; font-size: 10px; }
+    .fc-set-select option { color: #F1F5F9; background: #16161F; }
+    .fc-set-saved { font-size: 9px; color: #10B981; text-align: center; opacity: 0; transition: opacity .3s; margin-top: 4px; }
+    .fc-set-saved.visible { opacity: 1; }
+    .fc-set-mkt-row { display: flex; gap: 4px; flex: 1; }
+    .fc-set-mkt-btn {
+      flex: 1; background: #16161F; border: 1px solid #2E2E42; border-radius: 5px;
+      color: #475569; cursor: pointer; font-size: 10px; font-weight: 600;
+      padding: 5px 6px; text-align: center; transition: background .15s, color .15s, border-color .15s;
+    }
+    .fc-set-mkt-btn.active { background: #6366F1; border-color: #6366F1; color: #fff; }
   `;
 
   // ── HTML ───────────────────────────────────────────────────────────────────
@@ -287,6 +320,7 @@
         <button class="fc-itab active" data-itab="check">Check</button>
         <button class="fc-itab" data-itab="chart" id="tabChart" disabled>Chart</button>
         <button class="fc-itab" data-itab="details" id="tabDetails" disabled>Details</button>
+        <button class="fc-itab" data-itab="settings">⚙</button>
       </div>
 
       <div class="fc-body-wrap">
@@ -457,6 +491,32 @@
           <div class="fc-det-empty" id="detEmpty">Erst prüfen, dann Details.</div>
         </div>
 
+        <!-- ── SETTINGS TAB ── -->
+        <div class="fc-tab-pane" id="paneSettings">
+          <div class="fc-set-section">
+            <div class="fc-set-title">Standard-Marktplatz</div>
+            <div class="fc-set-row">
+              <span class="fc-set-label">Markt</span>
+              <div class="fc-set-mkt-row">
+                <button class="fc-set-mkt-btn active" data-setmarket="ebay">eBay</button>
+                <button class="fc-set-mkt-btn" data-setmarket="amazon">Amazon</button>
+              </div>
+            </div>
+          </div>
+          <div class="fc-set-section">
+            <div class="fc-set-title">eBay Einstellungen</div>
+            <div class="fc-set-row">
+              <span class="fc-set-label">Versand (€)</span>
+              <input class="fc-set-inp" id="setShipOut" type="number" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="fc-set-row">
+              <span class="fc-set-label">Kategorie</span>
+              <select class="fc-set-select" id="setCatId"></select>
+            </div>
+          </div>
+          <div class="fc-set-saved" id="setSavedMsg">✓ Gespeichert</div>
+        </div>
+
       </div><!-- /fc-body-wrap -->
     </div><!-- /fc-wrap -->
   `;
@@ -479,6 +539,12 @@
       this._innerTab      = 'check';
       this._alertOpen     = false;
       this._amazonMethod  = 'fba';
+      // Defaults from settings
+      this._defaults      = { market: 'ebay', shipOut: 0, catId: 'sonstiges' };
+      // Dual-fetch: cache results for both markets
+      this._resultCache   = {};       // { ebay: {data, ts}, amazon: {data, ts} }
+      this._crossId       = null;     // resolved cross-market identifier (ASIN for EAN, EAN for ASIN)
+      this._crossPending  = false;
       try {
         const pos = JSON.parse(sessionStorage.getItem('fc_pos') || '{}');
         if (pos.right  != null) this.style.right  = pos.right  + 'px';
@@ -486,6 +552,7 @@
       } catch (_) {}
       this._wireEvents();
       this._setupDrag(shadow.getElementById('fcHeader'));
+      this._loadDefaults();
     }
 
     // ── Lifecycle callbacks ───────────────────────────────────────────────────
@@ -498,9 +565,20 @@
 
     // ── Public API ────────────────────────────────────────────────────────────
     probe(identifier, market) {
+      // Clear cross-market cache for new probe
+      this._resultCache = {};
+      this._crossId     = null;
+      this._crossPending = false;
+      // Apply default market if not explicitly given
+      if (!market && this._defaults.market) market = this._defaults.market;
       if (market) this._setMarket(market, false);
       this._identifier = identifier;
       this._shadow.getElementById('fcIdTag').textContent = identifier || '';
+      // Apply default shipping in Details tab
+      if (this._defaults.shipOut > 0) {
+        const shipInp = this._shadow.getElementById('deShipOut');
+        if (shipInp && !parseFloat(shipInp.value)) shipInp.value = this._defaults.shipOut.toFixed(2);
+      }
       // Fill page price BEFORE running the check so EK is not 0
       this._autoFillPagePrice();
       this._setState('loading');
@@ -639,12 +717,37 @@
 
       // Details: Amazon recalc
       s.getElementById('daRecalcBtn').addEventListener('click', () => this._recalcAmazon());
+
+      // Settings: market buttons
+      s.querySelectorAll('[data-setmarket]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          s.querySelectorAll('[data-setmarket]').forEach(b => b.classList.toggle('active', b === btn));
+          this._saveDefaults();
+        });
+      });
+
+      // Settings: category & shipping — auto-save on change
+      const catSel = s.getElementById('setCatId');
+      if (catSel && typeof fcBuildCatOptions === 'function') {
+        catSel.innerHTML = fcBuildCatOptions(this._defaults.catId || 'sonstiges');
+      }
+      catSel?.addEventListener('change', () => this._saveDefaults());
+      s.getElementById('setShipOut')?.addEventListener('change', () => this._saveDefaults());
+      s.getElementById('setShipOut')?.addEventListener('blur', () => this._saveDefaults());
     }
 
     // ── Market ────────────────────────────────────────────────────────────────
     _setMarket(market, refetch) {
+      const prevMarket = this._market;
       this._market = market;
       const s = this._shadow;
+      // Swap identifiers: when toggling markets, swap current ↔ crossId
+      if (refetch && this._crossId && prevMarket !== market) {
+        const oldId = this._identifier;
+        this._identifier = this._crossId;
+        this._crossId = oldId;
+        s.getElementById('fcIdTag').textContent = this._identifier || '';
+      }
       s.querySelectorAll('.fc-mkt-btn').forEach(b => b.classList.toggle('active', b.dataset.market === market));
       // KPI labels
       s.getElementById('kvVkLabel').textContent    = market === 'amazon' ? 'Buy Box'    : 'Median VK';
@@ -659,14 +762,29 @@
         s.getElementById('detAmazon').style.display  = market === 'amazon'  ? '' : 'none';
         s.getElementById('detEmpty').style.display   = 'none';
       }
-      if (refetch && this._identifier) { this._setState('loading'); this._fetchResult(); }
+      if (refetch && this._identifier) {
+        // Check if we have a cached result for this market (from dual-fetch)
+        const cached = this._resultCache[market];
+        if (cached && cached.data && (Date.now() - cached.ts) < 300000) {
+          // Use cached result (< 5 min old)
+          this._result   = cached.data;
+          this._resultTs = cached.ts;
+          this._renderResult(cached.data);
+          this._populateDetails(cached.data);
+          this._loadChartSeries(cached.data);
+          this._checkInventoryStatus(this._identifier);
+          return;
+        }
+        this._setState('loading');
+        this._fetchResult();
+      }
     }
 
     // ── Inner Tabs ────────────────────────────────────────────────────────────
     _setInnerTab(tab) {
       this._innerTab = tab;
       const s = this._shadow;
-      const paneMap = { check: 'paneCheck', chart: 'paneChart', details: 'paneDetails' };
+      const paneMap = { check: 'paneCheck', chart: 'paneChart', details: 'paneDetails', settings: 'paneSettings' };
       s.querySelectorAll('.fc-itab').forEach(t => t.classList.toggle('active', t.dataset.itab === tab));
       s.querySelectorAll('.fc-tab-pane').forEach(p => p.classList.toggle('active', p.id === paneMap[tab]));
       if (tab === 'chart') setTimeout(() => this._drawChart(), 30);
@@ -739,10 +857,19 @@
       }
       this._result   = res.data;
       this._resultTs = Date.now();
+      // Cache this market's result
+      this._resultCache[this._market] = { data: res.data, ts: Date.now() };
+      // Extract cross-market identifier from API response
+      if (!this._crossId && res.data) {
+        if (this._market === 'ebay' && res.data.asin) this._crossId = res.data.asin;
+        else if (this._market === 'amazon' && res.data.ean) this._crossId = res.data.ean;
+      }
       this._renderResult(res.data);
       this._populateDetails(res.data);
       this._loadChartSeries(res.data);
       this._checkInventoryStatus(this._identifier);
+      // Trigger cross-market pre-fetch in background
+      this._fetchCrossMarket();
     }
 
     // ── Render Result ─────────────────────────────────────────────────────────
@@ -802,8 +929,9 @@
         s.getElementById('kvVk').textContent = fmt(d.sell_price_median);
         let feeAmt = d.fee ?? d.ebay_fee ?? null;
         if (feeAmt == null && d.sell_price_median != null) {
+          const catId = this._defaults.catId || 'sonstiges';
           feeAmt = typeof fcCalcEbayFee === 'function'
-            ? fcCalcEbayFee(Number(d.sell_price_median), 'sonstiges')
+            ? fcCalcEbayFee(Number(d.sell_price_median), catId)
             : Number(d.sell_price_median) * 0.13;
         }
         s.getElementById('kvFee').textContent = feeAmt != null ? `-€${Number(feeAmt).toFixed(2)}` : '—';
@@ -951,8 +1079,8 @@
       const shipOut  = parseFloat(this._shadow.getElementById('deShipOut').value) || 0;
       const d        = this._result;
       const vk       = Number(d.sell_price_median) || 0;
-      let fee        = d.fee ?? d.ebay_fee ?? null;
-      if (fee == null) fee = typeof fcCalcEbayFee === 'function' ? fcCalcEbayFee(vk, 'sonstiges') : vk * 0.13;
+      const catId    = this._defaults.catId || 'sonstiges';
+      let fee        = typeof fcCalcEbayFee === 'function' ? fcCalcEbayFee(vk, catId) : vk * 0.13;
       const profit   = vk - fee - this._lastEk - shipOut;
       const margin   = vk > 0 ? (profit / vk) * 100 : 0;
       const kvProfit = this._shadow.getElementById('kvProfit');
@@ -1142,6 +1270,108 @@
         e.preventDefault();
       });
     }
+
+    // ── Settings / Defaults ─────────────────────────────────────────────────
+    _loadDefaults() {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+      chrome.storage.local.get('fc_panel_defaults', data => {
+        if (chrome.runtime.lastError) return;
+        const d = data?.fc_panel_defaults;
+        if (!d) return;
+        this._defaults = { market: d.market || 'ebay', shipOut: d.shipOut || 0, catId: d.catId || 'sonstiges' };
+        // Apply default market
+        if (d.market && d.market !== this._market && !this._identifier) {
+          this._setMarket(d.market, false);
+        }
+        // Populate settings UI
+        this._populateSettingsUI();
+      });
+    }
+
+    _populateSettingsUI() {
+      const s = this._shadow;
+      const d = this._defaults;
+      const shipInp = s.getElementById('setShipOut');
+      if (shipInp) shipInp.value = d.shipOut > 0 ? d.shipOut : '';
+      const catSel = s.getElementById('setCatId');
+      if (catSel && typeof fcBuildCatOptions === 'function') {
+        catSel.innerHTML = fcBuildCatOptions(d.catId || 'sonstiges');
+      }
+      s.querySelectorAll('[data-setmarket]').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.setmarket === d.market);
+      });
+    }
+
+    _saveDefaults() {
+      if (typeof chrome === 'undefined' || !chrome.storage?.local) return;
+      const s = this._shadow;
+      const market = s.querySelector('[data-setmarket].active')?.dataset.setmarket || 'ebay';
+      const shipOut = parseFloat(s.getElementById('setShipOut')?.value) || 0;
+      const catId = s.getElementById('setCatId')?.value || 'sonstiges';
+      this._defaults = { market, shipOut, catId };
+      chrome.storage.local.set({ fc_panel_defaults: this._defaults });
+      // Flash saved msg
+      const msg = s.getElementById('setSavedMsg');
+      if (msg) { msg.classList.add('visible'); setTimeout(() => msg.classList.remove('visible'), 1500); }
+    }
+
+    // ── Dual-Market Pre-Fetch ───────────────────────────────────────────────
+    _fetchCrossMarket() {
+      // After a primary check succeeds, resolve the cross-market identifier and fetch
+      if (!this._result || !this._identifier) return;
+      const d = this._result;
+      const primary = this._market;
+      const cross = primary === 'ebay' ? 'amazon' : 'ebay';
+
+      // Resolve cross identifier from result (API often returns both ean + asin)
+      let crossId = null;
+      if (primary === 'ebay') {
+        crossId = d.asin || null;
+      } else {
+        crossId = d.ean || this._identifier;
+      }
+
+      // If no cross identifier from result, try resolving
+      if (!crossId) {
+        const msgType = primary === 'ebay' ? 'EAN_TO_ASIN' : 'ASIN_TO_EAN';
+        const param = primary === 'ebay' ? { ean: this._identifier } : { asin: this._identifier };
+        this._crossPending = true;
+        chrome.runtime.sendMessage({ type: msgType, ...param }, res => {
+          this._crossPending = false;
+          if (chrome.runtime.lastError || !res?.ok) return;
+          const resolved = primary === 'ebay' ? res.asin : res.ean;
+          if (resolved) {
+            this._crossId = resolved;
+            this._fetchForMarket(cross, resolved);
+          }
+        });
+        return;
+      }
+
+      this._crossId = crossId;
+      this._fetchForMarket(cross, crossId);
+    }
+
+    _fetchForMarket(market, identifier) {
+      // Silently fetch for the other market and cache the result
+      const ek = this._lastEk;
+      if (market === 'amazon') {
+        chrome.runtime.sendMessage({
+          type: 'AMAZON_CHECK', asin: identifier, ean: identifier,
+          ek, mode: this._mode, method: this._amazonMethod, shipIn: 0, prepFee: 0,
+        }, res => {
+          if (chrome.runtime.lastError || !res?.ok) return;
+          this._resultCache.amazon = { data: res.data, ts: Date.now() };
+        });
+      } else {
+        chrome.runtime.sendMessage({
+          type: 'FLIPCHECK', ean: identifier, ek, mode: this._mode,
+        }, res => {
+          if (chrome.runtime.lastError || !res?.ok) return;
+          this._resultCache.ebay = { data: res.data, ts: Date.now() };
+        });
+      }
+    }
   }
 
   // ── Manual init fallback ──────────────────────────────────────────────────
@@ -1183,6 +1413,10 @@
     el._innerTab      = 'check';
     el._alertOpen     = false;
     el._amazonMethod  = 'fba';
+    el._defaults      = { market: 'ebay', shipOut: 0, catId: 'sonstiges' };
+    el._resultCache   = {};
+    el._crossId       = null;
+    el._crossPending  = false;
     try {
       const pos = JSON.parse(sessionStorage.getItem('fc_pos') || '{}');
       if (pos.right  != null) el.style.right  = pos.right  + 'px';
@@ -1190,6 +1424,7 @@
     } catch (_) {}
     el._wireEvents();
     el._setupDrag(shadow.getElementById('fcHeader'));
+    el._loadDefaults();
     console.log('[FC] panel manually initialised — probe available:', typeof el.probe === 'function');
   }
 
