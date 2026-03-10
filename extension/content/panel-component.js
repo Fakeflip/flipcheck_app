@@ -501,24 +501,9 @@
       if (market) this._setMarket(market, false);
       this._identifier = identifier;
       this._shadow.getElementById('fcIdTag').textContent = identifier || '';
-
-      // License check — once per page session, fail-open on network errors
-      if (this._licenseChecked) {
-        if (!this._licenseOk) { this._setState('pro-required'); return; }
-        this._setState('loading');
-        this._fetchResult();
-        this._autoFillPagePrice();
-        return;
-      }
       this._setState('loading');
-      chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
-        this._licenseChecked = true;
-        const gotResponse = meRes?.ok === true || meRes?.ok === false;
-        this._licenseOk = !gotResponse || meRes?.data?.license_ok !== false;
-        if (!this._licenseOk) { this._setState('pro-required'); return; }
-        this._fetchResult();
-        this._autoFillPagePrice();
-      });
+      this._fetchResult();
+      this._autoFillPagePrice();
     }
 
     _autoFillPagePrice() {

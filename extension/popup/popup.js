@@ -81,26 +81,24 @@ async function checkToken() {
       _hasToken = !!(res?.token);
       $('authBanner').style.display = _hasToken ? 'none' : '';
 
-      if (!_hasToken) { resolve(); return; }
+      // License check is informational only — never block the UI.
+      // API calls go directly to api.joinflipcheck.app which has no auth.
+      // The gate license check just controls the upgrade banner visibility.
+      const gate = $('licenseGate');
+      if (gate) gate.style.display = 'none';
 
-      // License check — only block on explicit license_ok: false
-      // On network error / timeout → fail open (let user through)
-      chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
-        console.log('[FC] AUTH_ME response:', JSON.stringify(meRes));
-        const gotResponse = meRes?.ok === true || meRes?.ok === false;
-        const licenseOk   = !gotResponse || meRes?.data?.license_ok !== false;
-        const gate   = $('licenseGate');
-        const tabs   = document.querySelector('.fc-tabs');
-        const panels = document.querySelectorAll('.fc-panel');
-        if (gotResponse && !licenseOk) {
-          if (gate)  gate.style.display  = 'flex';
-          if (tabs)  tabs.style.display  = 'none';
-          panels.forEach(p => p.style.display = 'none');
-        } else {
-          if (gate) gate.style.display = 'none';
-        }
+      if (_hasToken) {
+        chrome.runtime.sendMessage({ type: 'AUTH_ME' }, meRes => {
+          console.log('[FC] AUTH_ME response:', JSON.stringify(meRes));
+          // Show upgrade banner for free users, but don't block functionality
+          if (meRes?.ok && meRes?.data?.license_ok === false) {
+            $('upgradeBanner').style.display = '';
+          }
+          resolve();
+        });
+      } else {
         resolve();
-      });
+      }
     });
   });
 }
