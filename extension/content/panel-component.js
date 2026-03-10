@@ -501,9 +501,10 @@
       if (market) this._setMarket(market, false);
       this._identifier = identifier;
       this._shadow.getElementById('fcIdTag').textContent = identifier || '';
+      // Fill page price BEFORE running the check so EK is not 0
+      this._autoFillPagePrice();
       this._setState('loading');
       this._fetchResult();
-      this._autoFillPagePrice();
     }
 
     _autoFillPagePrice() {
@@ -511,13 +512,14 @@
       const inp = this._shadow.getElementById('fcEkInp');
       // Don't overwrite a value the user already entered manually
       if (parseFloat(inp?.value) > 0) return;
+      const price = detectPagePrice();
+      if (price > 0) { this.autofillEk(price); return; }
+      // Retry for SPA hydration — if price arrives late, no auto-recheck
       const _try = () => {
-        if (parseFloat(inp?.value) > 0) return; // filled in the meantime
-        const price = detectPagePrice();
-        if (price > 0) this.autofillEk(price);
+        if (parseFloat(inp?.value) > 0) return;
+        const p = detectPagePrice();
+        if (p > 0) this.autofillEk(p);
       };
-      // Immediate attempt (SSR pages already rendered), then retry for SPA hydration
-      _try();
       setTimeout(_try, 600);
       setTimeout(_try, 1800);
     }
