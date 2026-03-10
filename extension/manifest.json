@@ -43,6 +43,7 @@
   },
   "host_permissions": [
     "https://gate.joinflipcheck.app/*",
+    "https://api.joinflipcheck.app/*",
     "http://127.0.0.1:8766/*",
     "https://*.ebay.de/*",
     "https://*.amazon.de/*",

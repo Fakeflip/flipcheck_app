@@ -1060,10 +1060,14 @@ async def pair(req: PairRequest, user=Depends(require_auth)):
 # FLIPCHECK
 # =========================================================
 class FlipRequest(BaseModel):
-    ean:      str
-    ek:       float
-    mode:     str = "mid"
-    category: str = "sonstiges"
+    ean:          str
+    ek:           float
+    mode:         str   = "mid"
+    category:     str   = "sonstiges"
+    shipping_in:  float = 0.0
+    shipping_out: float = 0.0
+    vat_mode:     str   = "no_vat"
+    ek_mode:      str   = "gross"
 
 
 @app.post("/flipcheck")
@@ -1105,10 +1109,14 @@ async def flipcheck(
             r = await client.post(
                 f"{BACKEND_URL}/flipcheck",
                 json={
-                    "ean":      req.ean,
-                    "ek":       req.ek,
-                    "mode":     req.mode,
-                    "category": getattr(req, "category", "sonstiges"),
+                    "ean":          req.ean,
+                    "ek":           req.ek,
+                    "mode":         req.mode,
+                    "category":     req.category,
+                    "shipping_in":  req.shipping_in,
+                    "shipping_out": req.shipping_out,
+                    "vat_mode":     req.vat_mode,
+                    "ek_mode":      req.ek_mode,
                 },
             )
             if r.status_code == 200:
