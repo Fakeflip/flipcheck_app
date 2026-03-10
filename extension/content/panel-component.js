@@ -145,9 +145,22 @@
       display: inline-block; margin-bottom: 8px; letter-spacing: .04em;
     }
     .fc-title {
-      font-size: 10px; color: #475569; margin-bottom: 8px;
+      font-size: 10px; color: #475569; margin-bottom: 4px;
       overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     }
+    .fc-id-row {
+      display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap;
+    }
+    .fc-id-row:empty { display: none; }
+    .fc-id-chip {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: 9px; font-family: 'SF Mono', 'Menlo', monospace;
+      background: #1E1E2E; border: 1px solid #2E2E42; border-radius: 4px;
+      padding: 2px 6px; color: #94A3B8; cursor: pointer;
+      transition: background .15s, border-color .15s;
+    }
+    .fc-id-chip:hover { background: #252538; border-color: #6366F1; }
+    .fc-id-chip-label { color: #6366F1; font-weight: 600; text-transform: uppercase; }
     .fc-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 10px; }
     .fc-kpi { background: #16161F; border-radius: 6px; padding: 6px 8px; }
     .fc-kpi-v { display: block; font-size: 13px; font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums; }
@@ -298,6 +311,7 @@
           <div class="fc-state" id="stResult">
             <div id="fcVerdictBadge" class="fc-verdict-badge">—</div>
             <div id="fcTitle" class="fc-title"></div>
+            <div id="fcIdDisplay" class="fc-id-row"></div>
             <div class="fc-kpis">
               <div class="fc-kpi">
                 <span class="fc-kpi-v" id="kvVk">—</span>
@@ -761,6 +775,29 @@
       const titleEl = s.getElementById('fcTitle');
       titleEl.textContent  = d.title ? d.title.slice(0, 72) : '';
       titleEl.style.display = d.title ? 'block' : 'none';
+
+      // EAN / ASIN display
+      const idEl = s.getElementById('fcIdDisplay');
+      const chips = [];
+      const ident = this._identifier || '';
+      const isAsin = /^[A-Z0-9]{10}$/.test(ident.toUpperCase()) && /[A-Z]/i.test(ident);
+      if (isAsin) {
+        chips.push(`<span class="fc-id-chip" data-copy="${ident}"><span class="fc-id-chip-label">ASIN</span>${ident}</span>`);
+        if (d.ean) chips.push(`<span class="fc-id-chip" data-copy="${d.ean}"><span class="fc-id-chip-label">EAN</span>${d.ean}</span>`);
+      } else {
+        if (ident) chips.push(`<span class="fc-id-chip" data-copy="${ident}"><span class="fc-id-chip-label">EAN</span>${ident}</span>`);
+        if (d.asin) chips.push(`<span class="fc-id-chip" data-copy="${d.asin}"><span class="fc-id-chip-label">ASIN</span>${d.asin}</span>`);
+      }
+      idEl.innerHTML = chips.join('');
+      idEl.querySelectorAll('.fc-id-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          navigator.clipboard.writeText(chip.dataset.copy).then(() => {
+            const orig = chip.innerHTML;
+            chip.innerHTML = '<span class="fc-id-chip-label">✓</span>Kopiert';
+            setTimeout(() => { chip.innerHTML = orig; }, 1200);
+          });
+        });
+      });
 
       // KPIs
       if (this._market === 'amazon') {

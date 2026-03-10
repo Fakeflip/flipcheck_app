@@ -204,12 +204,23 @@ const FlipcheckView = (() => {
     const score  = _deriveScore(d);
     const pColor = profit != null ? (profit >= 0 ? "var(--green)" : "var(--red)") : "var(--text-secondary)";
     const sColor = score >= 60 ? "var(--green)" : score >= 30 ? "var(--yellow)" : "var(--red)";
-    const fee    = vk != null ? (vk - (profit ?? 0) - (d.ek ?? 0)) : null;
+    /* Calculate eBay fee directly from category tiers */
+    let fee = null;
+    if (vk != null) {
+      const fcat = CATEGORIES.find(c => c.id === (d.category || "sonstiges")) || CATEGORIES[CATEGORIES.length - 1];
+      fee = 0; let fRem = vk;
+      for (const [limit, pct] of fcat.tiers) {
+        if (limit == null) { fee += fRem * pct; break; }
+        const chunk = Math.min(fRem, limit); fee += chunk * pct; fRem = Math.max(0, fRem - limit);
+        if (fRem <= 0) break;
+      }
+      fee = Math.max(fee, 0.35);
+    }
 
     /* Waterfall steps */
     const wfSteps = [];
     if (vk != null) wfSteps.push({ label:"Median VK", val: vk, color:"var(--text-primary)", plus:true });
-    if (fee != null && fee > 0) wfSteps.push({ label:"eBay-Gebühr", val:-Math.abs(fee), color:"var(--red)" });
+    if (fee != null && fee > 0) wfSteps.push({ label:"eBay-Gebühr", val:-fee, color:"var(--red)" });
     if (d.ship_in  > 0) wfSteps.push({ label:"Versand rein",  val:-d.ship_in,  color:"var(--red)" });
     if (d.ship_out > 0) wfSteps.push({ label:"Versand raus",  val:-d.ship_out, color:"var(--red)" });
     if (d.ek != null)   wfSteps.push({ label:"EK",            val:-d.ek,       color:"var(--red)" });
@@ -447,6 +458,15 @@ const FlipcheckView = (() => {
         d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, shipping_in: shipIn });
       } else {
         d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut });
+        // Local profit recalc (server doesn't include shipping + VAT)
+        if (d && d.sell_price_median != null) {
+          d.ek       = ek;
+          d.ship_in  = shipIn;
+          d.ship_out = shipOut;
+          d.category = cat;
+          d.profit_median = +calcProfit(d.sell_price_median, ek, cat, shipIn, shipOut).toFixed(2);
+          d.margin_pct    = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        }
       }
 
       _lastResult = d ? { ...d, ean, ek, market: _market } : null;
