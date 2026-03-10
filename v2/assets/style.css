@@ -1741,6 +1741,25 @@ img { display: block; max-width: 100%; }
   display: block;
 }
 
+/* Read/unread listing styles */
+.comp-listing-new td { font-weight: 600; }
+.comp-listing-new .comp-listing-title { color: var(--text); font-weight: 600; }
+.comp-new-badge {
+  font-size: 9px; font-weight: 700;
+  background: var(--accent-dim); color: var(--accent);
+  border: 1px solid var(--accent-border);
+  padding: 1px 5px; border-radius: var(--r-full);
+  text-transform: uppercase; letter-spacing: .04em;
+  flex-shrink: 0;
+}
+.comp-unread-count {
+  font-size: 10px; font-weight: 700;
+  background: var(--accent); color: #fff;
+  min-width: 18px; height: 18px; line-height: 18px;
+  text-align: center; border-radius: var(--r-full);
+  display: inline-block; flex-shrink: 0;
+}
+
 .badge-blue {
   background: var(--blue-subtle);
   color: var(--blue);

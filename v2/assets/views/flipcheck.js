@@ -44,8 +44,8 @@ const FlipcheckView = (() => {
   // calcEbayFee is global (defined in app.js — EBAY_FEE_CATEGORIES + calcEbayFee)
 
   // ─── Full profit calc (frontend-side, tiered fees + VAT) ─────────────────
-  // Returns { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, profit, margin }
-  function calcProfit(vkGross, ekGross, catId, vatMode, ekMode, shipInGross, shipOutGross, packagingPerUnit = 0, qty = 1, market = "ebay") {
+  // Returns { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, adFeeGross, adFeeNet, profit, margin }
+  function calcProfit(vkGross, ekGross, catId, vatMode, ekMode, shipInGross, shipOutGross, packagingPerUnit = 0, qty = 1, market = "ebay", adRatePct = 0) {
     const vat      = vatMode === "ust_19" ? 1.19 : 1.0;
     const feeGross = calcMarketFee(vkGross, market, catId);
     const feeNet   = feeGross / vat;
@@ -55,10 +55,13 @@ const FlipcheckView = (() => {
     const siNet    = (shipInGross  || 0) / vat;
     const soNet    = (shipOutGross || 0) / vat;
     const packNet  = packagingPerUnit; // packaging is already a net cost (no VAT recovery on packaging typically)
-    const profit   = vkNet - feeNet - ekNet - siNet - soNet - packNet;
+    // Advertising fee (eBay Promoted Listings): percentage of gross sell price
+    const adFeeGross = vkGross * ((adRatePct || 0) / 100);
+    const adFeeNet   = adFeeGross / vat;
+    const profit   = vkNet - feeNet - ekNet - siNet - soNet - packNet - adFeeNet;
     // Margin: net profit / net revenue — consistent denominator regardless of VAT mode
     const margin   = vkNet > 0 ? (profit / vkNet * 100) : 0;
-    return { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, profit, margin };
+    return { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, adFeeGross, adFeeNet, profit, margin };
   }
 
   function buildCatOptions(selectedId) {
@@ -122,6 +125,7 @@ const FlipcheckView = (() => {
   let lastEan    = null;
   let lastEk     = null;
   let _miniChart = null;   // Chart.js instance for the inline price sparkline
+  let _visibleFields = { ship_in: true, ship_out: true, packaging: false, ad_rate: false };
 
   // ─── Scanner IPC callback (stable ref for add/remove) ─────────────────────
   function _onScannerEan(ean) {
@@ -138,11 +142,18 @@ const FlipcheckView = (() => {
   async function mount(container, navId) {
     _container = container;
 
-    // Load settings for VAT / EK mode
+    // Load settings for VAT / EK mode + field visibility
     try {
       const s = await Storage.getSettings();
       _vatMode = s?.tax?.vat_mode  || "no_vat";
       _ekMode  = s?.tax?.ek_mode   || "gross";
+      const ff = s?.flipcheck_fields || {};
+      _visibleFields = {
+        ship_in:   ff.ship_in   !== false,
+        ship_out:  ff.ship_out  !== false,
+        packaging: ff.packaging === true,
+        ad_rate:   ff.ad_rate   === true,
+      };
     } catch {}
 
     // Guard: user may have navigated away during async load
@@ -279,28 +290,30 @@ const FlipcheckView = (() => {
                 ${isKl ? "" : vatBadge}
               </div>
 
+              ${(_visibleFields.ship_in || _visibleFields.ship_out) ? `
               <div class="input-group">
                 <label class="input-label">${I18N.t('fc.form.shipping')}${_vatMode==="ust_19"?" "+I18N.t('fc.form.gross_suffix'):""}</label>
                 <div class="grid-2-sm">
-                  <div>
+                  ${_visibleFields.ship_in ? `<div>
                     <div class="text-xs text-muted mb-4">${I18N.t('fc.form.ship_in')}</div>
                     <div class="input-prefix-wrap">
                       <span class="prefix">€</span>
                       <input id="fcShipIn" class="input" type="number" step="0.01" min="0" placeholder="0.00"
                         value="${esc(state.shipping_in||"")}" />
                     </div>
-                  </div>
-                  <div>
+                  </div>` : ""}
+                  ${_visibleFields.ship_out ? `<div>
                     <div class="text-xs text-muted mb-4">${I18N.t('fc.form.ship_out')}</div>
                     <div class="input-prefix-wrap">
                       <span class="prefix">€</span>
                       <input id="fcShipOut" class="input" type="number" step="0.01" min="0" placeholder="0.00"
                         value="${esc(state.shipping_out||"")}" />
                     </div>
-                  </div>
+                  </div>` : ""}
                 </div>
-              </div>
+              </div>` : ""}
 
+              ${_visibleFields.packaging ? `
               <div class="input-group">
                 <label class="input-label">${I18N.t('fc.form.packaging')}</label>
                 <div class="input-prefix-wrap">
@@ -309,7 +322,18 @@ const FlipcheckView = (() => {
                     value="${esc(state.packaging||"")}" />
                 </div>
                 <span class="input-hint">${I18N.t('fc.form.packaging_hint')}</span>
-              </div>
+              </div>` : ""}
+
+              ${_visibleFields.ad_rate ? `
+              <div class="input-group">
+                <label class="input-label">${I18N.t('fc.form.ad_rate')}</label>
+                <div class="input-prefix-wrap">
+                  <span class="prefix">%</span>
+                  <input id="fcAdRate" class="input" type="number" step="0.1" min="0" max="30" placeholder="0"
+                    value="${esc(state.ad_rate||"")}" />
+                </div>
+                <span class="input-hint">${I18N.t('fc.form.ad_rate_hint')}</span>
+              </div>` : ""}
             </div>
 
             <!-- Amazon-only fields -->
@@ -394,7 +418,7 @@ const FlipcheckView = (() => {
   }
 
   // ─── Result Card ──────────────────────────────────────────────────────────
-  function renderResult(data, ean, ek, catId, shipIn, shipOut) {
+  function renderResult(data, ean, ek, catId, shipIn, shipOut, adRate = 0) {
     const v  = data.verdict || "SKIP";
     const vc = v.toLowerCase();
 
@@ -406,11 +430,12 @@ const FlipcheckView = (() => {
 
     // ── Frontend-side profit calc ─────────────────────────────────────────
     const packagingCost = parseFloat(_container?.querySelector("#fcPackaging")?.value) || 0;
+    const adRatePct     = parseFloat(adRate) || 0;
     const ekNum  = parseFloat(ek)  || 0;  // guard: empty input → 0, never NaN
     let calc = null;
     if (vk != null) {
       calc = calcProfit(vk, ekNum, catId, _vatMode, _ekMode,
-        parseFloat(shipIn) || 0, parseFloat(shipOut) || 0, packagingCost, 1, selectedMarket);
+        parseFloat(shipIn) || 0, parseFloat(shipOut) || 0, packagingCost, 1, selectedMarket, adRatePct);
     }
 
     const dispProfit = calc?.profit ?? (data.profit_median ?? data.profit_avg ?? null);
@@ -539,6 +564,12 @@ const FlipcheckView = (() => {
             <div class="fc-wf-step red">
               <div class="fc-wf-step-l">${I18N.t('fc.waterfall.packaging')}</div>
               <div class="fc-wf-step-v">−${fmtEur(calc.packNet)}</div>
+            </div>` : ""}
+            ${calc?.adFeeNet > 0 ? `
+            <div class="fc-wf-arrow">→</div>
+            <div class="fc-wf-step red">
+              <div class="fc-wf-step-l">${I18N.t('fc.detail.ad_fee')} (${adRatePct}%)</div>
+              <div class="fc-wf-step-v">−${fmtEur(calc.adFeeNet)}</div>
             </div>` : ""}
             <div class="fc-wf-arrow">→</div>
             <div class="fc-wf-step red">
@@ -1476,6 +1507,7 @@ const FlipcheckView = (() => {
       const shipIn   = parseFloat(container.querySelector("#fcShipIn")?.value)    || 0;
       const shipOut  = parseFloat(container.querySelector("#fcShipOut")?.value)   || 0;
       const packaging = parseFloat(container.querySelector("#fcPackaging")?.value) || 0;
+      const adRate   = parseFloat(container.querySelector("#fcAdRate")?.value)    || 0;
 
       const { ok, data } = await API.flipcheck(ean, ek, mode, {
         category:     cat,
@@ -1489,7 +1521,7 @@ const FlipcheckView = (() => {
       if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
       lastResult = data; lastEan = ean; lastEk = ek;
-      resultEl.innerHTML = renderResult(data, ean, ek, cat, shipIn, shipOut);
+      resultEl.innerHTML = renderResult(data, ean, ek, cat, shipIn, shipOut, adRate);
 
       // Auto-save price history
       try {

@@ -57,15 +57,17 @@ function fcCalcEbayFee(priceGross, catId) {
  * @param {number} shipOut  - Outbound shipping cost (€)
  * @returns {{ feeGross, feeNet, vkNet, ekNet, profit, margin }}
  */
-function fcCalcProfit(vkGross, ekGross, catId, vatMode = 'no_vat', ekMode = 'gross', shipIn = 0, shipOut = 0) {
+function fcCalcProfit(vkGross, ekGross, catId, vatMode = 'no_vat', ekMode = 'gross', shipIn = 0, shipOut = 0, adRatePct = 0) {
   const vat    = vatMode === 'ust_19' ? 1.19 : 1.0;
   const feeGross = fcCalcEbayFee(vkGross, catId);
   const feeNet   = feeGross / vat;
   const vkNet    = vkGross / vat;
   const ekNet    = (vatMode === 'ust_19' && ekMode === 'gross') ? ekGross / vat : ekGross;
-  const profit   = vkNet - feeNet - ekNet - (shipIn || 0) - (shipOut || 0);
+  const adFeeGross = vkGross * ((adRatePct || 0) / 100);
+  const adFeeNet   = adFeeGross / vat;
+  const profit   = vkNet - feeNet - ekNet - (shipIn || 0) - (shipOut || 0) - adFeeNet;
   const margin   = vkGross > 0 ? (profit / vkGross * 100) : 0;
-  return { feeGross, feeNet, vkNet, ekNet, profit, margin };
+  return { feeGross, feeNet, vkNet, ekNet, adFeeGross, adFeeNet, profit, margin };
 }
 
 function fcBuildCatOptions(selectedId) {

@@ -61,6 +61,7 @@
  * @property {number}       ship_out    - Outbound shipping cost in EUR (0 if none)
  * @property {string|null}  sold_at     - ISO timestamp of sale (null while unsold)
  * @property {string}       cat_id      - eBay fee category ID (e.g. "sonstiges", "handys")
+ * @property {string}       condition   - Item condition: "new" | "like_new" | "very_good" | "good" | "acceptable" | "defective"
  */
 
 // ── Price History ─────────────────────────────────────────────────────────────

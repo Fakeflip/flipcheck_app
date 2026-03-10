@@ -1132,6 +1132,33 @@ const I18N = (() => {
       'hist.toast.err': 'Fehler',
       'hist.toast.err_sub': 'Aktion konnte nicht ausgeführt werden.',
       'inv.stats.inbound': 'Inbound',
+
+      // Competition read/unread
+      'comp.badge.new':              'NEU',
+      'comp.badge.new_count':        '{n} neue',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Flipcheck Felder',
+      'st.section.fc_fields.desc':   'Wähle welche optionalen Eingabefelder im Flipcheck angezeigt werden',
+      'st.fc_field.ship_in':         'Versand rein',
+      'st.fc_field.ship_out':        'Versand raus',
+      'st.fc_field.packaging':       'Verpackung',
+      'st.fc_field.ad_rate':         'Werbekosten (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Werbekosten',
+      'fc.form.ad_rate_hint':        'eBay Promoted Listings Rate (z.B. 5%)',
+      'fc.detail.ad_fee':            'Werbekosten',
+
+      // Condition
+      'inv.modal.condition':         'Zustand',
+      'inv.condition.new':           'Neu',
+      'inv.condition.like_new':      'Wie Neu',
+      'inv.condition.very_good':     'Sehr Gut',
+      'inv.condition.good':          'Gut',
+      'inv.condition.acceptable':    'Akzeptabel',
+      'inv.condition.defective':     'Defekt',
+      'inv.th.condition':            'Zustand',
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -2249,6 +2276,33 @@ const I18N = (() => {
       'hist.toast.err': 'Error',
       'hist.toast.err_sub': 'Action could not be completed.',
       'inv.stats.inbound': 'Inbound',
+
+      // Competition read/unread
+      'comp.badge.new':              'NEW',
+      'comp.badge.new_count':        '{n} new',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Flipcheck Fields',
+      'st.section.fc_fields.desc':   'Choose which optional input fields are shown in Flipcheck',
+      'st.fc_field.ship_in':         'Shipping in',
+      'st.fc_field.ship_out':        'Shipping out',
+      'st.fc_field.packaging':       'Packaging',
+      'st.fc_field.ad_rate':         'Ad cost (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Ad cost',
+      'fc.form.ad_rate_hint':        'eBay Promoted Listings rate (e.g. 5%)',
+      'fc.detail.ad_fee':            'Ad cost',
+
+      // Condition
+      'inv.modal.condition':         'Condition',
+      'inv.condition.new':           'New',
+      'inv.condition.like_new':      'Like New',
+      'inv.condition.very_good':     'Very Good',
+      'inv.condition.good':          'Good',
+      'inv.condition.acceptable':    'Acceptable',
+      'inv.condition.defective':     'Defective',
+      'inv.th.condition':            'Condition',
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -3348,6 +3402,33 @@ const I18N = (() => {
       'hist.toast.err': 'Errore',
       'hist.toast.err_sub': 'Azione non completata.',
       'inv.stats.inbound': 'In entrata',
+
+      // Competition read/unread
+      'comp.badge.new':              'NUOVO',
+      'comp.badge.new_count':        '{n} nuovi',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Campi Flipcheck',
+      'st.section.fc_fields.desc':   'Scegli quali campi opzionali mostrare nel Flipcheck',
+      'st.fc_field.ship_in':         'Spedizione in entrata',
+      'st.fc_field.ship_out':        'Spedizione in uscita',
+      'st.fc_field.packaging':       'Imballaggio',
+      'st.fc_field.ad_rate':         'Costi pubblicitari (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Costi pubblicitari',
+      'fc.form.ad_rate_hint':        'Tasso eBay Promoted Listings (es. 5%)',
+      'fc.detail.ad_fee':            'Costi pubblicitari',
+
+      // Condition
+      'inv.modal.condition':         'Condizione',
+      'inv.condition.new':           'Nuovo',
+      'inv.condition.like_new':      'Come Nuovo',
+      'inv.condition.very_good':     'Ottimo',
+      'inv.condition.good':          'Buono',
+      'inv.condition.acceptable':    'Accettabile',
+      'inv.condition.defective':     'Difettoso',
+      'inv.th.condition':            'Condizione',
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -4447,6 +4528,33 @@ const I18N = (() => {
       'hist.toast.err': 'Error',
       'hist.toast.err_sub': 'Acción no completada.',
       'inv.stats.inbound': 'Entrante',
+
+      // Competition read/unread
+      'comp.badge.new':              'NUEVO',
+      'comp.badge.new_count':        '{n} nuevos',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Campos Flipcheck',
+      'st.section.fc_fields.desc':   'Elige qué campos opcionales se muestran en el Flipcheck',
+      'st.fc_field.ship_in':         'Envío entrante',
+      'st.fc_field.ship_out':        'Envío saliente',
+      'st.fc_field.packaging':       'Embalaje',
+      'st.fc_field.ad_rate':         'Costes publicitarios (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Costes publicitarios',
+      'fc.form.ad_rate_hint':        'Tasa eBay Promoted Listings (ej. 5%)',
+      'fc.detail.ad_fee':            'Costes publicitarios',
+
+      // Condition
+      'inv.modal.condition':         'Estado',
+      'inv.condition.new':           'Nuevo',
+      'inv.condition.like_new':      'Como Nuevo',
+      'inv.condition.very_good':     'Muy Bueno',
+      'inv.condition.good':          'Bueno',
+      'inv.condition.acceptable':    'Aceptable',
+      'inv.condition.defective':     'Defectuoso',
+      'inv.th.condition':            'Estado',
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -5546,6 +5654,33 @@ const I18N = (() => {
       'hist.toast.err': 'Fout',
       'hist.toast.err_sub': 'Actie kon niet worden voltooid.',
       'inv.stats.inbound': 'Inkomend',
+
+      // Competition read/unread
+      'comp.badge.new':              'NIEUW',
+      'comp.badge.new_count':        '{n} nieuwe',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Flipcheck Velden',
+      'st.section.fc_fields.desc':   'Kies welke optionele invoervelden in Flipcheck worden getoond',
+      'st.fc_field.ship_in':         'Verzending inkomend',
+      'st.fc_field.ship_out':        'Verzending uitgaand',
+      'st.fc_field.packaging':       'Verpakking',
+      'st.fc_field.ad_rate':         'Advertentiekosten (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Advertentiekosten',
+      'fc.form.ad_rate_hint':        'eBay Promoted Listings tarief (bijv. 5%)',
+      'fc.detail.ad_fee':            'Advertentiekosten',
+
+      // Condition
+      'inv.modal.condition':         'Staat',
+      'inv.condition.new':           'Nieuw',
+      'inv.condition.like_new':      'Als Nieuw',
+      'inv.condition.very_good':     'Zeer Goed',
+      'inv.condition.good':          'Goed',
+      'inv.condition.acceptable':    'Acceptabel',
+      'inv.condition.defective':     'Defect',
+      'inv.th.condition':            'Staat',
     },
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -6645,6 +6780,33 @@ const I18N = (() => {
       'hist.toast.err': 'Erreur',
       'hist.toast.err_sub': 'Action impossible.',
       'inv.stats.inbound': 'Entrant',
+
+      // Competition read/unread
+      'comp.badge.new':              'NOUVEAU',
+      'comp.badge.new_count':        '{n} nouveaux',
+
+      // Flipcheck fields settings
+      'st.section.fc_fields':        'Champs Flipcheck',
+      'st.section.fc_fields.desc':   'Choisir quels champs optionnels afficher dans le Flipcheck',
+      'st.fc_field.ship_in':         'Expédition entrante',
+      'st.fc_field.ship_out':        'Expédition sortante',
+      'st.fc_field.packaging':       'Emballage',
+      'st.fc_field.ad_rate':         'Frais publicitaires (%)',
+
+      // Advertising
+      'fc.form.ad_rate':             'Frais publicitaires',
+      'fc.form.ad_rate_hint':        'Taux eBay Promoted Listings (ex. 5%)',
+      'fc.detail.ad_fee':            'Frais publicitaires',
+
+      // Condition
+      'inv.modal.condition':         'État',
+      'inv.condition.new':           'Neuf',
+      'inv.condition.like_new':      'Comme Neuf',
+      'inv.condition.very_good':     'Très Bon',
+      'inv.condition.good':          'Bon',
+      'inv.condition.acceptable':    'Acceptable',
+      'inv.condition.defective':     'Défectueux',
+      'inv.th.condition':            'État',
     },
   };
 

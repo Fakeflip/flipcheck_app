@@ -69,10 +69,10 @@ const InventoryView = (() => {
 
     let html = "";
     if (topH > 0)
-      html += `<tr class="inv-vs-spacer"><td colspan="9" style="height:${topH}px"></td></tr>`;
+      html += `<tr class="inv-vs-spacer"><td colspan="10" style="height:${topH}px"></td></tr>`;
     html += _state.vs.data.slice(start, end).map(renderRow).join("");
     if (botH > 0)
-      html += `<tr class="inv-vs-spacer"><td colspan="9" style="height:${botH}px"></td></tr>`;
+      html += `<tr class="inv-vs-spacer"><td colspan="10" style="height:${botH}px"></td></tr>`;
 
     tbody.innerHTML = html;
   }
@@ -335,6 +335,7 @@ const InventoryView = (() => {
               <th class="inv-sort-th col-right${_state.sort.col==="vk"     ?" inv-sort-active":""}" data-sort="vk"    >VK ${_sortIcon("vk")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="profit" ?" inv-sort-active":""}" data-sort="profit">Profit ${_sortIcon("profit")}</th>
               <th class="inv-sort-th${_state.sort.col==="status" ?" inv-sort-active":""}" data-sort="status">Status ${_sortIcon("status")}</th>
+              <th class="inv-sort-th${_state.sort.col==="condition"?" inv-sort-active":""}" data-sort="condition">${I18N.t('inv.th.condition')} ${_sortIcon("condition")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="age"    ?" inv-sort-active":""}" data-sort="age"   >${I18N.t('inv.col.age')} ${_sortIcon("age")}</th>
               <th style="width:100px"></th>
             </tr>
@@ -427,6 +428,7 @@ const InventoryView = (() => {
         <td class="col-right col-num" style="font-size:12px">${item.sell_price != null ? fmtEur(item.sell_price) : "—"}</td>
         <td class="col-right">${profitHtml}</td>
         <td><span class="badge status-${item.status||"IN_STOCK"}">${esc(STATUS_LABELS[item.status] || item.status || "—")}</span></td>
+        <td><span class="badge badge-muted" style="font-size:10px">${esc(FC.CONDITION_LABELS[item.condition] || item.condition || "Neu")}</span></td>
         <td class="col-right text-sm">${ageHtml}</td>
         <td>
           <div class="row" style="gap:4px;justify-content:flex-end">
@@ -674,6 +676,12 @@ const InventoryView = (() => {
             </select>
           </div>
         </div>
+        <div class="input-group">
+          <label class="input-label">${I18N.t('inv.modal.condition')}</label>
+          <select id="mCondition" class="select">
+            ${FC.CONDITIONS.map(c => `<option value="${c}" ${c === "new" ? "selected" : ""}>${FC.CONDITION_LABELS[c]}</option>`).join("")}
+          </select>
+        </div>
         ${_buildCatRowHtml("ebay", null)}
         <div class="input-group">
           <label class="input-label">${I18N.t('inv.add.label')}</label>
@@ -696,14 +704,15 @@ const InventoryView = (() => {
           if (!ean) { Toast.error(I18N.t('inv.add.err_ean'), I18N.t('inv.add.err_ean_sub')); return; }
           await Storage.upsertItem({
             ean,
-            title:  document.getElementById("mTitle")?.value.trim() || "",
-            ek:     parseFloat(document.getElementById("mEk")?.value) || null,
-            qty:    parseInt(document.getElementById("mQty")?.value) || 1,
-            market: document.getElementById("mMarket")?.value || "ebay",
-            status: document.getElementById("mStatus")?.value || "IN_STOCK",
-            cat_id: document.getElementById("invCatSel")?.value || null,
-            label:  document.getElementById("mLabel")?.value.trim() || "",
-            source: document.getElementById("mSource")?.value.trim() || "",
+            title:     document.getElementById("mTitle")?.value.trim() || "",
+            ek:        parseFloat(document.getElementById("mEk")?.value) || null,
+            qty:       parseInt(document.getElementById("mQty")?.value) || 1,
+            market:    document.getElementById("mMarket")?.value || "ebay",
+            status:    document.getElementById("mStatus")?.value || "IN_STOCK",
+            condition: document.getElementById("mCondition")?.value || "new",
+            cat_id:    document.getElementById("invCatSel")?.value || null,
+            label:     document.getElementById("mLabel")?.value.trim() || "",
+            source:    document.getElementById("mSource")?.value.trim() || "",
           });
           Modal.close(true);
           await loadItems(container);
@@ -757,6 +766,12 @@ const InventoryView = (() => {
             </select>
           </div>
         </div>
+        <div class="input-group">
+          <label class="input-label">${I18N.t('inv.modal.condition')}</label>
+          <select id="eCondition" class="select">
+            ${FC.CONDITIONS.map(c => `<option value="${c}" ${(item.condition||"new")===c?"selected":""}>${FC.CONDITION_LABELS[c]}</option>`).join("")}
+          </select>
+        </div>
         ${_buildCatRowHtml(item.market || "ebay", item.cat_id)}
         <div class="input-group">
           <label class="input-label">${I18N.t('inv.add.label')}</label>
@@ -789,16 +804,17 @@ const InventoryView = (() => {
           const newStatus = document.getElementById("eStatus")?.value || item.status;
           await Storage.upsertItem({
             ...item,
-            title:  document.getElementById("eTitle")?.value.trim() || item.title,
-            ean:    document.getElementById("eEan")?.value.trim()   || item.ean,
-            ek:     parseFloat(document.getElementById("eEk")?.value) || item.ek,
-            qty:    parseInt(document.getElementById("eQty")?.value)  || item.qty,
-            market: document.getElementById("eMarket")?.value || item.market,
-            status: newStatus,
-            cat_id: document.getElementById("invCatSel")?.value || item.cat_id || null,
-            label:  document.getElementById("eLabel")?.value.trim()  || "",
-            source: document.getElementById("eSource")?.value.trim() || "",
-            notes:  document.getElementById("eNotes")?.value.trim()  || "",
+            title:     document.getElementById("eTitle")?.value.trim() || item.title,
+            ean:       document.getElementById("eEan")?.value.trim()   || item.ean,
+            ek:        parseFloat(document.getElementById("eEk")?.value) || item.ek,
+            qty:       parseInt(document.getElementById("eQty")?.value)  || item.qty,
+            market:    document.getElementById("eMarket")?.value || item.market,
+            status:    newStatus,
+            condition: document.getElementById("eCondition")?.value || item.condition || "new",
+            cat_id:    document.getElementById("invCatSel")?.value || item.cat_id || null,
+            label:     document.getElementById("eLabel")?.value.trim()  || "",
+            source:    document.getElementById("eSource")?.value.trim() || "",
+            notes:     document.getElementById("eNotes")?.value.trim()  || "",
             // Auto-stamp sold_at when status changes to SOLD and it wasn't set before
             sold_at: newStatus === "SOLD" && !item.sold_at ? new Date().toISOString() : item.sold_at,
           });
@@ -1115,8 +1131,8 @@ const InventoryView = (() => {
     const rows = getFiltered();
     if (rows.length === 0) { Toast.warning(I18N.t('inv.export.empty'), I18N.t('inv.export.empty_sub')); return; }
 
-    const cols   = ["ean","title","ek","qty","status","market","sell_price","ship_out","cat_id","label","source","notes","created_at","sold_at"];
-    const header = ["EAN","Titel","EK","Menge","Status","Markt","VK","Versand raus","Kategorie","Label","Quelle","Notiz","Erstellt","Verkauft am"];
+    const cols   = ["ean","title","ek","qty","status","condition","market","sell_price","ship_out","cat_id","label","source","notes","created_at","sold_at"];
+    const header = ["EAN","Titel","EK","Menge","Status","Zustand","Markt","VK","Versand raus","Kategorie","Label","Quelle","Notiz","Erstellt","Verkauft am"];
 
     const escCsv = v => {
       if (v == null) return "";

@@ -261,11 +261,15 @@ const CompetitionView = (() => {
     const right = _container?.querySelector("#compRight");
     if (right) right.innerHTML = renderRightLoading(`@${username}…`);
     try {
-      const { ok, data } = await API.sellerListings(username, 100, q);
+      const [{ ok, data }, seenIds] = await Promise.all([
+        API.sellerListings(username, 100, q),
+        Storage.getSeenListings(username),
+      ]);
       if (!ok || !data?.ok) throw new Error(data?.error || "API-Fehler");
       const items         = data.items || [];
       const feedbackScore = items[0]?.seller_feedback ?? null;
       const feedbackPct   = items[0]?.seller_pct      ?? null;
+      const seenSet       = new Set(seenIds || []);
       if (!q) {
         await Storage.updateSellerCount(username, data.total, feedbackScore, feedbackPct);
         const s = _sellers.find(x => x.username === username);
@@ -277,18 +281,24 @@ const CompetitionView = (() => {
         }
         rerenderSellerLeft();
       }
-      if (right) right.innerHTML = renderSellerListings(username, data.total, items, q, feedbackScore, feedbackPct);
+      if (right) right.innerHTML = renderSellerListings(username, data.total, items, q, feedbackScore, feedbackPct, seenSet);
       bindRightRefresh();
+      // Mark all displayed listings as seen
+      const allIds = items.map(it => it.item_id).filter(Boolean);
+      if (allIds.length) Storage.markSeenListings(username, allIds);
     } catch (err) {
       if (right) right.innerHTML = renderRightError(err.message);
     }
   }
 
-  function renderSellerListings(username, total, items, activeQ = "", feedbackScore = null, feedbackPct = null) {
-    const rows = items.map(it => `
-      <tr>
+  function renderSellerListings(username, total, items, activeQ = "", feedbackScore = null, feedbackPct = null, seenSet = null) {
+    const rows = items.map(it => {
+      const isNew = seenSet && it.item_id && !seenSet.has(it.item_id);
+      return `
+      <tr class="${isNew ? "comp-listing-new" : ""}">
         <td>
           <div class="row gap-8">
+            ${isNew ? `<span class="comp-new-badge">${I18N.t('comp.badge.new')}</span>` : ""}
             <span class="comp-listing-title" title="${esc(it.title)}">${esc(it.title.length > 40 ? it.title.slice(0, 40) + '…' : it.title)}</span>
           </div>
         </td>
@@ -296,8 +306,8 @@ const CompetitionView = (() => {
         <td class="text-muted text-sm text-right" style="white-space:nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : "—"}</td>
         <td><span class="badge badge-muted" style="font-size:10px;white-space:nowrap">${esc(it.condition || "—")}</span></td>
         <td style="text-align:right">${it.item_url ? `<a href="${esc(it.item_url)}" class="btn btn-ghost btn-sm" target="_blank" style="padding:2px 8px;font-size:10px">eBay →</a>` : ""}</td>
-      </tr>
-    `).join("");
+      </tr>`;
+    }).join("");
 
     const totalLabel = activeQ
       ? `${total} Treffer für „${esc(activeQ)}"`

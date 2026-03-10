@@ -27,6 +27,10 @@ const VALID_STATUSES = new Set([
   "IN_STOCK", "LISTED", "LISTING_PENDING", "INBOUND", "SOLD", "RETURN", "ARCHIVED",
 ]);
 
+const VALID_CONDITIONS = new Set([
+  "new", "like_new", "very_good", "good", "acceptable", "defective",
+]);
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -83,6 +87,9 @@ function normalizeItem(input) {
 
   // Category
   it.cat_id = it.cat_id || "sonstiges";
+
+  // Condition — default to "new" for unknown/missing values
+  it.condition = VALID_CONDITIONS.has(it.condition) ? it.condition : "new";
 
   return /** @type {import('./assets/lib/types.js').FC_InventoryItem} */ (it);
 }
@@ -162,6 +169,7 @@ module.exports = {
   SCHEMA_VERSION,
   VALID_MARKETS,
   VALID_STATUSES,
+  VALID_CONDITIONS,
   uid,
   nowIso,
   normalizeItem,

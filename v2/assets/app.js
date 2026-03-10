@@ -8,6 +8,7 @@
  * @type {{
  *   token:            string|null,
  *   backendBase:      string|null,
+ *   gateBase:         string|null,
  *   settings:         FC_Settings,
  *   currentView:      string|null,
  *   viewInstances:    Record<string, {mount: Function, unmount?: Function}>,
@@ -20,6 +21,7 @@
 const App = {
   token: null,
   backendBase: null,
+  gateBase: null,
   settings: {},
   currentView: null,
   viewInstances: {},
@@ -236,7 +238,11 @@ const API = {
    * @returns {Promise<FC_ApiResponse>}
    */
   async call(path, { method = "GET", body = null } = {}) {
-    const base = App.backendBase || "http://127.0.0.1:9000";
+    // Auth endpoints → gate server; everything else → backend API
+    const isAuth = path.startsWith("/auth/");
+    const base = isAuth
+      ? (App.gateBase || App.backendBase || "http://127.0.0.1:9000")
+      : (App.backendBase || "http://127.0.0.1:9000");
     /** @type {Record<string, string>} */
     const headers = { "Content-Type": "application/json" };
     if (App.token) headers["Authorization"] = `Bearer ${App.token}`;
@@ -736,11 +742,13 @@ async function boot() {
 
   // Load backend base + settings in parallel (independent IPC calls)
   try {
-    const [base, settings] = await Promise.all([
+    const [base, gate, settings] = await Promise.all([
       window.fc.backendBase().catch(() => null),
+      window.fc.gateBase().catch(() => null),
       (/** @type {any} */ (Storage)).getSettings().catch(() => ({})),
     ]);
     if (base) App.backendBase = base;
+    if (gate) App.gateBase = gate;
     App.settings = settings || {};
     // Apply saved language
     if (settings?.language && typeof I18N !== 'undefined') {

@@ -234,6 +234,12 @@ function apiBase() {
   return `http://${HOST}:${BACKEND_PORT}`;
 }
 
+/** Backend API base (eBay/Amazon data endpoints — NOT the auth gate). */
+function apiBaseBackend() {
+  if (MODE === "remote") return "https://api.joinflipcheck.app";
+  return `http://${HOST}:${BACKEND_PORT}`;
+}
+
 // ─── Scanner Server (Handy-Barcode) ──────────────────────────────────────────
 function getLocalIP() {
   for (const iface of Object.values(os.networkInterfaces()).flat()) {
@@ -663,7 +669,8 @@ app.on("window-all-closed", () => {
 });
 
 // ─── IPC: Config ──────────────────────────────────────────────────────────────
-ipcMain.handle("cfg:backendBase", () => apiBase());
+ipcMain.handle("cfg:backendBase", () => apiBaseBackend());
+ipcMain.handle("cfg:gateBase", () => apiBase());
 ipcMain.handle("cfg:mode", () => MODE);
 ipcMain.handle("cfg:version", () => APP_VERSION);
 ipcMain.handle("cfg:requireAuth", () => IS_PROD); // In dev/local mode: no auth required
@@ -1001,7 +1008,7 @@ async function runCompetitionMonitor() {
     if (!webhookUrl) { console.log("[Monitor] No webhook URL configured, skipping."); return; }
 
     const token = await getToken();
-    const base  = apiBase();
+    const base  = apiBaseBackend();
     const cache = readCompCache();
     const now   = new Date().toISOString();
 
@@ -1097,6 +1104,35 @@ ipcMain.handle("competition:monitorStatus", () => {
 ipcMain.handle("competition:setMonitorInterval", (_e, intervalMin) => {
   saveSettings({ ...loadSettings(), monitor_interval_min: Math.max(5, intervalMin || 15) });
   startCompetitionMonitor();
+  return { ok: true };
+});
+
+// ─── IPC: Seen Listings (read/unread per seller) ─────────────────────────────
+const SEEN_LISTINGS_FILE = path.join(app.getPath("userData"), "seen_listings.json");
+
+function readSeenListings() {
+  try {
+    if (!fs.existsSync(SEEN_LISTINGS_FILE)) return {};
+    return JSON.parse(fs.readFileSync(SEEN_LISTINGS_FILE, "utf8") || "{}") || {};
+  } catch { return {}; }
+}
+
+function writeSeenListings(data) {
+  try { fs.writeFileSync(SEEN_LISTINGS_FILE, JSON.stringify(data, null, 2), "utf8"); } catch {}
+}
+
+ipcMain.handle("competition:getSeenListings", (_e, username) => {
+  const data = readSeenListings();
+  return data[username] || [];
+});
+
+ipcMain.handle("competition:markSeenListings", (_e, username, itemIds) => {
+  const data = readSeenListings();
+  const existing = new Set(data[username] || []);
+  for (const id of itemIds) existing.add(id);
+  // Cap at 500 per seller (keep newest)
+  data[username] = [...existing].slice(-500);
+  writeSeenListings(data);
   return { ok: true };
 });
 

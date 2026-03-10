@@ -83,6 +83,21 @@ const FC = (() => {
     SKIP: Object.freeze({ bg: "rgba(239,68,68,.12)",   border: "rgba(239,68,68,.28)",   text: "#EF4444" }),
   });
 
+  // ── Conditions ──────────────────────────────────────────────────────────
+  /** Canonical item condition keys — stored in `item.condition`. */
+  const CONDITIONS = Object.freeze([
+    "new", "like_new", "very_good", "good", "acceptable", "defective",
+  ]);
+
+  const CONDITION_LABELS = Object.freeze({
+    new:        "Neu",
+    like_new:   "Wie Neu",
+    very_good:  "Sehr Gut",
+    good:       "Gut",
+    acceptable: "Akzeptabel",
+    defective:  "Defekt",
+  });
+
   // ── Virtual scroller tuning ──────────────────────────────────────────────
   /** Estimated row height in pixels — used by all virtual-scrolling tables. */
   const VS_ROW_H = 44;
@@ -98,6 +113,8 @@ const FC = (() => {
     MARKET_COLORS,
     MARKET_CHART_COLORS,
     VERDICT_COLORS,
+    CONDITIONS,
+    CONDITION_LABELS,
     VS_ROW_H,
     VS_BUF,
   });

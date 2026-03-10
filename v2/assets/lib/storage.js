@@ -432,6 +432,18 @@ const Storage = (() => {
     catch { return null; }
   }
 
+  /** @param {string} username @returns {Promise<string[]>} */
+  async function getSeenListings(username) {
+    try { return await window.fc.getSeenListings(username); }
+    catch { return []; }
+  }
+
+  /** @param {string} username @param {string[]} ids @returns {Promise<{ok:boolean}|null>} */
+  async function markSeenListings(username, ids) {
+    try { return await window.fc.markSeenListings(username, ids); }
+    catch { return null; }
+  }
+
   return {
     listInventory, upsertItem, deleteItem, bulkUpdate,
     savePrice, savePriceSeries, getHistory, listHistory, deleteHistory, deleteHistoryEntry,
@@ -441,6 +453,7 @@ const Storage = (() => {
     _invalidateAnalytics,
     listSellers, addSeller, removeSeller, updateSellerCount,
     monitorStatus, setMonitorInterval,
+    getSeenListings, markSeenListings,
     listAlerts, addAlert, removeAlert, updateAlert, resetAlert,
   };
 })();

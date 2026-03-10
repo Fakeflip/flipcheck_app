@@ -45,6 +45,12 @@ const SettingsView = (() => {
         flipcheck_mode: container.querySelector("#sModeSeg .seg-btn.active")?.dataset.val || "mid",
         ek_mode:        container.querySelector("#sEkModeSeg .seg-btn.active")?.dataset.val || "gross",
       },
+      flipcheck_fields: {
+        ship_in:   !!container.querySelector("#sFcShipIn")?.checked,
+        ship_out:  !!container.querySelector("#sFcShipOut")?.checked,
+        packaging: !!container.querySelector("#sFcPackaging")?.checked,
+        ad_rate:   !!container.querySelector("#sFcAdRate")?.checked,
+      },
     };
   }
 
@@ -55,6 +61,11 @@ const SettingsView = (() => {
     const defaultMarket = s?.defaults?.market || "ebay";
     const defaultMode   = s?.defaults?.flipcheck_mode || "mid";
     const ekMode        = s?.defaults?.ek_mode || "gross";
+    const ff            = s?.flipcheck_fields || {};
+    const fcShipIn      = ff.ship_in   !== false;
+    const fcShipOut     = ff.ship_out  !== false;
+    const fcPackaging   = ff.packaging === true;
+    const fcAdRate      = ff.ad_rate   === true;
 
     return `
       <div class="page-header">
@@ -145,6 +156,37 @@ const SettingsView = (() => {
                 <button class="seg-btn ${defaultMode === "mid"  ? "active" : ""}" data-val="mid">MID</button>
                 <button class="seg-btn ${defaultMode === "high" ? "active" : ""}" data-val="high">HIGH</button>
               </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Flipcheck Felder ─────────────────────────────────────────── -->
+        <div class="st-section">
+          ${sectionHeader(I18N.t('st.section.fc_fields'), icoForm(), I18N.t('st.section.fc_fields.desc'))}
+          <div class="panel st-panel">
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>${I18N.t('st.fc_field.ship_in')}</h4>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sFcShipIn" ${fcShipIn ? "checked" : ""} /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>${I18N.t('st.fc_field.ship_out')}</h4>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sFcShipOut" ${fcShipOut ? "checked" : ""} /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>${I18N.t('st.fc_field.packaging')}</h4>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sFcPackaging" ${fcPackaging ? "checked" : ""} /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row" style="border:none">
+              <div class="settings-row-left">
+                <h4>${I18N.t('st.fc_field.ad_rate')}</h4>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sFcAdRate" ${fcAdRate ? "checked" : ""} /><span class="toggle-slider"></span></label>
             </div>
           </div>
         </div>
@@ -308,6 +350,12 @@ const SettingsView = (() => {
       <circle cx="8" cy="11.5" r=".6" fill="currentColor"/>
     </svg>`;
   }
+  function icoForm() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <rect x="2" y="2" width="12" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
+      <path d="M5 6h6M5 8.5h4M5 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+    </svg>`;
+  }
 
   // ─── Events ────────────────────────────────────────────────────────────────
   function attachEvents(container, settings) {
@@ -339,6 +387,11 @@ const SettingsView = (() => {
       container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
     });
     container.querySelector("#sWeeklyTarget")?.addEventListener("input", () => scheduleSave(container));
+
+    // Flipcheck field toggles → auto-save
+    ["#sFcShipIn", "#sFcShipOut", "#sFcPackaging", "#sFcAdRate"].forEach(sel => {
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+    });
 
     // Price history vacuum
     container.querySelector("#btnVacuumHistory")?.addEventListener("click", async () => {

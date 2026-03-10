@@ -28,14 +28,16 @@ const MARKER   = "/*__xattr_patched__*/";
 const OLD_LINE =
   "await (0, util_1.execFileAsync)('codesign', perFileArgs.concat('--entitlements', perFileOptions.entitlements, filePath));";
 
-// Replacement: strip xattrs immediately before codesign so macOS detritus is gone
+// Replacement: strip xattrs immediately before codesign so macOS detritus is gone.
+// Use execFileSync (not execSync) to avoid shell interpretation of spaces/parens in filePath.
 const NEW_LINE =
-  `${MARKER} try { require('child_process').execSync('/usr/bin/xattr -cr "' + filePath.replace(/"/g, '\\\\"') + '"', {stdio:'pipe'}); } catch(_){} ` +
+  `${MARKER} try { require('child_process').execFileSync('/usr/bin/xattr', ['-cr', filePath], {stdio:'pipe'}); } catch(_){} ` +
   OLD_LINE;
 
 const src = fs.readFileSync(SIGN_JS, "utf8");
 
-if (!src.includes(MARKER)) {
+const needsPatch = !src.includes(MARKER) || src.includes("execSync("); // re-patch if old buggy execSync variant
+if (needsPatch) {
   const patched = src.replace(OLD_LINE, NEW_LINE);
 
   if (!patched.includes(MARKER)) {
@@ -57,7 +59,7 @@ if (!src.includes(MARKER)) {
 
   console.log("  • xattr patch written to @electron/osx-sign/dist/cjs/sign.js");
 } else {
-  console.log("  • xattr patch already present in sign.js (skipping rewrite)");
+  console.log("  • xattr patch (execFileSync) already present in sign.js");
 }
 
 // ── Sign ───────────────────────────────────────────────────────────────────────

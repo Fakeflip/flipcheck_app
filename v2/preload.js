@@ -51,8 +51,10 @@ const _scannerListeners = new Map();
 contextBridge.exposeInMainWorld("fc", {
   // ── Config ────────────────────────────────────────────────────────────────
 
-  /** @returns {Promise<string>} */
+  /** @returns {Promise<string>} Backend API base (api.joinflipcheck.app in production) */
   backendBase: () => ipcRenderer.invoke("cfg:backendBase"),
+  /** @returns {Promise<string>} Auth gate base (gate.joinflipcheck.app in production) */
+  gateBase:    () => ipcRenderer.invoke("cfg:gateBase"),
   /** @returns {Promise<string>} */
   mode:        () => ipcRenderer.invoke("cfg:mode"),
   /** @returns {Promise<string>} */
@@ -180,6 +182,20 @@ contextBridge.exposeInMainWorld("fc", {
    * @returns {Promise<{ok: boolean}>}
    */
   competitionSetMonitorInterval: (min) => ipcRenderer.invoke("competition:setMonitorInterval", min),
+
+  /**
+   * Get list of already-seen listing IDs for a seller.
+   * @param {string} username
+   * @returns {Promise<string[]>}
+   */
+  getSeenListings: (username) => ipcRenderer.invoke("competition:getSeenListings", username),
+  /**
+   * Mark listing IDs as seen for a seller.
+   * @param {string} username
+   * @param {string[]} ids
+   * @returns {Promise<{ok: boolean}>}
+   */
+  markSeenListings: (username, ids) => ipcRenderer.invoke("competition:markSeenListings", username, ids),
 
   // ── Price Alerts ──────────────────────────────────────────────────────────
 
