@@ -15,6 +15,41 @@ const _cache    = new Map(); // key: "EAN:EK:mode" → { ts, data }
 const _inflight = new Map(); // deduplication
 let   _token    = null;
 
+// ── Session Cache (chrome.storage.session) ────────────────────────────────────
+// Faster than storage.local, survives SW restarts within the browser session.
+// Used to re-warm L1 after SW is killed by Chrome (~30s idle).
+const SESSION_KEY    = 'fcSessionCache';
+const SESSION_MAX    = 150;
+const SESSION_TTL_MS = 5 * 60 * 1000; // same as L1
+
+async function _sessionSet(key, entry) {
+  try {
+    const res = await _cr.storage.session.get(SESSION_KEY);
+    const sc  = res[SESSION_KEY] || {};
+    sc[key]   = entry;
+    const ks  = Object.keys(sc);
+    if (ks.length > SESSION_MAX) {
+      // Evict oldest (simple FIFO)
+      ks.sort((a, b) => sc[a].ts - sc[b].ts)
+        .slice(0, ks.length - SESSION_MAX)
+        .forEach(k => delete sc[k]);
+    }
+    await _cr.storage.session.set({ [SESSION_KEY]: sc });
+  } catch {}
+}
+
+// Warm L1 from session cache on SW wake — called as a top-level promise
+const _warmupDone = (async () => {
+  try {
+    const res = await _cr.storage.session.get(SESSION_KEY);
+    const sc  = res[SESSION_KEY] || {};
+    const now = Date.now();
+    for (const [k, v] of Object.entries(sc)) {
+      if (now - v.ts < SESSION_TTL_MS) _cache.set(k, v);
+    }
+  } catch {}
+})();
+
 // ── API Concurrency Limiter (max 4 simultaneous requests) ────────────────────
 // Prevents batch-checks from hammering the backend and triggering rate-limits.
 const API_CONCURRENCY = 4;
@@ -192,9 +227,11 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
     }
     const data = await res.json();
 
-    // Write L1 + L2
-    _cache.set(key, { ts: Date.now(), data });
+    // Write L1 + session (L2) + storage.local (L3)
+    const entry = { ts: Date.now(), data };
+    _cache.set(key, entry);
     if (_cache.size > 200) _cache.delete(_cache.keys().next().value);
+    _sessionSet(key, entry); // fire-and-forget
     await l2Set(key, data);
     _inflight.delete(key);
     return data;
@@ -249,8 +286,10 @@ async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba',
     }
     const data = await res.json();
 
-    _cache.set(key, { ts: Date.now(), data });
+    const entry = { ts: Date.now(), data };
+    _cache.set(key, entry);
     if (_cache.size > 200) _cache.delete(_cache.keys().next().value);
+    _sessionSet(key, entry); // fire-and-forget
     await l2Set(key, data);
     _inflight.delete(key);
     return data;
@@ -320,6 +359,7 @@ _cr.contextMenus.onClicked.addListener((info, tab) => {
 // ── Message Handler ───────────────────────────────────────────────────────────
 _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
   (async () => {
+    await _warmupDone; // ensure L1 is warmed from session cache before first lookup
     try {
       switch (msg.type) {
 
