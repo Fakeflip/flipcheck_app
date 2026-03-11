@@ -29,20 +29,21 @@ const CATEGORIES = [
   { id: 'scanner_hw',        label: 'Scanner-Hardware',      tiers: [[990, 0.065], [null, 0.03]] },
   { id: 'zubehoer',          label: 'Zubehör (allgemein)',   tiers: [[990, 0.11],  [null, 0.03]] },
   { id: 'kabel',             label: 'Kabel & Stecker',       tiers: [[990, 0.11],  [null, 0.03]] },
-  { id: 'mode',              label: 'Mode & Bekleidung',     tiers: [[null, 0.15]] },
-  { id: 'sport',             label: 'Sport & Freizeit',      tiers: [[null, 0.115]] },
-  { id: 'spielzeug',         label: 'Spielzeug',             tiers: [[null, 0.115]] },
-  { id: 'buecher',           label: 'Bücher',                tiers: [[null, 0.15]] },
-  { id: 'sonstiges',         label: 'Sonstiges',             tiers: [[null, 0.13]] },
-  { id: 'other',             label: 'Sonstige Kategorie',    tiers: [[null, 0.13]] },
+  // Sonstiges: 12% bis €990, danach 3% (seit Feb 2026)
+  { id: 'mode',              label: 'Mode & Bekleidung',     tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'sport',             label: 'Sport & Freizeit',      tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'spielzeug',         label: 'Spielzeug',             tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'buecher',           label: 'Bücher',                tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'sonstiges',         label: 'Sonstiges',             tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'other',             label: 'Sonstige Kategorie',    tiers: [[990, 0.12], [null, 0.03]] },
 ];
 
 // ── Amazon Fee Tables ─────────────────────────────────────────────────────────
-// Referral fees by category (Amazon DE, 2025 rates)
-// Electronics: 8% since 2024 update; Smartphones remain ~7%; Min. fee €0.30
+// Referral fees by category (Amazon DE, 2025/2026 rates)
+// Personal Computers/Tablets: 6%; Consumer Electronics/Smartphones: 8%; Min. fee €0.30
 const AMAZON_REFERRAL_PCTS = {
-  computer_tablets:   0.08,  // Electronics DE 8% (2024+)
-  handys:             0.07,  // Smartphones Amazon-spezifisch ~7%
+  computer_tablets:   0.06,  // Personal Computers & Tablets: 6% (Amazon DE 2025)
+  handys:             0.08,  // Smartphones: 8% (Consumer Electronics Amazon DE)
   konsolen:           0.08,
   foto_camcorder:     0.08,
   tv_video_audio:     0.08,

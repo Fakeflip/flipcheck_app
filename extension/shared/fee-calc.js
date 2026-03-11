@@ -23,14 +23,19 @@ const FC_CATEGORIES = [
   { id: 'notebook_zubehoer', label: 'Notebook- & Desktop-Zubehör',    group: 'Zubehör (11%+3%)',    tiers: [[990, 0.11],  [null, 0.03]] },
   { id: 'tablet_zubehoer',   label: 'Tablet & eBook Zubehör',         group: 'Zubehör (11%+3%)',    tiers: [[990, 0.11],  [null, 0.03]] },
   { id: 'pc_zubehoer',       label: 'PC & Videospiele Zubehör',       group: 'Zubehör (11%+3%)',    tiers: [[990, 0.11],  [null, 0.03]] },
-  // Sonstige Flat-Rate
-  { id: 'mode',              label: 'Mode / Bekleidung',               group: 'Sonstiges (Flat)',    tiers: [[null, 0.15]]  },
-  { id: 'sport_freizeit',    label: 'Sport & Freizeit',                group: 'Sonstiges (Flat)',    tiers: [[null, 0.115]] },
-  { id: 'spielzeug',         label: 'Spielzeug / LEGO',                group: 'Sonstiges (Flat)',    tiers: [[null, 0.115]] },
-  { id: 'haushalt_garten',   label: 'Haushalt & Garten',               group: 'Sonstiges (Flat)',    tiers: [[null, 0.115]] },
-  { id: 'buecher',           label: 'Bücher & Medien',                 group: 'Sonstiges (Flat)',    tiers: [[null, 0.15]]  },
-  { id: 'sonstiges',         label: 'Sonstiges',                       group: 'Sonstiges (Flat)',    tiers: [[null, 0.13]]  },
+  // Sonstige: 12% bis €990, danach 3% (eBay DE seit Feb 2026)
+  { id: 'mode',              label: 'Mode / Bekleidung',               group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'sport_freizeit',    label: 'Sport & Freizeit',                group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'spielzeug',         label: 'Spielzeug / LEGO',                group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'haushalt_garten',   label: 'Haushalt & Garten',               group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'buecher',           label: 'Bücher & Medien',                 group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
+  { id: 'sonstiges',         label: 'Sonstiges',                       group: 'Sonstiges (12%+3%)',  tiers: [[990, 0.12], [null, 0.03]] },
 ];
+
+// eBay DE fixed per-order fee (since Feb 12, 2026): €0.35 for orders ≤€10, €0.45 for orders >€10
+function _fcFixedFee(priceGross) {
+  return priceGross > 10 ? 0.45 : 0.35;
+}
 
 function fcCalcEbayFee(priceGross, catId) {
   const cat = FC_CATEGORIES.find(c => c.id === catId) || FC_CATEGORIES[FC_CATEGORIES.length - 1];
@@ -43,7 +48,7 @@ function fcCalcEbayFee(priceGross, catId) {
     prev = threshold;
     if (remaining <= 0) break;
   }
-  return fee;
+  return fee + _fcFixedFee(priceGross);
 }
 
 /**
