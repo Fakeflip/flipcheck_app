@@ -12,7 +12,9 @@ from typing import Optional, Dict, Any, List, Tuple
 import httpx
 
 KEEPA_API_BASE = "https://api.keepa.com"
-KEEPA_API_KEY  = os.environ.get("KEEPA_API_KEY", "")
+# Read dynamically at call time so load_dotenv() called after module import still works.
+def _keepa_key() -> str:
+    return os.environ.get("KEEPA_API_KEY", "")
 
 # Keepa price divisor (prices stored as int * 100, -1 = unavailable)
 KEEPA_DIV = 100.0
@@ -270,7 +272,7 @@ async def keepa_search_de(term: str, limit: int = 20) -> List[str]:
     try:
         async with httpx.AsyncClient(timeout=15) as client:
             r = await client.get(f"{KEEPA_API_BASE}/search", params={
-                "key":    KEEPA_API_KEY,
+                "key":    _keepa_key(),
                 "domain": "3",
                 "type":   "product",
                 "term":   term,
@@ -289,12 +291,13 @@ async def keepa_batch_stats(asins: List[str]) -> List[Dict[str, Any]]:
     """Batch Keepa product lookup — 90-day stats only, no price history.
     More token-efficient than keepa_lookup (history=0). Max 100 ASINs per call.
     """
-    if not asins or not KEEPA_API_KEY:
+    key = _keepa_key()
+    if not asins or not key:
         return []
     try:
         async with httpx.AsyncClient(timeout=30) as client:
             r = await client.get(f"{KEEPA_API_BASE}/product", params={
-                "key":     KEEPA_API_KEY,
+                "key":     key,
                 "domain":  "3",
                 "asin":    ",".join(asins),
                 "stats":   "90",
@@ -556,7 +559,8 @@ async def keepa_lookup(asin: str) -> Optional[Dict[str, Any]]:
     Returns raw Keepa product dict or None on error.
     Caches results for 30 minutes.
     """
-    if not KEEPA_API_KEY:
+    key = _keepa_key()
+    if not key:
         return None
 
     # Check cache
@@ -567,7 +571,7 @@ async def keepa_lookup(asin: str) -> Optional[Dict[str, Any]]:
             return data
 
     params = {
-        "key":      KEEPA_API_KEY,
+        "key":      key,
         "domain":   "3",   # Amazon.de
         "asin":     asin,
         "stats":    "90",  # stats for last 90 days
@@ -595,11 +599,12 @@ async def keepa_lookup(asin: str) -> Optional[Dict[str, Any]]:
 
 async def asin_from_ean(ean: str) -> Optional[str]:
     """Look up ASIN from EAN using Keepa."""
-    if not KEEPA_API_KEY:
+    key = _keepa_key()
+    if not key:
         return None
 
     params = {
-        "key":    KEEPA_API_KEY,
+        "key":    key,
         "domain": "3",
         "type":   "product",
         "term":   ean,

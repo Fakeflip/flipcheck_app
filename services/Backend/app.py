@@ -1,6 +1,16 @@
 from __future__ import annotations
 
 import sys as _sys, os as _os
+
+# Load .env FIRST — before any submodule reads os.environ at import time
+# (amazon.py captures KEEPA_API_KEY at module level).
+_env_path = _os.path.join(_os.path.dirname(_os.path.abspath(__file__)), ".env")
+try:
+    from dotenv import load_dotenv as _load_dotenv
+    _load_dotenv(_env_path, override=False)  # override=False: real env vars always win
+except ImportError:
+    pass  # python-dotenv not installed — rely on OS-level env vars
+
 # Ensure ebay_live.py is importable regardless of the CWD uvicorn starts from.
 # Checks: (1) this file's own dir, (2) ../Backend relative to this file.
 for _p in [

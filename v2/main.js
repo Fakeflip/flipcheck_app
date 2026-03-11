@@ -448,17 +448,23 @@ function startHttpsScannerServer() {
 function getBackendDir() {
   return IS_PROD
     ? path.join(process.resourcesPath, "Backend")
-    : path.join(__dirname, "..", "services", "auth");
+    : path.join(__dirname, "..", "services", "Backend");
 }
 
 function startBackend(port) {
   const dir = getBackendDir();
+  // Dev: prefer .venv inside services/Backend; fall back to system python
   const python = IS_PROD ? "python" : (() => {
-    const venv = path.join(dir, ".venv", "Scripts", "python.exe");
-    return fs.existsSync(venv) ? venv : "python";
+    const venvWin = path.join(dir, ".venv", "Scripts", "python.exe");
+    const venvMac = path.join(dir, ".venv", "bin", "python");
+    if (fs.existsSync(venvWin)) return venvWin;
+    if (fs.existsSync(venvMac)) return venvMac;
+    return "python3";
   })();
+  // Local module is app.py (app:app); packaged build uses flipcheck_app:app
+  const module = IS_PROD ? "flipcheck_app:app" : "app:app";
 
-  backendProc = spawn(python, ["-m", "uvicorn", "flipcheck_app:app", "--host", HOST, "--port", String(port), "--log-level", "warning"], {
+  backendProc = spawn(python, ["-m", "uvicorn", module, "--host", HOST, "--port", String(port), "--log-level", "warning"], {
     cwd: dir,
     env: { ...process.env, PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
