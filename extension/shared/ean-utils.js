@@ -10,6 +10,8 @@
 function isValidEan(s) {
   const str = String(s || '').trim();
   if (!/^\d{8,14}$/.test(str)) return false;
+  // Reject obviously fake/test codes: all same digit, or all-zero prefix run
+  if (/^(\d)\1{7,}$/.test(str)) return false;
 
   // EAN-13 / UPC-A (12) / EAN-8 checksum validation (Luhn-variant)
   if (str.length === 13 || str.length === 12) {
@@ -29,6 +31,13 @@ function isValidEan(s) {
   }
   // UPC-E (6), GTIN-14, ITF-14 — accept without full checksum
   return true;
+}
+
+/** Normalize UPC-A (12 digits) to EAN-13 by prepending '0'. Returns EAN string unchanged for all other lengths. */
+function normalizeToEan13(s) {
+  const str = String(s || '').trim();
+  if (str.length === 12 && isValidEan(str)) return '0' + str;
+  return str;
 }
 
 // ── Shared Helpers ────────────────────────────────────────────────────────────
@@ -54,6 +63,15 @@ function _eanFromJsonLd(d) {
       for (const offer of offerList) {
         for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean']) {
           const v = offer?.[k];
+          if (v && isValidEan(String(v))) return String(v).trim();
+        }
+      }
+    }
+    // Shopify ProductGroup: variants carry the EAN, not the parent product
+    if (Array.isArray(item?.hasVariant)) {
+      for (const variant of item.hasVariant) {
+        for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean']) {
+          const v = variant?.[k];
           if (v && isValidEan(String(v))) return String(v).trim();
         }
       }
@@ -125,6 +143,9 @@ function _metaEan() {
     'meta[name="gtin13"]', 'meta[property="product:gtin"]',
     'meta[name="isbn"]', 'meta[property="og:isbn"]',
     'meta[itemprop="gtin13"]',
+    'meta[property="product:isbn"]',             // book retailers
+    'meta[property="product:retailer_item_id"]', // Facebook Open Graph Catalog (fashion shops: Zalando, AboutYou)
+    'meta[name="product:upc"]',                  // some WooCommerce setups
   ]) {
     const el = document.querySelector(sel);
     const v  = el?.content?.trim();
@@ -161,12 +182,18 @@ function _tableEan(tableSelector, labelPattern = /EAN|GTIN|Barcode|ISBN/i) {
 function _scanInlineScripts() {
   // Matches both JSON-style ("key":"value") and assignment-style (key:"value" or key:'value')
   const RE = /["']?(?:gtin1[23348]?|gtin|ean|EAN|ean_code|eanCode|barcode|barCode|product_gtin|productGtin)["']?\s*[=:]\s*["'](\d{8,14})["']/g;
+  // Context keywords that indicate a numeric string is NOT an EAN
+  const REJECT_CTX = /order_id|order-id|session|cookie|timestamp|unix|epoch|transaction|payment|invoice|customer_id|user_id/i;
   for (const script of document.querySelectorAll('script:not([src])')) {
     const text = script.textContent;
     if (!text || text.length > 600000) continue; // skip massive bundles
     let m;
     while ((m = RE.exec(text)) !== null) {
-      if (isValidEan(m[1])) return m[1];
+      if (!isValidEan(m[1])) continue;
+      // Reject if the 80 chars before the match contain order/session-like keywords
+      const preCtx = text.substring(Math.max(0, m.index - 80), m.index);
+      if (REJECT_CTX.test(preCtx)) continue;
+      return m[1];
     }
     RE.lastIndex = 0; // reset for next script tag
   }
@@ -194,14 +221,17 @@ function extractEanEbayProduct() {
 
   // 2) Item-Specifics table — current eBay.de layout (2024-2026)
   //    Labels live inside .ux-labels-values with a BOLD span
+  //    Value may be split across multiple .ux-textspans — join them all
   for (const section of document.querySelectorAll('.ux-labels-values')) {
-    const labelEls = section.querySelectorAll('.ux-labels-values__labels span, .ux-textspans--BOLD');
-    for (const lbl of labelEls) {
-      if (/^(EAN|GTIN|UPC|ISBN|Barcode)$/i.test(lbl.textContent.trim())) {
-        const valEl = section.querySelector('.ux-labels-values__values span, .ux-labels-values__values-content');
-        const val   = (valEl?.textContent || '').replace(/\s/g, '');
-        if (isValidEan(val)) return val;
-      }
+    const labelEl = section.querySelector('.ux-labels-values__labels .ux-textspans--BOLD');
+    if (!labelEl) continue;
+    if (/^(EAN|GTIN|UPC|ISBN|Barcode)$/i.test(labelEl.textContent.trim())) {
+      const valContainer = section.querySelector('.ux-labels-values__values');
+      const val = Array.from(valContainer?.querySelectorAll('.ux-textspans') || [])
+                       .map(s => s.textContent.trim())
+                       .join('')
+                       .replace(/\s/g, '');
+      if (isValidEan(val)) return val;
     }
   }
 
@@ -267,8 +297,15 @@ function extractEanAmazon() {
   }
 
   // 2) Detail Bullets (Produktinformationen section)
+  //    Amazon renders label + value as two sibling spans inside same <li>
   for (const li of document.querySelectorAll(
       '#detailBullets_feature_div li, #detail-bullets li, .detail-bullet-list li')) {
+    const spans = li.querySelectorAll('span');
+    if (spans.length >= 2 && /EAN|GTIN|Barcode/i.test(spans[0].textContent)) {
+      const v = spans[1].textContent.trim().replace(/\s/g, '');
+      if (isValidEan(v)) return v;
+    }
+    // Fallback: text-match for older layouts
     const m = li.textContent.match(/(?:EAN|GTIN|Barcode)[:\s]+([\d\s]{8,16})/i);
     if (m) {
       const v = m[1].replace(/\s/g, '');
@@ -379,6 +416,11 @@ const extractEanMediaMarkt = extractEanSaturn;
 
 function extractEanConrad() {
   const ld = _scanJsonLd(); if (ld) return ld;
+  // Conrad uses <script id="product-data" type="application/json"> with full product record
+  const productData = document.querySelector('script#product-data[type="application/json"]');
+  if (productData) {
+    try { const r = _deepSearchEan(JSON.parse(productData.textContent)); if (r) return r; } catch {}
+  }
   return (
     _dataAttrEan() ||
     _tableEan('.product-attribute-table tr, .pdp-attributes tr') ||
@@ -485,7 +527,7 @@ function extractEanDM() {
     const m = el.textContent.match(/EAN[:\s]+([\d]{8,14})/i);
     if (m && isValidEan(m[1])) return m[1];
   }
-  return _metaEan() || _dataAttrEan();
+  return _metaEan() || _dataAttrEan() || _eanFromImageUrls();
 }
 
 // ── Rossmann.de ──────────────────────────────────────────────────────────────
@@ -500,7 +542,7 @@ function extractEanRossmann() {
     const m = el.textContent.match(/EAN[:\s]+([\d]{8,14})/i);
     if (m && isValidEan(m[1])) return m[1];
   }
-  return _metaEan() || _itemPropEan();
+  return _metaEan() || _itemPropEan() || _eanFromImageUrls();
 }
 
 // ── Zalando.de ───────────────────────────────────────────────────────────────
@@ -793,7 +835,18 @@ function extractEanGeneric() {
   if (inl) return inl;
 
   // 6) TreeWalker: text nodes matching "EAN: 1234567890123" (up to 5000 nodes)
-  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  //    Skip nodes inside footer/nav/aside/header — those produce false positives
+  const SKIP_TAGS = new Set(['footer', 'nav', 'aside', 'header', 'script', 'style']);
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      let el = node.parentElement;
+      while (el && el !== document.body) {
+        if (SKIP_TAGS.has(el.tagName.toLowerCase())) return NodeFilter.FILTER_REJECT;
+        el = el.parentElement;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
   let node;
   let checked = 0;
   while ((node = walker.nextNode()) && checked < 5000) {
@@ -804,6 +857,30 @@ function extractEanGeneric() {
     if (m && isValidEan(m[1])) return m[1];
   }
 
+  // 7) Image URL scan — last resort for shops that embed EAN in CDN image paths
+  return _eanFromImageUrls();
+}
+
+/** Extract EAN from CDN image URLs in product gallery containers.
+ *  Effective for DM.de, Rossmann, Conrad where EAN is embedded in image path. */
+function _eanFromImageUrls() {
+  const scopes = [
+    '.product-image', '#product-images', '[class*="gallery"]',
+    '[class*="ProductImage"]', '[class*="product-gallery"]',
+    '[data-testid*="image"]', '[data-role*="image"]',
+  ];
+  for (const scope of scopes) {
+    const container = document.querySelector(scope);
+    if (!container) continue;
+    for (const img of container.querySelectorAll('img[src]')) {
+      // EAN-13 embedded in path segments
+      const m13 = img.src.match(/[/\-_](\d{13})[/\-_.]/);
+      if (m13 && isValidEan(m13[1])) return m13[1];
+      // EAN-8 fallback
+      const m8 = img.src.match(/[/\-_](\d{8})[/\-_.]/);
+      if (m8 && isValidEan(m8[1])) return m8[1];
+    }
+  }
   return null;
 }
 
