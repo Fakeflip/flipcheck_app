@@ -676,8 +676,8 @@ async def amazon_check(
     buy_box_avg90 = _keepa_price(avg90[18] if len(avg90) > 18 else -1)
     new_avg30     = _keepa_price(avg30[1]  if len(avg30) > 1  else -1)
 
-    # Best sell price estimate (prefer buy box, fallback to new)
-    sell_price = buy_box_current or buy_box_avg30 or new_current or new_avg30 or 0.0
+    # Prefer 30-day average — more stable for flip decisions than current snapshot.
+    sell_price = buy_box_avg30 or buy_box_current or new_avg30 or new_current or 0.0
 
     # Sales rank → monthly sales estimate
     rank_current = current[11] if len(current) > 11 else -1

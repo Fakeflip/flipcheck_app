@@ -59,6 +59,23 @@
       } else {
         panel.setIdentifier(identifier, 'amazon');
       }
+
+      if (asin) {
+        if (ean) {
+          // Both known from page — pre-populate crossId immediately.
+          // eBay tab switch works without any ASIN_TO_EAN roundtrip.
+          if (typeof panel.setCrossId === 'function') panel.setCrossId(ean);
+        } else {
+          // No EAN on page — ask background to resolve via Keepa in background.
+          // Result is stored as crossId so eBay tab switch works later.
+          chrome.runtime.sendMessage({ type: 'ASIN_TO_EAN', asin }, res => {
+            if (res?.ok && res.ean && typeof panel.setCrossId === 'function') {
+              panel.setCrossId(res.ean);
+            }
+          });
+        }
+      }
+
       // Auto-fill EK from page price
       setTimeout(() => {
         const price = detectAmazonPrice();
@@ -133,6 +150,16 @@
       // Re-probe if identifier changed (new product page)
       if (newId && newId !== panel.currentEan) {
         panel.probe(newId, 'amazon');
+        // Pre-populate EAN crossId for the new product
+        if (newAsin) {
+          if (newEan) {
+            if (typeof panel.setCrossId === 'function') panel.setCrossId(newEan);
+          } else {
+            chrome.runtime.sendMessage({ type: 'ASIN_TO_EAN', asin: newAsin }, res => {
+              if (res?.ok && res.ean && typeof panel.setCrossId === 'function') panel.setCrossId(res.ean);
+            });
+          }
+        }
         setTimeout(() => {
           const price = detectAmazonPrice();
           if (price && price > 0) panel.autofillEk(price);

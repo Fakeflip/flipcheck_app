@@ -629,6 +629,11 @@
     setMarket(market) { this._setMarket(market, false); }
     setState(s) { this._setState(s); }
 
+    // Pre-populate the cross-market identifier so market-switch works without a
+    // roundtrip. Called by injector scripts when both identifiers are known upfront
+    // (e.g. amazon-product.js found an EAN on the page AND an ASIN in the URL).
+    setCrossId(id) { if (id) this._crossId = id; }
+
     autofillEk(price) {
       const inp = this._shadow.getElementById('fcEkInp');
       inp.value = Number(price).toFixed(2);
@@ -762,7 +767,7 @@
       }
       s.querySelectorAll('.fc-mkt-btn').forEach(b => b.classList.toggle('active', b.dataset.market === market));
       // KPI labels
-      s.getElementById('kvVkLabel').textContent    = market === 'amazon' ? 'Buy Box'    : 'Median VK';
+      s.getElementById('kvVkLabel').textContent    = market === 'amazon' ? 'Ø Buy Box 30d' : 'Median VK';
       s.getElementById('kvFeeLabel').textContent   = market === 'amazon' ? 'Ref + FBA'  : 'eBay Gebühr';
       s.getElementById('kvSalesLabel').textContent = market === 'amazon' ? 'Sales Rank' : 'Verk./30d';
       // Show PREP fee row for Amazon only
@@ -948,7 +953,10 @@
 
       // KPIs
       if (this._market === 'amazon') {
-        s.getElementById('kvVk').textContent = d.buy_box ? fmt(d.buy_box) : fmt(d.sell_price_median);
+        // Use 30-day avg buy box — more representative for flip decisions.
+        // Fallback chain: avg30 → current → sell_price_median (backend's own fallback).
+        const vk30 = d.buy_box_avg30 || d.sell_price_median;
+        s.getElementById('kvVk').textContent = fmt(vk30);
         const totalFee = (d.referral_fee ?? 0) + (d.fba_fee ?? 0);
         s.getElementById('kvFee').textContent = totalFee > 0 ? `-€${totalFee.toFixed(2)}` : '—';
         // Sales label: est. monthly sales + BSR drops hint
