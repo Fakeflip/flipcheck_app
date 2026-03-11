@@ -1249,25 +1249,34 @@
 
     _setupDrag(handle) {
       let startX, startY, origRight, origBottom;
-      handle.addEventListener('mousedown', e => {
+      handle.addEventListener('pointerdown', e => {
         if (e.target.closest('button')) return;
+        e.preventDefault();
+        handle.setPointerCapture(e.pointerId); // ensures pointermove fires even when cursor leaves handle
         startX = e.clientX; startY = e.clientY;
         origRight  = parseInt(this.style.right  || '20') || 20;
         origBottom = parseInt(this.style.bottom || '20') || 20;
         const onMove = ev => {
+          requestAnimationFrame(() => {
+            const r = Math.max(0, origRight  - (ev.clientX - startX));
+            const b = Math.max(0, origBottom - (ev.clientY - startY));
+            this.style.right  = r + 'px';
+            this.style.bottom = b + 'px';
+          });
+        };
+        const onUp = ev => {
+          handle.releasePointerCapture(ev.pointerId);
+          handle.removeEventListener('pointermove', onMove);
+          handle.removeEventListener('pointerup', onUp);
+          handle.removeEventListener('pointercancel', onUp);
+          // Persist position to storage.local (survives page reload; sessionStorage does not sync across tabs)
           const r = Math.max(0, origRight  - (ev.clientX - startX));
           const b = Math.max(0, origBottom - (ev.clientY - startY));
-          this.style.right  = r + 'px';
-          this.style.bottom = b + 'px';
-          try { sessionStorage.setItem('fc_pos', JSON.stringify({ right: r, bottom: b })); } catch (_) {}
+          try { chrome.storage.local.set({ fc_pos: { right: r, bottom: b } }); } catch (_) {}
         };
-        const onUp = () => {
-          document.removeEventListener('mousemove', onMove);
-          document.removeEventListener('mouseup', onUp);
-        };
-        document.addEventListener('mousemove', onMove);
-        document.addEventListener('mouseup', onUp);
-        e.preventDefault();
+        handle.addEventListener('pointermove', onMove);
+        handle.addEventListener('pointerup', onUp);
+        handle.addEventListener('pointercancel', onUp);
       });
     }
 
@@ -1418,9 +1427,11 @@
     el._crossId       = null;
     el._crossPending  = false;
     try {
-      const pos = JSON.parse(sessionStorage.getItem('fc_pos') || '{}');
-      if (pos.right  != null) el.style.right  = pos.right  + 'px';
-      if (pos.bottom != null) el.style.bottom = pos.bottom + 'px';
+      chrome.storage.local.get('fc_pos', res => {
+        const pos = res?.fc_pos || {};
+        if (pos.right  != null) el.style.right  = pos.right  + 'px';
+        if (pos.bottom != null) el.style.bottom = pos.bottom + 'px';
+      });
     } catch (_) {}
     el._wireEvents();
     el._setupDrag(shadow.getElementById('fcHeader'));
