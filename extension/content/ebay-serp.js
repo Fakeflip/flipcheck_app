@@ -253,7 +253,7 @@
     for (const e of entries) {
       if (e.isIntersecting) { _io.unobserve(e.target); queueCard(e.target); }
     }
-  }, { rootMargin: '300px' });
+  }, { rootMargin: '400px 0px' }); // 400px vertical preload — ~2-3 rows ahead
 
   function observeCards() {
     document.querySelectorAll(
@@ -263,10 +263,23 @@
       '.s-item:not([data-fc-observed]),.srp-item:not([data-fc-observed])',
     ).forEach(card => {
       if (card.classList.contains('s-item--watch-at-corner')) return;
+      if (card.classList.contains('s-item--placeholder')) return; // eBay template ghost card
       if (!card.querySelector('.s-card__title,.s-card__link,.s-item__title,.s-item__link')) return;
       card.dataset.fcObserved = '1';
       _io.observe(card);
     });
+  }
+
+  // scrollend fallback — catches fast kinetic scrolls that outrun the IO preload margin
+  if ('onscrollend' in window) {
+    window.addEventListener('scrollend', () => {
+      document.querySelectorAll(
+        'li[id*="item"].s-card:not([data-fc-observed]),.s-item:not([data-fc-observed])',
+      ).forEach(card => {
+        const r = card.getBoundingClientRect();
+        if (r.top < window.innerHeight + 100 && r.bottom > -100) observeCards();
+      });
+    }, { passive: true });
   }
 
   // ── MutationObserver ─────────────────────────────────────────────────────────

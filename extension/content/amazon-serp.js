@@ -264,21 +264,27 @@
     for (const e of entries) {
       if (e.isIntersecting) { _io.unobserve(e.target); queueCard(e.target); }
     }
-  }, { rootMargin: '300px' });
+  }, { rootMargin: '400px 0px' }); // 400px vertical preload — ~2-3 rows ahead
 
   function observeCards() {
     document.querySelectorAll(
-      '[data-asin]:not([data-fc-amz-observed]):not(.AdHolder)' +
-      ':not([data-component-type="sp-sponsored-result"])' +
-      ':not([data-component-type="s-impression-logger"])',
+      // data-component-type="s-search-result" = organic only (excludes sp-sponsored-result)
+      '[data-asin][data-component-type="s-search-result"]:not([data-fc-amz-observed])',
     ).forEach(card => {
-      // Skip ads, carousels, sponsored tiles without product content
+      // Failsafe: skip empty ASIN (ad placeholders) and any remaining sponsored labels
+      if (!card.dataset.asin) return;
       if (card.querySelector('.puis-sponsored-label-text, .a-sponsored')) return;
-      if (!card.querySelector('.s-image, .s-title-instructions-style, h2')) return;
-      if (card.dataset.fcAmzObserved) return;
+      if (!card.querySelector('.s-image, h2')) return;
       card.dataset.fcAmzObserved = '1';
       _io.observe(card);
     });
+  }
+
+  // scrollend fallback — catches fast kinetic scrolls that outrun the IO preload margin
+  if ('onscrollend' in window) {
+    window.addEventListener('scrollend', () => {
+      observeCards(); // re-scan for any cards that entered viewport faster than 400px margin
+    }, { passive: true });
   }
 
   // ── MutationObserver ──────────────────────────────────────────────────────
