@@ -853,7 +853,8 @@ async function runBatchCheck() {
   for (let i = 0; i < eans.length; i += CONCURRENCY) {
     const chunk = eans.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(ean => new Promise(resolve => {
-      chrome.runtime.sendMessage({ type: 'FLIPCHECK', ean, ek, mode, catId: 'sonstiges' }, res => {
+      const catId = $('catSel')?.value || 'sonstiges';
+      chrome.runtime.sendMessage({ type: 'FLIPCHECK', ean, ek, mode, catId }, res => {
         done++;
         const pct = Math.round((done / eans.length) * 100);
         progBar.style.width   = pct + '%';

@@ -8,7 +8,27 @@
 // ── Validation ────────────────────────────────────────────────────────────────
 
 function isValidEan(s) {
-  return /^\d{8,14}$/.test(String(s || '').trim());
+  const str = String(s || '').trim();
+  if (!/^\d{8,14}$/.test(str)) return false;
+
+  // EAN-13 / UPC-A (12) / EAN-8 checksum validation (Luhn-variant)
+  if (str.length === 13 || str.length === 12) {
+    let sum = 0;
+    for (let i = 0; i < str.length - 1; i++) {
+      sum += parseInt(str[i]) * (i % 2 === 0 ? 1 : 3);
+    }
+    const check = (10 - (sum % 10)) % 10;
+    return check === parseInt(str[str.length - 1]);
+  }
+  if (str.length === 8) {
+    const w = [3,1,3,1,3,1,3];
+    let sum = 0;
+    for (let i = 0; i < 7; i++) sum += parseInt(str[i]) * w[i];
+    const check = (10 - (sum % 10)) % 10;
+    return check === parseInt(str[7]);
+  }
+  // UPC-E (6), GTIN-14, ITF-14 — accept without full checksum
+  return true;
 }
 
 // ── Shared Helpers ────────────────────────────────────────────────────────────

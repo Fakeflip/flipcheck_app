@@ -112,7 +112,8 @@ function fcGetFbaTier(weightKg = 0.5, longestCm = 20) {
  */
 function fcCalcAmazonProfit({ sellPrice, ek, category = 'sonstiges', method = 'fba', shipIn = 4.99, fbaFee = 3.40 }) {
   const refPct     = (typeof AMAZON_REFERRAL_PCTS !== 'undefined' ? AMAZON_REFERRAL_PCTS[category] : null) || 0.15;
-  const referralFee = +(sellPrice * refPct).toFixed(2);
+  // Amazon minimum referral fee: €0.30 per unit
+  const referralFee = +Math.max(0.30, sellPrice * refPct).toFixed(2);
   const fulfillment = method === 'fba' ? fbaFee : 0;
   const shipOut     = method === 'fbm' ? shipIn : 0;
   const totalFees   = +(referralFee + fulfillment + shipOut).toFixed(2);

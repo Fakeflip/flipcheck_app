@@ -190,6 +190,23 @@
     return null;
   }
 
+  // ── sendMessage with timeout (prevents eternal spinner if SW is dormant) ──────
+
+  function sendWithTimeout(msg, timeoutMs = 12000) {
+    return new Promise(resolve => {
+      let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
+      try {
+        chrome.runtime.sendMessage(msg, res => {
+          if (done) return;
+          done = true;
+          clearTimeout(t);
+          resolve(chrome.runtime.lastError ? null : res);
+        });
+      } catch { clearTimeout(t); resolve(null); }
+    });
+  }
+
   // ── Batch Flush ──────────────────────────────────────────────────────────────
 
   function flushBatch() {
@@ -208,15 +225,11 @@
         continue;
       }
 
-      chrome.runtime.sendMessage(
-        { type: 'FLIPCHECK', ean, ek: 0, mode: 'mid' },
-        res => {
-          if (chrome.runtime.lastError) return;
-          const d = res?.ok ? res.data : null;
-          if (d) _results.set(ean, d);
-          cards.forEach(c => injectResultBadge(c, d));
-        },
-      );
+      sendWithTimeout({ type: 'FLIPCHECK', ean, ek: 0, mode: 'mid' }).then(res => {
+        const d = res?.ok ? res.data : null;
+        if (d) _results.set(ean, d);
+        cards.forEach(c => injectResultBadge(c, d));
+      });
     }
   }
 

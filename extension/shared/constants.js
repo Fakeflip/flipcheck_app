@@ -38,15 +38,16 @@ const CATEGORIES = [
 ];
 
 // ── Amazon Fee Tables ─────────────────────────────────────────────────────────
-// Referral fees by category (Amazon DE, approximate)
+// Referral fees by category (Amazon DE, 2025 rates)
+// Electronics: 8% since 2024 update; Smartphones remain ~7%; Min. fee €0.30
 const AMAZON_REFERRAL_PCTS = {
-  computer_tablets:   0.07,
-  handys:             0.07,
+  computer_tablets:   0.08,  // Electronics DE 8% (2024+)
+  handys:             0.07,  // Smartphones Amazon-spezifisch ~7%
   konsolen:           0.08,
-  foto_camcorder:     0.07,
-  tv_video_audio:     0.07,
-  haushaltsgeraete:   0.07,
-  drucker:            0.07,
+  foto_camcorder:     0.08,
+  tv_video_audio:     0.08,
+  haushaltsgeraete:   0.08,
+  drucker:            0.08,
   handy_zubehoer:     0.15,
   notebook_zubehoer:  0.15,
   kabel:              0.15,
@@ -57,16 +58,17 @@ const AMAZON_REFERRAL_PCTS = {
   sonstiges:          0.15,
 };
 
-// FBA fee tiers (simplified DE 2024)
+// FBA fee tiers (Amazon DE 2025, inkl. Deutschland-Aufschlag +€0.26/Einheit)
 // [maxWeightKg, maxLongestCm, feeEur, label]
+const DE_FBA_SURCHARGE = 0.26;
 const FBA_TIERS = [
-  [0.20,  20, 2.70, 'Klein Standard'],
-  [0.40,  30, 3.00, 'Klein Standard+'],
-  [0.90,  33, 3.40, 'Standard 1'],
-  [1.50,  33, 3.80, 'Standard 2'],
-  [3.00,  45, 4.70, 'Groß 1'],
-  [5.00,  61, 5.40, 'Groß 2'],
-  [9.00,  61, 6.50, 'Groß 3'],
-  [15.0,  74, 8.10, 'Groß 4'],
-  [null, null, 9.80, 'Schwer/Sperrig'],
+  [0.20,  20, 2.70 + DE_FBA_SURCHARGE, 'Klein Standard'],
+  [0.40,  30, 3.00 + DE_FBA_SURCHARGE, 'Klein Standard+'],
+  [0.90,  33, 3.40 + DE_FBA_SURCHARGE, 'Standard 1'],
+  [1.50,  33, 3.80 + DE_FBA_SURCHARGE, 'Standard 2'],
+  [3.00,  45, 4.70 + DE_FBA_SURCHARGE, 'Groß 1'],
+  [5.00,  61, 5.40 + DE_FBA_SURCHARGE, 'Groß 2'],
+  [9.00,  61, 6.50 + DE_FBA_SURCHARGE, 'Groß 3'],
+  [15.0,  74, 8.10 + DE_FBA_SURCHARGE, 'Groß 4'],
+  [null, null, 9.80 + DE_FBA_SURCHARGE, 'Schwer/Sperrig'],
 ];

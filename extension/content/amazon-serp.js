@@ -194,6 +194,23 @@
     return null;
   }
 
+  // ── sendMessage with timeout (prevents eternal spinner if SW is dormant) ──────
+
+  function sendWithTimeout(msg, timeoutMs = 12000) {
+    return new Promise(resolve => {
+      let done = false;
+      const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, timeoutMs);
+      try {
+        chrome.runtime.sendMessage(msg, res => {
+          if (done) return;
+          done = true;
+          clearTimeout(t);
+          resolve(chrome.runtime.lastError ? null : res);
+        });
+      } catch { clearTimeout(t); resolve(null); }
+    });
+  }
+
   // ── Batch Flush ───────────────────────────────────────────────────────────
 
   function flushBatch() {
@@ -215,16 +232,12 @@
       if (_inflight.has(asin)) continue;
       _inflight.add(asin);
 
-      chrome.runtime.sendMessage(
-        { type: 'AMAZON_SERP_CHECK', asin },
-        res => {
-          _inflight.delete(asin);
-          if (chrome.runtime.lastError) return;
-          const d = res?.ok ? res.data : null;
-          if (d) _results.set(asin, d);
-          cards.forEach(c => injectResultBadge(c, d));
-        },
-      );
+      sendWithTimeout({ type: 'AMAZON_SERP_CHECK', asin }).then(res => {
+        _inflight.delete(asin);
+        const d = res?.ok ? res.data : null;
+        if (d) _results.set(asin, d);
+        cards.forEach(c => injectResultBadge(c, d));
+      });
     }
   }
 
@@ -255,9 +268,12 @@
 
   function observeCards() {
     document.querySelectorAll(
-      '[data-asin]:not([data-fc-amz-observed]):not(.AdHolder)',
+      '[data-asin]:not([data-fc-amz-observed]):not(.AdHolder)' +
+      ':not([data-component-type="sp-sponsored-result"])' +
+      ':not([data-component-type="s-impression-logger"])',
     ).forEach(card => {
       // Skip ads, carousels, sponsored tiles without product content
+      if (card.querySelector('.puis-sponsored-label-text, .a-sponsored')) return;
       if (!card.querySelector('.s-image, .s-title-instructions-style, h2')) return;
       if (card.dataset.fcAmzObserved) return;
       card.dataset.fcAmzObserved = '1';
