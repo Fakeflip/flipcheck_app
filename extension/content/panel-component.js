@@ -229,6 +229,7 @@
     .fc-chart-stat { flex: 1; background: #16161F; border-radius: 6px; padding: 5px 7px; text-align: center; }
     .fc-chart-stat-v { display: block; font-size: 11px; font-weight: 700; color: #F1F5F9; font-variant-numeric: tabular-nums; }
     .fc-chart-stat-l { display: block; font-size: 9px; color: #475569; margin-top: 1px; }
+    .fc-chart-trend { letter-spacing: .02em; transition: color .2s; }
 
     /* ── DETAILS TAB ── */
     .fc-det-section { margin-bottom: 10px; }
@@ -428,6 +429,7 @@
             <div class="fc-chart-stat"><span class="fc-chart-stat-v" id="csMin">—</span><span class="fc-chart-stat-l">Min</span></div>
             <div class="fc-chart-stat"><span class="fc-chart-stat-v" id="csAvg">—</span><span class="fc-chart-stat-l">Avg</span></div>
             <div class="fc-chart-stat"><span class="fc-chart-stat-v" id="csMax">—</span><span class="fc-chart-stat-l">Max</span></div>
+            <div class="fc-chart-stat"><span class="fc-chart-stat-v fc-chart-trend" id="csTrend">—</span><span class="fc-chart-stat-l">Trend</span></div>
           </div>
         </div>
 
@@ -1205,12 +1207,43 @@
       for (let i = 1; i < pts.length; i++) ctx.lineTo(toX(i), toY(pts[i].price));
       ctx.stroke();
 
-      // Dot at last point
+      // ── Median dashed reference line ──────────────────────────────────────
+      const sorted = [...prices].sort((a, b) => a - b);
+      const mid    = Math.floor(sorted.length / 2);
+      const median = sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+      const medY   = toY(median);
+      ctx.save();
+      ctx.setLineDash([4, 3]);
+      ctx.strokeStyle = 'rgba(148,163,184,0.55)'; // slate-400
+      ctx.lineWidth   = 0.75;
+      ctx.beginPath();
+      ctx.moveTo(PAD.l, medY);
+      ctx.lineTo(W - PAD.r, medY);
+      ctx.stroke();
+      ctx.restore();
+
+      // ── Min/Max dots ──────────────────────────────────────────────────────
+      const minIdx = prices.indexOf(minP);
+      const maxIdx = prices.indexOf(maxP);
+      [[minIdx, minP, '#EF4444'], [maxIdx, maxP, '#22C55E']].forEach(([idx, p, col]) => {
+        ctx.beginPath();
+        ctx.arc(toX(idx), toY(p), 3, 0, Math.PI * 2);
+        ctx.fillStyle = col;
+        ctx.fill();
+        ctx.strokeStyle = '#111118';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      });
+
+      // Current price dot (larger)
       const li = pts.length - 1;
       ctx.beginPath();
-      ctx.arc(toX(li), toY(pts[li].price), 3, 0, Math.PI * 2);
+      ctx.arc(toX(li), toY(pts[li].price), 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#6366F1';
       ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.stroke();
 
       // Stats
       const sum = prices.reduce((a, b) => a + b, 0);
@@ -1219,6 +1252,21 @@
       s.getElementById('csMin').textContent = f(minP);
       s.getElementById('csAvg').textContent = f(avg);
       s.getElementById('csMax').textContent = f(maxP);
+
+      // Trend indicator (7d avg vs prior 23d avg, ±3% threshold)
+      const trendEl = s.getElementById('csTrend');
+      if (trendEl && prices.length >= 8) {
+        const last7  = prices.slice(-7);
+        const prior  = prices.slice(-30, -7);
+        if (prior.length >= 3) {
+          const avg7  = last7.reduce((a, b) => a + b, 0) / last7.length;
+          const avg23 = prior.reduce((a, b) => a + b, 0) / prior.length;
+          const pct   = ((avg7 - avg23) / avg23) * 100;
+          const [arrow, col] = pct < -3 ? ['↓', '#EF4444'] : pct > 3 ? ['↑', '#22C55E'] : ['→', '#94A3B8'];
+          trendEl.textContent  = `${arrow} ${Math.abs(pct).toFixed(1)}%`;
+          trendEl.style.color  = col;
+        }
+      }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
