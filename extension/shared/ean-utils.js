@@ -42,9 +42,21 @@ function _eanFromJsonLd(d) {
   }
   const items = d?.['@graph'] ? d['@graph'] : [d];
   for (const item of items) {
-    for (const k of ['gtin13', 'gtin8', 'gtin', 'ean', 'isbn']) {
+    // Direct GTIN/EAN fields
+    for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean', 'isbn']) {
       const v = item?.[k];
       if (v && isValidEan(String(v))) return String(v).trim();
+    }
+    // Nested in offers (schema.org Product → offers → gtin13)
+    const offers = item?.offers;
+    if (offers) {
+      const offerList = Array.isArray(offers) ? offers : [offers];
+      for (const offer of offerList) {
+        for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean']) {
+          const v = offer?.[k];
+          if (v && isValidEan(String(v))) return String(v).trim();
+        }
+      }
     }
   }
   return null;
@@ -64,7 +76,9 @@ function _scanJsonLd() {
 /** Parse a JSON data layer script by selector and recurse for ean/gtin. */
 function _deepSearchEan(obj, depth = 0) {
   if (depth > 8 || !obj || typeof obj !== 'object') return null;
-  for (const k of ['gtin13', 'gtin8', 'gtin', 'ean', 'isbn', 'barcode']) {
+  for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean', 'isbn', 'barcode',
+                   'eanCode', 'ean_code', 'gtinCode', 'gtin_code', 'productGtin', 'product_gtin',
+                   'barCode', 'bar_code', 'productEan', 'product_ean']) {
     if (obj[k] && isValidEan(String(obj[k]))) return String(obj[k]);
   }
   for (const v of Object.values(obj)) {
@@ -145,7 +159,8 @@ function _tableEan(tableSelector, labelPattern = /EAN|GTIN|Barcode|ISBN/i) {
 /** Scan ALL inline <script> tags for EAN/GTIN patterns.
  *  Most reliable for modern React/Next.js shops that embed product data in JS. */
 function _scanInlineScripts() {
-  const RE = /"(?:gtin13|gtin8|gtin|ean|EAN|barcode)"\s*:\s*"(\d{8,14})"/g;
+  // Matches both JSON-style ("key":"value") and assignment-style (key:"value" or key:'value')
+  const RE = /["']?(?:gtin1[23348]?|gtin|ean|EAN|ean_code|eanCode|barcode|barCode|product_gtin|productGtin)["']?\s*[=:]\s*["'](\d{8,14})["']/g;
   for (const script of document.querySelectorAll('script:not([src])')) {
     const text = script.textContent;
     if (!text || text.length > 600000) continue; // skip massive bundles
@@ -817,8 +832,18 @@ function detectPagePrice() {
   for (const el of document.querySelectorAll('script[type="application/ld+json"]')) {
     try {
       const d = JSON.parse(el.textContent);
-      const raw = d?.offers?.price ?? d?.offers?.[0]?.price ?? d?.price;
-      if (raw) { const p = _pp(raw); if (p) return p; }
+      // Handle @graph, top-level arrays, and nested offers
+      const nodes = d?.['@graph'] ? d['@graph'] : (Array.isArray(d) ? d : [d]);
+      for (const node of nodes) {
+        const offers = node?.offers;
+        const offerList = offers ? (Array.isArray(offers) ? offers : [offers]) : [];
+        for (const offer of offerList) {
+          const raw = offer?.price ?? offer?.lowPrice;
+          if (raw) { const p = _pp(raw); if (p) return p; }
+        }
+        const raw = node?.price;
+        if (raw) { const p = _pp(raw); if (p) return p; }
+      }
     } catch (_) {}
   }
 

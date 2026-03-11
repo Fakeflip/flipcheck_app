@@ -52,6 +52,10 @@ const $ = id => document.getElementById(id);
   await loadSettings();
   await Promise.all([checkToken(), checkBridge(), loadRecent(), detectCurrentTab()]);
   wireEvents();
+  // Auto-focus EAN input after init (but only if nothing was pre-filled from tab detection)
+  const eanVal = $('eanInp').value;
+  if (!eanVal) $('eanInp').focus();
+  else { $('eanInp').focus(); $('eanInp').select(); }
 })();
 
 // ── Category Select ───────────────────────────────────────────────────────────
@@ -399,7 +403,10 @@ function wireEvents() {
   wireAsinToEanBtn();
 
   $('checkBtn').addEventListener('click', runSingleCheck);
-  $('eanInp').addEventListener('keydown', e => { if (e.key === 'Enter') runSingleCheck(); });
+  ['eanInp', 'ekInp', 'ekInpAmz', 'fcShipIn', 'fcShipOut', 'fcAmzShipIn', 'fcPrepFee'].forEach(id => {
+    const el = $(id);
+    if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') runSingleCheck(); });
+  });
 
   // ── 🔍 Seite scannen ──────────────────────────────────────────────────────
   $('scanPageBtn').addEventListener('click', scanCurrentPage);
