@@ -565,6 +565,15 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
 _cr.runtime.onInstalled.addListener(() => setupContextMenu());
 _cr.runtime.onStartup.addListener(() => setupContextMenu());
 
+// ── SW Keep-Alive (batch check) ───────────────────────────────────────────────
+// Popup connects a 'keepAlive' port during long batch runs.
+// Receiving any message on the port resets the SW idle timer.
+_cr.runtime.onConnect.addListener(port => {
+  if (port.name !== 'keepAlive') return;
+  port.onMessage.addListener(() => {}); // just receiving keeps SW alive
+  port.onDisconnect.addListener(() => {});
+});
+
 // ── Alt+F global shortcut → toggle floating panel in active tab ──────────────
 _cr.commands.onCommand.addListener(async command => {
   if (command !== 'toggle-panel') return;

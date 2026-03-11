@@ -817,6 +817,24 @@ function parseBatchEans() {
     .slice(0, 50);
 }
 
+// ── SW Keep-Alive ─────────────────────────────────────────────────────────────
+let _keepAlivePort  = null;
+let _keepAliveTimer = null;
+
+function _startSwKeepAlive() {
+  try { _keepAlivePort = chrome.runtime.connect({ name: 'keepAlive' }); } catch { return; }
+  _keepAliveTimer = setInterval(() => {
+    try { _keepAlivePort?.postMessage({ ping: true }); } catch { _stopSwKeepAlive(); }
+  }, 25_000);
+}
+
+function _stopSwKeepAlive() {
+  clearInterval(_keepAliveTimer);
+  _keepAliveTimer = null;
+  try { _keepAlivePort?.disconnect(); } catch {}
+  _keepAlivePort = null;
+}
+
 async function runBatchCheck() {
   if (_batchRunning) return;
   const eans = parseBatchEans();
@@ -829,6 +847,7 @@ async function runBatchCheck() {
   hideUpgradeBanner();
   _batchRunning = true;
   _batchResults = [];
+  _startSwKeepAlive();
 
   const ek   = parseFloat($('batchEkInp').value) || 0;
   const mode = $('batchModeSel').value || 'mid';
@@ -887,6 +906,7 @@ async function runBatchCheck() {
     return (b.profit ?? -Infinity) - (a.profit ?? -Infinity);
   });
 
+  _stopSwKeepAlive();
   renderBatchResults();
   btn.disabled = false;
   btn.textContent = '→ Alle prüfen';
