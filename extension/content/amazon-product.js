@@ -17,7 +17,7 @@
   // ── Context-menu EAN probe ─────────────────────────────────────────────────
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.type === 'CONTEXT_EAN_PROBE' && msg.ean && typeof panel.probe === 'function') {
-      panel.probe(msg.ean);
+      panel.probe(msg.ean, 'amazon');
     }
   });
 
@@ -30,7 +30,7 @@
     }
   });
 
-  // ── Load settings, then extract EAN with retry ──────────────────────────────
+  // ── Load settings, then extract identifier with retry ──────────────────────
   chrome.runtime.sendMessage({ type: 'SETTINGS_GET' }, res => {
     const s         = res?.data || {};
     const autoPanel = s.autoPanel !== false; // default: true
@@ -38,27 +38,26 @@
   });
 
   // ── Extraction with up to 3 attempts ──────────────────────────────────────
+  // On Amazon: ASIN from URL is always the primary identifier.
+  // EAN is a nice-to-have for cross-market lookup but not required.
   function tryExtract(autoPanel, attempt) {
-    // Wait for custom element upgrade (customElements.define may be delayed on SPAs)
+    // Wait for panel to be initialised (custom element upgrade or manual init)
     if (typeof panel.probe !== 'function') {
       setTimeout(() => tryExtract(autoPanel, attempt), 150);
       return;
     }
-    const ean = extractEanAmazon();
 
-    if (ean) {
+    const asin = getAmazonAsin();
+    const ean  = extractEanAmazon();
+    // ASIN takes priority — it's the identifier for Amazon checks.
+    // EAN is used as fallback (e.g. on /dp/ pages without an ASIN in path).
+    const identifier = asin || ean;
+
+    if (identifier) {
       if (autoPanel) {
-        const asin = getAmazonAsin();
-        if (asin) {
-          panel.setMarket('amazon');
-          panel.probe(asin || ean, 'amazon');
-        } else {
-          panel.probe(ean);
-        }
+        panel.probe(identifier, 'amazon');
       } else {
-        const asin = getAmazonAsin();
-        panel.setMarket('amazon');
-        panel.setIdentifier(asin || ean, 'amazon');
+        panel.setIdentifier(identifier, 'amazon');
       }
       // Auto-fill EK from page price
       setTimeout(() => {
@@ -68,11 +67,10 @@
       return;
     }
 
-    if (attempt === 0) {
+    // Neither ASIN nor EAN found yet — retry (Amazon loads details lazily)
+    if (attempt < 2) {
       panel.setState('no-ean');
-      setTimeout(() => tryExtract(autoPanel, 1), 2000); // Amazon loads details lazily
-    } else if (attempt === 1) {
-      setTimeout(() => tryExtract(autoPanel, 2), 4000);
+      setTimeout(() => tryExtract(autoPanel, attempt + 1), attempt === 0 ? 2000 : 4000);
     }
     // attempt 2: stay no-ean
   }
@@ -112,37 +110,34 @@
     return null;
   }
 
-  // ── Manual EAN scan (panel button) ────────────────────────────────────────
+  // ── Manual EAN scan (panel 🔍 button) ─────────────────────────────────────
   panel.addEventListener('fc-manual-ean', () => {
     const asin = getAmazonAsin();
     const ean  = extractEanAmazon();
-    if ((asin || ean) && typeof panel.probe === 'function') {
-      panel.setMarket('amazon');
-      panel.probe(asin || ean, 'amazon');
+    const identifier = asin || ean;
+    if (identifier && typeof panel.probe === 'function') {
+      panel.probe(identifier, 'amazon');
     }
   });
 
   // ── SPA navigation ──────────────────────────────────────────────────────────
   let _lastUrl = location.href;
   new MutationObserver(() => {
-    if (location.href !== _lastUrl) {
-      _lastUrl = location.href;
-      setTimeout(() => {
-        const newEan = extractEanAmazon();
-        if (newEan && newEan !== panel.currentEan && typeof panel.probe === 'function') {
-          const newAsin = getAmazonAsin();
-          if (newAsin) {
-            panel.setMarket('amazon');
-            panel.probe(newAsin || newEan, 'amazon');
-          } else {
-            panel.probe(newEan);
-          }
-          setTimeout(() => {
-            const price = detectAmazonPrice();
-            if (price && price > 0) panel.autofillEk(price);
-          }, 600);
-        }
-      }, 1200);
-    }
+    if (location.href === _lastUrl) return;
+    _lastUrl = location.href;
+    setTimeout(() => {
+      if (typeof panel.probe !== 'function') return;
+      const newAsin = getAmazonAsin();
+      const newEan  = extractEanAmazon();
+      const newId   = newAsin || newEan;
+      // Re-probe if identifier changed (new product page)
+      if (newId && newId !== panel.currentEan) {
+        panel.probe(newId, 'amazon');
+        setTimeout(() => {
+          const price = detectAmazonPrice();
+          if (price && price > 0) panel.autofillEk(price);
+        }, 600);
+      }
+    }, 1200);
   }).observe(document, { subtree: true, childList: true });
 })();

@@ -558,6 +558,16 @@
     }
 
     // ── Lifecycle callbacks ───────────────────────────────────────────────────
+    connectedCallback() {
+      // Runs after element is appended to DOM — attributes (data-market) are set by now.
+      const dm = this.dataset?.market;
+      if (dm && ['ebay', 'amazon', 'kaufland'].includes(dm) && dm !== this._market) {
+        this._market = dm;
+        this._shadow.querySelectorAll('.fc-mkt-btn').forEach(b =>
+          b.classList.toggle('active', b.dataset.market === dm));
+      }
+    }
+
     disconnectedCallback() {
       // Fired by the browser when this element is removed from the DOM (e.g. by
       // Next.js SSR hydration replacing <body>). Content scripts listen for this
@@ -768,13 +778,34 @@
         // Check if we have a cached result for this market (from dual-fetch)
         const cached = this._resultCache[market];
         if (cached && cached.data && (Date.now() - cached.ts) < 300000) {
-          // Use cached result (< 5 min old)
           this._result   = cached.data;
           this._resultTs = cached.ts;
           this._renderResult(cached.data);
           this._populateDetails(cached.data);
           this._loadChartSeries(cached.data);
           this._checkInventoryStatus(this._identifier);
+          return;
+        }
+        // Guard: switching to eBay while current identifier is an ASIN (no EAN yet).
+        // Resolve via ASIN_TO_EAN first, then fetch.
+        const isAsin = id => /^[A-Z0-9]{10}$/.test(String(id || '')) && /[A-Z]/.test(String(id || ''));
+        if (market === 'ebay' && isAsin(this._identifier)) {
+          this._setState('loading');
+          chrome.runtime.sendMessage({ type: 'ASIN_TO_EAN', asin: this._identifier }, res => {
+            if (chrome.runtime.lastError) { this._setState('error'); return; }
+            const ean = res?.ean;
+            if (ean) {
+              this._crossId    = this._identifier; // keep ASIN as crossId
+              this._identifier = ean;
+              s.getElementById('fcIdTag').textContent = ean;
+              this._fetchResult();
+            } else {
+              // No EAN resolvable — stay on Amazon, revert market
+              this._market = prevMarket;
+              s.querySelectorAll('.fc-mkt-btn').forEach(b => b.classList.toggle('active', b.dataset.market === prevMarket));
+              this._setState('error');
+            }
+          });
           return;
         }
         this._setState('loading');
@@ -1336,8 +1367,11 @@
         const d = data?.fc_panel_defaults;
         if (!d) return;
         this._defaults = { market: d.market || 'ebay', shipOut: d.shipOut || 0, catId: d.catId || 'sonstiges' };
-        // Apply default market
-        if (d.market && d.market !== this._market && !this._identifier) {
+        // Apply default market — but NOT if the injector already set a specific market
+        // via data-market attribute (e.g. amazon-product.js sets data-market="amazon").
+        const injectorMarket = this.dataset?.market;
+        const marketLocked   = injectorMarket && ['ebay', 'amazon', 'kaufland'].includes(injectorMarket);
+        if (d.market && d.market !== this._market && !this._identifier && !marketLocked) {
           this._setMarket(d.market, false);
         }
         // Populate settings UI
@@ -1385,7 +1419,8 @@
       if (primary === 'ebay') {
         crossId = d.asin || null;
       } else {
-        crossId = d.ean || this._identifier;
+        // Amazon → eBay: need EAN. Never use ASIN as eBay identifier.
+        crossId = d.ean || null;
       }
 
       // If no cross identifier from result, try resolving
@@ -1483,8 +1518,19 @@
     } catch (_) {}
     el._wireEvents();
     el._setupDrag(shadow.getElementById('fcHeader'));
+
+    // Respect data-market attribute set by injector scripts (e.g. amazon-product.js
+    // sets panel.dataset.market = 'amazon' before _manualInitPanel runs).
+    // Must happen AFTER _wireEvents so the market buttons exist in the shadow DOM.
+    const dataMarket = el.dataset?.market;
+    if (dataMarket && ['ebay', 'amazon', 'kaufland'].includes(dataMarket)) {
+      el._market = dataMarket;
+      shadow.querySelectorAll('.fc-mkt-btn').forEach(b =>
+        b.classList.toggle('active', b.dataset.market === dataMarket));
+    }
+
     el._loadDefaults();
-    console.log('[FC] panel manually initialised — probe available:', typeof el.probe === 'function');
+    console.log('[FC] panel manually initialised — market:', el._market, '— probe available:', typeof el.probe === 'function');
   }
 
   // ── Panel init helpers ────────────────────────────────────────────────────
