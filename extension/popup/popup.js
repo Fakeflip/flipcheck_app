@@ -54,8 +54,31 @@ const $ = id => document.getElementById(id);
   wireEvents();
   // Auto-focus EAN input after init (but only if nothing was pre-filled from tab detection)
   const eanVal = $('eanInp').value;
-  if (!eanVal) $('eanInp').focus();
-  else { $('eanInp').focus(); $('eanInp').select(); }
+  if (!eanVal) {
+    // Try clipboard auto-fill if input is still empty
+    try {
+      const clip = await navigator.clipboard.readText();
+      const raw  = clip.trim();
+      const nums = raw.replace(/\D/g, '');
+      if (/^\d{8,14}$/.test(nums) && !$('eanInp').value) {
+        $('eanInp').value = nums;
+        $('eanInp').classList.add('fc-autofilled');
+        // Auto-switch market if ASIN-like
+      } else {
+        const upper = raw.toUpperCase();
+        if (/^[A-Z0-9]{10}$/.test(upper) && /[A-Z]/.test(upper) && !$('eanInp').value) {
+          $('eanInp').value = upper;
+          setMarket('amazon');
+          $('eanInp').classList.add('fc-autofilled');
+        }
+      }
+    } catch { /* clipboard denied — silent */ }
+    $('eanInp').focus();
+    $('eanInp').select();
+  } else {
+    $('eanInp').focus();
+    $('eanInp').select();
+  }
 })();
 
 // ── Category Select ───────────────────────────────────────────────────────────
@@ -408,6 +431,28 @@ function wireEvents() {
     if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') runSingleCheck(); });
   });
 
+  // Escape to close popup
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') window.close(); });
+
+  // Ctrl+Enter in batch textarea → run batch
+  $('batchTa').addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runBatchCheck();
+  });
+
+  // Multi-EAN paste in single input → redirect to batch tab
+  $('eanInp').addEventListener('paste', e => {
+    const pasted = (e.clipboardData || window.clipboardData).getData('text');
+    const lines  = pasted.split(/[\n\r,;]+/)
+      .map(l => l.trim().replace(/\D/g, ''))
+      .filter(l => /^\d{8,14}$/.test(l));
+    if (lines.length > 1) {
+      e.preventDefault();
+      $('batchTa').value = lines.join('\n');
+      $('tabBatch').click();
+      updateBatchCount();
+    }
+  });
+
   // ── 🔍 Seite scannen ──────────────────────────────────────────────────────
   $('scanPageBtn').addEventListener('click', scanCurrentPage);
 
@@ -475,6 +520,11 @@ function wireEvents() {
   $('batchRunBtn').addEventListener('click', runBatchCheck);
   $('batchCsvBtn').addEventListener('click', exportBatchCsv);
   $('batchCopyBtn').addEventListener('click', copyBatchText);
+  $('batchCancelBtn')?.addEventListener('click', () => {
+    _batchCancelFlag = true;
+    const cancel = $('batchCancelBtn');
+    if (cancel) { cancel.disabled = true; cancel.textContent = 'Abbrechen…'; }
+  });
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -527,8 +577,12 @@ function runSingleCheck() {
       if (res?.error === 'plan_limit') {
         showUpgradeBanner(res.upgradeUrl);
         setSingleError(`Tageslimit: ${res.dailyLimit || 20} kostenlose Checks/Tag verbraucht.`);
+      } else if (res?.error === 'not_found') {
+        setSingleError('Kein Produkt für diese EAN gefunden.');
+      } else if (res?.error === 'unauthorized') {
+        setSingleError('Token abgelaufen — bitte neu anmelden.');
       } else {
-        setSingleError('Fehler — Backend nicht erreichbar oder kein Token.');
+        setSingleError('Verbindung fehlgeschlagen. Backend nicht erreichbar.', true);
       }
       return;
     }
@@ -795,10 +849,13 @@ function clearSingleResult() {
   r.classList.remove('visible');
   r.innerHTML = '';
 }
-function setSingleError(msg) {
+function setSingleError(msg, retryable = false) {
   const el = $('fcError');
-  el.textContent = msg;
+  el.innerHTML = `<span>${esc(msg)}</span>${retryable ? ' <button class="fc-retry-btn" id="fcRetryBtn">↺ Nochmal</button>' : ''}`;
   el.classList.add('visible');
+  if (retryable) {
+    $('fcRetryBtn')?.addEventListener('click', runSingleCheck);
+  }
 }
 function clearSingleError() { $('fcError').classList.remove('visible'); }
 function showUpgradeBanner(url) {
@@ -828,8 +885,9 @@ function parseBatchEans() {
 }
 
 // ── SW Keep-Alive ─────────────────────────────────────────────────────────────
-let _keepAlivePort  = null;
-let _keepAliveTimer = null;
+let _keepAlivePort    = null;
+let _keepAliveTimer   = null;
+let _batchCancelFlag  = false;
 
 function _startSwKeepAlive() {
   try { _keepAlivePort = chrome.runtime.connect({ name: 'keepAlive' }); } catch { return; }
@@ -855,16 +913,19 @@ async function runBatchCheck() {
 
   clearBatchError();
   hideUpgradeBanner();
-  _batchRunning = true;
-  _batchResults = [];
+  _batchRunning    = true;
+  _batchCancelFlag = false;
+  _batchResults    = [];
   _startSwKeepAlive();
 
   const ek   = parseFloat($('batchEkInp').value) || 0;
   const mode = $('batchModeSel').value || 'mid';
 
-  const btn = $('batchRunBtn');
+  const btn    = $('batchRunBtn');
+  const cancel = $('batchCancelBtn');
   btn.disabled = true;
   btn.textContent = '⏳ Prüfe…';
+  if (cancel) { cancel.style.display = ''; cancel.disabled = false; }
 
   const prog      = $('batchProgress');
   const progBar   = $('batchProgressBar');
@@ -873,13 +934,18 @@ async function runBatchCheck() {
   progBar.style.width = '0%';
   progLabel.textContent = `0 / ${eans.length}`;
 
-  $('batchResultWrap').style.display = 'none';
+  // Show result table immediately for streaming results
+  $('batchResultWrap').style.display = '';
   $('batchTbody').innerHTML = '';
+  $('batchResultCount').textContent = '…';
+  $('batchSummary').innerHTML = '';
 
   let done = 0;
+  const startTime  = Date.now();
   const CONCURRENCY = 6;
 
   for (let i = 0; i < eans.length; i += CONCURRENCY) {
+    if (_batchCancelFlag) break;
     const chunk = eans.slice(i, i + CONCURRENCY);
     await Promise.all(chunk.map(ean => new Promise(resolve => {
       const catId = $('catSel')?.value || 'sonstiges';
@@ -887,21 +953,31 @@ async function runBatchCheck() {
         done++;
         const pct = Math.round((done / eans.length) * 100);
         progBar.style.width   = pct + '%';
-        progLabel.textContent = `${done} / ${eans.length}`;
+        // Estimated time remaining after first result
+        if (done > 1) {
+          const elapsed = (Date.now() - startTime) / 1000;
+          const rate    = done / elapsed;
+          const remSec  = Math.round((eans.length - done) / rate);
+          progLabel.textContent = `${done} / ${eans.length}${remSec > 2 ? ` · ~${remSec}s` : ''}`;
+        } else {
+          progLabel.textContent = `${done} / ${eans.length}`;
+        }
 
+        let row;
         if (res?.ok && res.data) {
           const d = res.data;
-          _batchResults.push({
-            ean, verdict: d.verdict || null, vk: d.sell_price_median,
-            profit: d.profit_median, margin: d.margin_pct, sales: d.sales_30d,
-            title: d.title || '', error: false,
-          });
+          row = { ean, verdict: d.verdict || null, vk: d.sell_price_median,
+                  profit: d.profit_median, margin: d.margin_pct, sales: d.sales_30d,
+                  title: d.title || '', error: false };
         } else if (res?.error === 'plan_limit') {
-          _batchResults.push({ ean, error: true, planLimit: true });
+          row = { ean, error: true, planLimit: true };
           showUpgradeBanner(res.upgradeUrl);
         } else {
-          _batchResults.push({ ean, error: true });
+          row = { ean, error: true };
         }
+        _batchResults.push(row);
+        // Stream row into table immediately
+        _appendBatchRow(row);
         resolve();
       });
     })));
@@ -917,10 +993,37 @@ async function runBatchCheck() {
   });
 
   _stopSwKeepAlive();
-  renderBatchResults();
+  if (cancel) cancel.style.display = 'none';
+  renderBatchResults(); // re-render sorted final view
   btn.disabled = false;
   btn.textContent = '→ Alle prüfen';
   _batchRunning = false;
+}
+
+function _appendBatchRow(r) {
+  const tbody = $('batchTbody');
+  const tr    = document.createElement('tr');
+  if (r.error) {
+    const errColor = r.planLimit ? '#6366F1' : '#475569';
+    const errText  = r.planLimit ? 'Limit' : 'Fehler';
+    tr.className   = 'err';
+    tr.innerHTML   = `<td><span class="fc-tbl-ean" title="${esc(r.ean)}">${esc(r.ean.slice(-8))}</span></td>
+      <td colspan="5" style="color:${errColor};font-size:10px">${errText}</td>`;
+  } else {
+    const vc = VERDICT_COLORS[r.verdict] || { bg: '#1E1E2E', border: '#2E2E42', text: '#475569' };
+    const pColor = r.profit > 0 ? '#10B981' : r.profit < 0 ? '#EF4444' : '#94A3B8';
+    const fmtCur = v => v != null && !isNaN(v) ? `€${Math.round(v)}` : '—';
+    const fmtPct = v => v != null && !isNaN(v) ? `${Number(v).toFixed(0)}%` : '—';
+    const fmtP   = v => v == null || isNaN(v) ? '—' : `${v > 0 ? '+' : ''}€${Number(v).toFixed(2)}`;
+    tr.title     = esc(r.title ? r.title.slice(0, 80) : r.ean);
+    tr.innerHTML = `<td><span class="fc-tbl-ean">${esc(r.ean.slice(-8))}</span></td>
+      <td><span class="fc-tbl-badge" style="background:${vc.bg};color:${vc.text};border:1px solid ${vc.border}">${esc(r.verdict || '—')}</span></td>
+      <td>${fmtCur(r.vk)}</td>
+      <td style="color:${pColor}">${fmtP(r.profit)}</td>
+      <td>${fmtPct(r.margin)}</td>
+      <td style="text-align:right">${r.sales ?? '—'}</td>`;
+  }
+  tbody.appendChild(tr);
 }
 
 function renderBatchResults() {
