@@ -46,6 +46,9 @@ const $ = id => document.getElementById(id);
 // ── Init ──────────────────────────────────────────────────────────────────────
 (async function init() {
   buildCatOptions();
+  // Clear deal alert badge as soon as popup opens
+  chrome.storage.local.set({ fcBadgeCount: 0 });
+  chrome.action.setBadgeText({ text: '' });
   await loadSettings();
   await Promise.all([checkToken(), checkBridge(), loadRecent(), detectCurrentTab()]);
   wireEvents();

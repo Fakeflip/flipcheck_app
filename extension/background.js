@@ -601,6 +601,28 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
   return true; // keep async channel open
 });
 
+// ── Badge Helpers (deal alert counter) ───────────────────────────────────────
+async function fcBadgeIncrement() {
+  const { fcBadgeCount = 0 } = await _cr.storage.local.get('fcBadgeCount');
+  const n = fcBadgeCount + 1;
+  await _cr.storage.local.set({ fcBadgeCount: n });
+  _cr.action.setBadgeText({ text: String(n) });
+  _cr.action.setBadgeBackgroundColor({ color: '#6366F1' });
+}
+
+async function fcBadgeClear() {
+  await _cr.storage.local.set({ fcBadgeCount: 0 });
+  _cr.action.setBadgeText({ text: '' });
+}
+
+// Restore badge on SW wake (SW kill clears in-memory state)
+_cr.storage.local.get('fcBadgeCount').then(({ fcBadgeCount }) => {
+  if (fcBadgeCount > 0) {
+    _cr.action.setBadgeText({ text: String(fcBadgeCount) });
+    _cr.action.setBadgeBackgroundColor({ color: '#6366F1' });
+  }
+});
+
 // ── Startup ───────────────────────────────────────────────────────────────────
 _cr.runtime.onInstalled.addListener(() => setupContextMenu());
 _cr.runtime.onStartup.addListener(() => setupContextMenu());

@@ -30,6 +30,7 @@
     "storage",
     "alarms",
     "contextMenus",
+    "notifications",
     "tabs"
   ],
   "commands": {
