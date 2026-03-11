@@ -12,7 +12,7 @@
   const panel = document.createElement('flipcheck-panel');
   panel.id = '__fc_panel';
   panel.dataset.market = 'amazon';
-  document.body.appendChild(panel);
+  document.documentElement.appendChild(panel);
 
   // ── Context-menu EAN probe ─────────────────────────────────────────────────
   chrome.runtime.onMessage.addListener(msg => {

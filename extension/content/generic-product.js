@@ -11,7 +11,7 @@
 
   const panel = document.createElement('flipcheck-panel');
   panel.id = '__fc_panel';
-  document.body.appendChild(panel);
+  document.documentElement.appendChild(panel);
 
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.type === 'CONTEXT_EAN_PROBE' && msg.ean && typeof panel.probe === 'function') panel.probe(msg.ean);
