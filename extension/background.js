@@ -207,7 +207,7 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await _fetchWithRetry('https://api.joinflipcheck.app/flipcheck', {
+    const res = await _fetchWithRetry('https://gate.joinflipcheck.app/flipcheck', {
       method: 'POST',
       headers,
       body: JSON.stringify({ ean, ek: ekNum, mode, category: catId, shipping_in: shipInNum, shipping_out: shipOutNum }),
@@ -266,7 +266,7 @@ async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba',
     const headers = { 'Content-Type': 'application/json' };
     if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    const res = await _fetchWithRetry('https://api.joinflipcheck.app/amazon-check', {
+    const res = await _fetchWithRetry('https://gate.joinflipcheck.app/amazon-check', {
       method:  'POST',
       headers,
       body:    JSON.stringify({ asin, ean, ek: ekNum, mode, method, ship_in: shipIn, category: catId, prep_fee: prepNum }),

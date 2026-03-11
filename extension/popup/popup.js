@@ -112,8 +112,8 @@ async function checkToken() {
       $('authBanner').style.display = _hasToken ? 'none' : '';
 
       // License check is informational only — never block the UI.
-      // API calls go directly to api.joinflipcheck.app which has no auth.
-      // The gate license check just controls the upgrade banner visibility.
+      // API calls go through gate.joinflipcheck.app which validates JWT + license.
+      // The gate license check also controls the upgrade banner visibility.
       const gate = $('licenseGate');
       if (gate) gate.style.display = 'none';
 

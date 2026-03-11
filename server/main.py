@@ -1136,6 +1136,9 @@ class AmazonCheckRequest(BaseModel):
     method:   str   = "fba"   # "fba" or "fbm"
     ship_in:  float = 4.99
     category: str   = "sonstiges"
+    prep_fee: float = 0.0
+    vat_mode: str   = "no_vat"
+    ek_mode:  str   = "gross"
 
 
 @app.post("/amazon-check")
@@ -1179,6 +1182,9 @@ async def amazon_check(
                     "method":   req.method,
                     "ship_in":  req.ship_in,
                     "category": req.category,
+                    "prep_fee": req.prep_fee,
+                    "vat_mode": req.vat_mode,
+                    "ek_mode":  req.ek_mode,
                 },
             )
             if r.status_code == 200:
