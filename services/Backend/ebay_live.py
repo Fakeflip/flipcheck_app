@@ -253,6 +253,79 @@ def _build_browse_market_prices(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "rep_itemId": rep.get("itemId"),
         "rep_title": rep.get("title"),
     }
+# =========================================================
+# PUBLIC SOLD LISTINGS FALLBACK (kein Cookie / Browse nötig)
+# =========================================================
+_PUBLIC_SOLD_CACHE: Dict[str, Dict[str, Any]] = {}
+_PUBLIC_SOLD_TTL = 20 * 60  # 20 min
+
+def _fetch_public_sold_prices(query: str) -> Optional[Dict[str, Any]]:
+    """
+    Scrapt öffentliche eBay Abgeschlossene Angebote (LH_Sold=1).
+    Kein OAuth, kein Cookie nötig — funktioniert immer als Fallback.
+    Gibt {"avg_price", "median_price", "monthly_sales": None} zurück.
+    """
+    cache_key = query.strip().lower()
+    now = time.time()
+    hit = _PUBLIC_SOLD_CACHE.get(cache_key)
+    if hit and (now - hit["ts"] < _PUBLIC_SOLD_TTL):
+        return hit["data"]
+
+    try:
+        url = (
+            "https://www.ebay.de/sch/i.html"
+            f"?_nkw={requests.utils.quote(query)}"
+            "&LH_Complete=1&LH_Sold=1&_sacat=0&_sop=10&_ipg=50"
+        )
+        headers = {
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "de-DE,de;q=0.9",
+            "User-Agent": SESSION.headers.get("User-Agent", "Mozilla/5.0"),
+        }
+        proxy = _get_proxy()
+        resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        if resp.status_code != 200:
+            return None
+
+        # Preise aus HTML extrahieren (kein BeautifulSoup nötig)
+        # eBay schreibt Preise als: EUR 12,99 oder 12,99 €
+        price_pattern = re.compile(
+            r'class="s-item__price"[^>]*>.*?(?:EUR\s*|)(\d{1,4}[.,]\d{2})\s*(?:€|EUR)?',
+            re.DOTALL | re.IGNORECASE,
+        )
+        raw_prices = price_pattern.findall(resp.text)
+        prices: List[float] = []
+        for raw in raw_prices:
+            p = _parse_price_number(raw)
+            if p and 0.5 < p < 5000:
+                prices.append(p)
+
+        if len(prices) < 3:
+            return None
+
+        prices.sort()
+        n = len(prices)
+        median = prices[n // 2] if n % 2 == 1 else (prices[n // 2 - 1] + prices[n // 2]) / 2
+        # IQR-filter: Ausreißer entfernen
+        q1, q3 = prices[n // 4], prices[(3 * n) // 4]
+        iqr = q3 - q1
+        filtered = [p for p in prices if q1 - 1.5 * iqr <= p <= q3 + 1.5 * iqr] or prices
+        avg = sum(filtered) / len(filtered)
+
+        data = {
+            "avg_price": round(avg, 2),
+            "median_price": round(median, 2),
+            "monthly_sales": None,
+            "_source": "public_scrape",
+        }
+        _PUBLIC_SOLD_CACHE[cache_key] = {"ts": now, "data": data}
+        logger.info(f"[PublicSold] {query}: median={median:.2f} avg={avg:.2f} n={len(prices)}")
+        return data
+    except Exception as e:
+        logger.warning(f"[PublicSold] Scrape failed for '{query}': {e}")
+        return None
+
+
 _BAD_WORDS_DEFAULT = [
     "case", "cover", "hülle", "schutz", "folie",
     "filter", "ersatz", "replacement", "teile", "part", "parts",
@@ -518,6 +591,9 @@ def calc_days_to_cash(offer_count: Optional[int], sales_30d: Optional[int]) -> O
     Alte Call-Sites erwarten 30d-Fenster.
     """
     return calc_days_to_cash_window(offer_count, sales_30d, 30)
+
+# Backward-compat alias
+derive_days_to_cash = calc_days_to_cash
 # =========================================================
 # PUBLIC ENTRYPOINT
 # =========================================================
@@ -542,11 +618,20 @@ def lookup_ebay_metrics_query(
         return {"error": "mode muss 'ean' oder 'keyword' sein."}
     # ✅ Research-only Mode: Browse komplett skippen
     if EBAY_DISABLE_BROWSE:
-        if not EBAY_RESEARCH_COOKIE:
-            return {"error": "Research Cookie fehlt (EBAY_RESEARCH_COOKIE). Browse ist deaktiviert."}
-        research = fetch_research_stats(q, day_range=int(trends_day_range))
+        research = None
+        if EBAY_RESEARCH_COOKIE:
+            research = fetch_research_stats(q, day_range=int(trends_day_range))
+
+        # Wenn Research kein Ergebnis → Public Sold Scrape als Fallback
+        if not research or (research.get("avg_price") is None and research.get("median_price") is None):
+            fallback = _fetch_public_sold_prices(q)
+            if fallback:
+                research = fallback
+                logger.info(f"[Fallback] Nutze Public Sold Scrape für '{q}'")
+
         if not research:
-            return {"error": "Research lieferte keine Daten (Cookie tot / Rate Limit / Query zu dünn)."}
+            return {"error": "Keine Preisdaten verfügbar (Research-Cookie fehlt/tot und Public-Scrape ohne Ergebnis)."}
+
         research_avg_gross = research.get("avg_price")
         research_med_gross = research.get("median_price")
         sales_30d = research.get("monthly_sales")
@@ -554,7 +639,7 @@ def lookup_ebay_metrics_query(
         avg_gross_basis = float(research_avg_gross) if isinstance(research_avg_gross, (int, float)) else None
         med_gross_basis = float(research_med_gross) if isinstance(research_med_gross, (int, float)) else None
         if avg_gross_basis is None and med_gross_basis is None:
-            return {"error": "Research: Kein Preis extrahierbar (avg/median beide None)."}
+            return {"error": "Kein Preis extrahierbar (avg/median beide None)."}
         # fallback: wenn eins fehlt, nimm das andere
         if avg_gross_basis is None:
             avg_gross_basis = float(med_gross_basis)
@@ -587,10 +672,28 @@ def lookup_ebay_metrics_query(
         # offer_count/days_to_cash nicht möglich ohne Active Listings
         offer_count = None
         days_to_cash = None
+        # Trends → price_series / qty_series (Format das app.py erwartet: [[ts_ms, wert], ...])
+        price_series: List[List] = []
+        qty_series: List[List] = []
+        if trends and trends.get("points"):
+            for pt in trends["points"]:
+                ts = pt.get("ts")
+                if ts is None:
+                    continue
+                avg_v = pt.get("averageSold")
+                qty_v = pt.get("quantity")
+                if avg_v is not None:
+                    price_series.append([ts, round(float(avg_v), 2)])
+                if qty_v is not None:
+                    qty_series.append([ts, int(qty_v)])
         return {
             "mode": mode,
             "query": q,
-            "sell_gross_avg": round(float(avg_gross_basis), 2),
+            # Feldnamen die app.py erwartet
+            "sell_price_avg":    round(float(avg_gross_basis), 2),
+            "sell_price_median": round(float(med_gross_basis), 2),
+            # Aliases für Abwärtskompatibilität
+            "sell_gross_avg":    round(float(avg_gross_basis), 2),
             "sell_gross_median": round(float(med_gross_basis), 2),
             "revenue_cash_avg": avg_stats["revenue_cash"],
             "revenue_cash_median": med_stats["revenue_cash"],
@@ -607,6 +710,8 @@ def lookup_ebay_metrics_query(
             "days_to_cash": days_to_cash,
             "sell_net_avg": sell_net_avg,
             "sell_net_median": sell_net_median,
+            "price_series": price_series,
+            "qty_series":   qty_series,
             "inputs": {
                 "ek_net": round(float(ek_net), 2),
                 "shipping_out_net": round(float(shipping_out_net), 2),
@@ -625,6 +730,7 @@ def lookup_ebay_metrics_query(
                 "rep_title": None,
                 "rep_itemId": None,
                 "research_ok": True,
+                "research_source": research.get("_source", "research_api"),
                 "trends_range": int(trends_day_range),
                 "trends_ok": bool(trends and (trends.get("points") is not None)),
                 "keyword_filtered": False,
@@ -687,10 +793,28 @@ def lookup_ebay_metrics_query(
     ALWAYS_VAT = 0.19
     sell_net_avg = round(gross_to_net(float(avg_gross_basis), ALWAYS_VAT), 2)
     sell_net_median = round(gross_to_net(float(med_gross_basis), ALWAYS_VAT), 2)
+    # Trends → price_series / qty_series
+    price_series: List[List] = []
+    qty_series: List[List] = []
+    if trends and trends.get("points"):
+        for pt in trends["points"]:
+            ts = pt.get("ts")
+            if ts is None:
+                continue
+            avg_v = pt.get("averageSold")
+            qty_v = pt.get("quantity")
+            if avg_v is not None:
+                price_series.append([ts, round(float(avg_v), 2)])
+            if qty_v is not None:
+                qty_series.append([ts, int(qty_v)])
     return {
         "mode": mode,
         "query": q,
-        "sell_gross_avg": round(float(avg_gross_basis), 2),
+        # Feldnamen die app.py erwartet
+        "sell_price_avg":    round(float(avg_gross_basis), 2),
+        "sell_price_median": round(float(med_gross_basis), 2),
+        # Aliases für Abwärtskompatibilität
+        "sell_gross_avg":    round(float(avg_gross_basis), 2),
         "sell_gross_median": round(float(med_gross_basis), 2),
         "revenue_cash_avg": avg_stats["revenue_cash"],
         "revenue_cash_median": med_stats["revenue_cash"],
@@ -707,6 +831,8 @@ def lookup_ebay_metrics_query(
         "days_to_cash": days_to_cash,
         "sell_net_avg": sell_net_avg,
         "sell_net_median": sell_net_median,
+        "price_series": price_series,
+        "qty_series":   qty_series,
         "inputs": {
             "ek_net": round(float(ek_net), 2),
             "shipping_out_net": round(float(shipping_out_net), 2),
