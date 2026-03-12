@@ -4,6 +4,7 @@ Provides ASIN lookup via Keepa API and Amazon profit calculation.
 """
 from __future__ import annotations
 
+import asyncio
 import os
 import time
 import math
@@ -355,19 +356,20 @@ def _csv_to_series(csv: Optional[List[int]], max_points: int = 90, days: int = 9
     return result
 
 
-def _csv_to_rank_series(rank_csv: Optional[List[int]], max_points: int = 120) -> List[List]:
+def _csv_to_rank_series(rank_csv: Optional[List[int]], max_points: int = 365, days: int = 365) -> List[List]:
     """
     Convert Keepa rank CSV to [[epoch_ms, rank], ...] series for charting.
-    Filters -1 (unavailable) entries.
+    Filters -1 (unavailable) entries. Defaults to last 365 days.
     """
     if not rank_csv or len(rank_csv) < 2:
         return []
     KEEPA_EPOCH_OFFSET = 21564000
+    cutoff_keepa = (time.time() / 60) - KEEPA_EPOCH_OFFSET - (days * 24 * 60)
     result = []
     for i in range(0, len(rank_csv) - 1, 2):
         keepa_ts = rank_csv[i]
         rank     = rank_csv[i + 1]
-        if rank < 0:
+        if rank < 0 or keepa_ts < cutoff_keepa:
             continue
         epoch_ms = (keepa_ts + KEEPA_EPOCH_OFFSET) * 60 * 1000
         result.append([epoch_ms, rank])
@@ -597,6 +599,75 @@ async def keepa_lookup(asin: str) -> Optional[Dict[str, Any]]:
     return product
 
 
+# Keepa domain codes for EU/key Amazon marketplaces
+_INTL_DOMAINS: Dict[str, str] = {
+    "FR": "6",
+    "UK": "4",
+    "IT": "8",
+    "ES": "9",
+    "NL": "11",
+    "PL": "13",
+}
+_intl_price_cache: Dict[str, Tuple[float, Dict[str, Optional[float]]]] = {}
+_INTL_CACHE_TTL = 1800  # 30 min
+
+async def _fetch_one_intl_price(asin: str, country: str, domain: str, client: "httpx.AsyncClient") -> Tuple[str, Optional[float]]:
+    """Fetch current buy box price for one marketplace. Returns (country, price_eur_or_local)."""
+    key = _keepa_key()
+    try:
+        r = await client.get(
+            f"{KEEPA_API_BASE}/product",
+            params={"key": key, "domain": domain, "asin": asin, "stats": "30", "history": "0"},
+            timeout=10,
+        )
+        r.raise_for_status()
+        data = r.json()
+        products = data.get("products")
+        if not products:
+            return country, None
+        p = products[0]
+        stats = p.get("stats") or {}
+        # buyBoxPrice: index 18 in csv, but stats gives current values
+        buy_box = stats.get("current") and stats["current"][18]  # buyBox
+        if buy_box is None or buy_box < 0:
+            buy_box = stats.get("current") and stats["current"][0]   # NEW price
+        if buy_box is not None and buy_box > 0:
+            return country, round(buy_box / KEEPA_DIV, 2)
+        return country, None
+    except Exception:
+        return country, None
+
+
+async def fetch_intl_prices(asin: str) -> Dict[str, Optional[float]]:
+    """Fetch current buy box prices for key EU Amazon marketplaces in parallel."""
+    cached = _intl_price_cache.get(asin)
+    if cached:
+        ts, data = cached
+        if time.time() - ts < _INTL_CACHE_TTL:
+            return data
+
+    key = _keepa_key()
+    if not key:
+        return {}
+
+    async with httpx.AsyncClient() as client:
+        tasks = [
+            _fetch_one_intl_price(asin, country, domain, client)
+            for country, domain in _INTL_DOMAINS.items()
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    prices = {}
+    for r in results:
+        if isinstance(r, tuple):
+            country, price = r
+            if price is not None:
+                prices[country] = price
+
+    _intl_price_cache[asin] = (time.time(), prices)
+    return prices
+
+
 async def asin_from_ean(ean: str) -> Optional[str]:
     """Look up ASIN from EAN using Keepa."""
     key = _keepa_key()
@@ -762,13 +833,21 @@ async def amazon_check(
     days_to_cash       = round(30 / sales_30d, 1) if sales_30d > 0 else None
 
     # ── Price history series ──────────────────────────────────────────────────
-    # Use buy box series, fallback to new marketplace series
-    bb_series  = _csv_to_series(buy_box_csv if len(buy_box_csv) > 2 else new_csv)
-    amz_series = _csv_to_series(amz_csv)
+    # Return up to 365 days so the 1J chart range is meaningful in the extension
+    bb_series  = _csv_to_series(buy_box_csv if len(buy_box_csv) > 2 else new_csv, max_points=365, days=365)
+    amz_series = _csv_to_series(amz_csv, max_points=365, days=365)
+
+    # ── International prices (parallel Keepa calls for EU markets) ───────────
+    intl_prices = await fetch_intl_prices(asin) if asin else {}
 
     # ── EAN list from Keepa ───────────────────────────────────────────────────
     ean_list = product.get("eanList") or []
     resolved_ean = ean or (ean_list[0] if ean_list else None)
+
+    # ── Product image from Keepa imagesCSV ───────────────────────────────────
+    imgs_csv = product.get("imagesCSV") or ""
+    imgs = [i.strip() for i in imgs_csv.split(",") if i.strip()]
+    product_image = f"https://images-na.ssl-images-amazon.com/images/I/{imgs[0]}" if imgs else None
 
     return {
         "ok":               True,
@@ -777,6 +856,7 @@ async def amazon_check(
         "ean":              resolved_ean,
         "title":            title,
         "verdict":          verdict,
+        "product_image":    product_image,
 
         # Prices
         "sell_price_median": round(sell_price, 2),
@@ -826,6 +906,9 @@ async def amazon_check(
         "price_series":      bb_series,
         "amz_series":        amz_series,
         "rank_series":       rank_series,
+
+        # International prices (current buy box per EU marketplace)
+        "intl_prices":       intl_prices,
 
         # Product signals
         "signals":           signals,

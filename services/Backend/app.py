@@ -759,6 +759,7 @@ async def flipcheck(request: Request):
             "ean":              ean,
             "ek":               round(float(ek), 2),
             "title":            debug.get("rep_title") or ean,
+            "product_image":    debug.get("rep_image"),
             "verdict":          verdict,
             "reason":           reason,
             "vat_mode":         vat_mode,
@@ -779,7 +780,7 @@ async def flipcheck(request: Request):
             # Logistics
             "days_to_cash":     m.get("days_to_cash"),
             "sales_30d":        m.get("sales_30d"),
-            "offer_count":      m.get("offer_count"),
+            "offer_count":      debug.get("offer_count"),
             "browse_avg":       debug.get("browse_avg"),
             # Daily series from eBay Research (metricsTrends) — 30-31 daily data points
             # [[epoch_ms, avg_sold_price], ...] and [[epoch_ms, qty_sold], ...]

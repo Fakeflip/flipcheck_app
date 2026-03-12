@@ -244,7 +244,9 @@ def _build_browse_market_prices(items: List[Dict[str, Any]]) -> Dict[str, Any]:
     lo, hi = median * 0.5, median * 1.5
     filtered = [p for p in prices if lo <= p <= hi] or prices
     avg_price = sum(filtered) / len(filtered)
+    rep_item = next((it for it in items if it.get("itemId") == min(offers, key=lambda o: abs(o["price"] - avg_price)).get("itemId")), {})
     rep = min(offers, key=lambda o: abs(o["price"] - avg_price))
+    rep_image = ((rep_item.get("thumbnailImages") or [{}])[0]).get("imageUrl") or (rep_item.get("image") or {}).get("imageUrl")
     return {
         "ok": True,
         "browse_avg": round(avg_price, 2),
@@ -252,6 +254,7 @@ def _build_browse_market_prices(items: List[Dict[str, Any]]) -> Dict[str, Any]:
         "offer_count": len(prices),
         "rep_itemId": rep.get("itemId"),
         "rep_title": rep.get("title"),
+        "rep_image": rep_image,
     }
 # =========================================================
 # PUBLIC SOLD LISTINGS FALLBACK (kein Cookie / Browse nötig)
@@ -608,7 +611,7 @@ def lookup_ebay_metrics_query(
     vat_rate: float = 0.19,
     fee_up_to_200: float = 0.12,
     fee_above_200: float = 0.12,
-    trends_day_range: int = 30,
+    trends_day_range: int = 90,
     bad_words: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     q = (query or "").strip()
@@ -850,6 +853,7 @@ def lookup_ebay_metrics_query(
             "browse_median_gross": browse_median_gross,
             "rep_title": browse_prices.get("rep_title"),
             "rep_itemId": browse_prices.get("rep_itemId"),
+            "rep_image": browse_prices.get("rep_image"),
             "research_ok": research_ok,
             "trends_range": int(trends_day_range),
             "trends_ok": bool(trends and (trends.get("points") is not None)),

@@ -67,6 +67,12 @@ function _eanFromJsonLd(d) {
         }
       }
     }
+    // schema.org BuyAction / SellAction / OrderItem — product is in "object"
+    // MediaMarkt uses BuyAction with { "@type":"BuyAction", "object": { "@type":"Product", "gtin13":"..." } }
+    if (item?.object) {
+      const r = _eanFromJsonLd(item.object);
+      if (r) return r;
+    }
     // Shopify ProductGroup: variants carry the EAN, not the parent product
     if (Array.isArray(item?.hasVariant)) {
       for (const variant of item.hasVariant) {
@@ -75,6 +81,11 @@ function _eanFromJsonLd(d) {
           if (v && isValidEan(String(v))) return String(v).trim();
         }
       }
+    }
+    // schema.org ItemList / ListItem — item may be in "item" property
+    if (item?.item) {
+      const r = _eanFromJsonLd(item.item);
+      if (r) return r;
     }
   }
   return null;
@@ -91,9 +102,11 @@ function _scanJsonLd() {
   return null;
 }
 
-/** Parse a JSON data layer script by selector and recurse for ean/gtin. */
+/** Parse a JSON data layer script by selector and recurse for ean/gtin.
+ *  depth limit raised to 12 — MediaMarkt/Saturn nest product data ~10 levels
+ *  deep inside __NEXT_DATA__ (props→pageProps→ssrPageData→layout→body→…→product→ean). */
 function _deepSearchEan(obj, depth = 0) {
-  if (depth > 8 || !obj || typeof obj !== 'object') return null;
+  if (depth > 12 || !obj || typeof obj !== 'object') return null;
   for (const k of ['gtin13', 'gtin8', 'gtin12', 'gtin14', 'gtin', 'ean', 'isbn', 'barcode',
                    'eanCode', 'ean_code', 'gtinCode', 'gtin_code', 'productGtin', 'product_gtin',
                    'barCode', 'bar_code', 'productEan', 'product_ean']) {
@@ -280,8 +293,9 @@ function extractEanFromSerpCard(card) {
 
 function extractEanAmazon() {
   // 1) Technical Details tables — Amazon uses multiple section IDs depending on product/locale
-  //    Labels may be "EAN", "GTIN", or "Global Trade Identification Number" (English Amazon.de)
-  const AMAZON_EAN_RE = /EAN|GTIN|Global Trade Identification/i;
+  //    Labels may be "EAN", "GTIN", "UPC" (English Amazon.de frequently uses UPC label),
+  //    "Global Trade Identification Number", "Barcode No.", or "Product Code".
+  const AMAZON_EAN_RE = /EAN|GTIN|Global Trade Identification|UPC|Barcode No|Product Code/i;
   for (const row of document.querySelectorAll(
       '#productDetails_techSpec_section_1 tr, ' +
       '#productDetails_techSpec_section_2 tr, ' +
@@ -291,7 +305,8 @@ function extractEanAmazon() {
     const th = (row.querySelector('th') || row.cells?.[0])?.textContent || '';
     const td = (row.querySelector('td') || row.cells?.[1])?.textContent || '';
     if (AMAZON_EAN_RE.test(th)) {
-      const v = td.trim().replace(/\s/g, '');
+      // normalizeToEan13 converts 12-digit UPC-A → EAN-13 by prepending '0'
+      const v = normalizeToEan13(td.trim().replace(/\s/g, ''));
       if (isValidEan(v)) return v;
     }
   }
@@ -301,14 +316,14 @@ function extractEanAmazon() {
   for (const li of document.querySelectorAll(
       '#detailBullets_feature_div li, #detail-bullets li, .detail-bullet-list li')) {
     const spans = li.querySelectorAll('span');
-    if (spans.length >= 2 && /EAN|GTIN|Barcode/i.test(spans[0].textContent)) {
-      const v = spans[1].textContent.trim().replace(/\s/g, '');
+    if (spans.length >= 2 && /EAN|GTIN|Barcode|UPC/i.test(spans[0].textContent)) {
+      const v = normalizeToEan13(spans[1].textContent.trim().replace(/\s/g, ''));
       if (isValidEan(v)) return v;
     }
     // Fallback: text-match for older layouts
-    const m = li.textContent.match(/(?:EAN|GTIN|Barcode)[:\s]+([\d\s]{8,16})/i);
+    const m = li.textContent.match(/(?:EAN|GTIN|Barcode|UPC)[:\s]+([\d\s]{8,16})/i);
     if (m) {
-      const v = m[1].replace(/\s/g, '');
+      const v = normalizeToEan13(m[1].replace(/\s/g, ''));
       if (isValidEan(v)) return v;
     }
   }
@@ -328,8 +343,8 @@ function extractEanAmazon() {
   // 6) Aplus content / additional product info sections
   for (const el of document.querySelectorAll(
       '#aplus li, #aplus td, #dpx-asin_feature_div td, .aplus-module td')) {
-    if (/EAN|GTIN/i.test(el.previousElementSibling?.textContent || el.textContent)) {
-      const v = el.textContent.trim().replace(/\s/g, '');
+    if (/EAN|GTIN|UPC/i.test(el.previousElementSibling?.textContent || el.textContent)) {
+      const v = normalizeToEan13(el.textContent.trim().replace(/\s/g, ''));
       if (isValidEan(v)) return v;
     }
   }
@@ -392,19 +407,51 @@ function extractEanOtto() {
 // ── Saturn.de + MediaMarkt.de (same platform — MediaSaturn) ──────────────────
 
 function extractEanSaturn() {
-  // 1) JSON-LD
-  const ld = _scanJsonLd(); if (ld) return ld;
-  // 2) __NEXT_DATA__ (Saturn/MMS React app)
+  // 1) JSON-LD — scan in REVERSE order because MediaMarkt/Saturn Next.js SPA navigation
+  //    leaves old JSON-LD script tags in the DOM; new page's tags are appended at the end.
+  //    Scanning last→first ensures we get the current product's EAN, not the previous page's.
+  const ldScripts = [...document.querySelectorAll('script[type="application/ld+json"]')].reverse();
+  for (const el of ldScripts) {
+    try {
+      const ean = _eanFromJsonLd(JSON.parse(el.textContent));
+      if (ean) return ean;
+    } catch {}
+  }
+
+  // 2) __NEXT_DATA__ — MediaSaturn is Next.js; product EAN is nested ~10 levels deep.
+  //    _deepSearchEan depth was raised to 12 to cover the full nesting path.
   const next = _parseScriptVar('#__NEXT_DATA__');
   if (next) { const r = _deepSearchEan(next); if (r) return r; }
-  // 3) General inline script scan (catches window.__DATA__ and other patterns)
+
+  // 3) Inline scripts (catches window.__DATA__, dataLayer, and other bundles)
   const inl = _scanInlineScripts(); if (inl) return inl;
-  // 4) DOM tables and meta
+
+  // 4) DOM — try both legacy and current (2024/2025) MediaMarkt/Saturn selectors
+  const specTables = [
+    // Current MediaMarkt.de 2024/2025 (data-testid based)
+    '[data-testid="mms-product-specification-table"] tr',
+    '[data-testid="product-specification"] tr',
+    '[data-testid="pdp-specification-table"] tr',
+    '[data-testid="spec-table"] tr',
+    // Current Saturn.de
+    '[data-test="spec-table"] tr',
+    '[data-test="product-specifications"] tr',
+    // Legacy class names (pre-2024)
+    '.product-details-page__specification tr',
+    '.sc-bdf5e3bc tr',
+    '.pdp-specification-table tr',
+  ];
+  for (const sel of specTables) {
+    const v = _tableEan(sel);
+    if (v) return v;
+  }
+
   return (
     _dataAttrEan() ||
-    _tableEan('.product-details-page__specification tr, .sc-bdf5e3bc tr') ||
-    _tableEan('[data-test="spec-table"] tr') ||
-    _textMatchEan('.product-details-page__information, [data-test="productDetails"]') ||
+    _textMatchEan(
+      '[data-testid="pdp-product-info"], [data-testid="product-info"], ' +
+      '.product-details-page__information, [data-test="productDetails"]'
+    ) ||
     _metaEan()
   );
 }
@@ -903,6 +950,26 @@ function detectPagePrice() {
     const iv = s.match(/^(\d{1,5})$/);
     if (iv) { const p = parseFloat(iv[0]); if (p > 0 && p < 99999) return p; }
     return null;
+  }
+
+  // 0) High-priority sale-price selectors — must run BEFORE JSON-LD because some
+  //    retailers (MediaMarkt, Saturn) put the UVP/RRP in JSON-LD offers.price
+  //    while the actual sale price is only in the DOM.
+  const SALE_FIRST = [
+    '[data-test="branded-price-without-rrp"]',          // MediaMarkt / Saturn sale price
+    '[class*="BrandedPrice"] [class*="price--highlight"]',
+    '[class*="price--red"]',
+    '[class*="price--sale"]',
+    '.m-price__highlight',                              // Lidl sale
+    '[class*="salePrice"]',
+    '[class*="sale-price"]',
+  ];
+  for (const sel of SALE_FIRST) {
+    const el = document.querySelector(sel);
+    if (el) {
+      const p = _pp(el.getAttribute('content') || el.textContent);
+      if (p) return p;
+    }
   }
 
   // 1) JSON-LD structured data (most reliable)

@@ -960,10 +960,11 @@ const FlipcheckView = (() => {
     let chartEntries = [];
 
     if (Array.isArray(price_series) && price_series.length >= 2) {
-      // Convert [[epoch_ms, price], ...] to chart entry objects
+      // Convert [[epoch_ms, price], ...] to chart entry objects — trim to last 30 days
+      const cutoff30d = Date.now() - 30 * 86400000;
       const qtyMap = new Map((qty_series || []).map(([ts, q]) => [ts, q]));
       chartEntries = price_series
-        .filter(([, p]) => p != null)
+        .filter(([epochMs, p]) => p != null && epochMs >= cutoff30d)
         .map(([epochMs, price]) => ({
           ts:           new Date(epochMs).toISOString(),
           research_avg: price,
@@ -1028,7 +1029,13 @@ const FlipcheckView = (() => {
     const seriesSource = chartWrap.dataset.market === "amazon"   ? "Keepa/Buy Box"
                        : chartWrap.dataset.market === "kaufland" ? "Kaufland Research"
                        :                                           "eBay Research";
-    const periodLabel  = isFromSeries ? `${I18N.t('fc.chart.last30')} (${seriesSource})` : `${I18N.t('fc.chart.last')} ${chartEntries.length} ${I18N.t('fc.chart.checks')}`;
+    let seriesDays = 30;
+    if (isFromSeries && chartEntries.length >= 2) {
+      const t0 = new Date(chartEntries[0].ts).getTime();
+      const t1 = new Date(chartEntries[chartEntries.length - 1].ts).getTime();
+      seriesDays = Math.max(1, Math.round((t1 - t0) / 86400000));
+    }
+    const periodLabel  = isFromSeries ? `Letzte ${seriesDays} Tage (${seriesSource})` : `${I18N.t('fc.chart.last')} ${chartEntries.length} ${I18N.t('fc.chart.checks')}`;
 
     chartWrap.innerHTML = `
       <div class="panel" style="padding:14px 16px">
@@ -1159,13 +1166,16 @@ const FlipcheckView = (() => {
     const ranks = pts.map(([, r]) => r);
     const minR  = Math.min(...ranks);
     const maxR  = Math.max(...ranks);
+    const bsrDays = pts.length >= 2
+      ? Math.max(1, Math.round((pts[pts.length - 1][0] - pts[0][0]) / 86400000))
+      : 30;
 
     chartWrap.innerHTML = `
       <div class="panel" style="padding:14px 16px">
         <div class="row-between mb-12">
           <div class="row gap-8" style="align-items:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,5 9,9 15,2" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.bsr_history')} — ${I18N.t('fc.chart.last30')} (Keepa)</span>
+            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.bsr_history')} — Letzte ${bsrDays} Tage (Keepa)</span>
           </div>
           <div class="row gap-12" style="align-items:center">
             <span class="text-xs text-muted">Best: <strong style="color:var(--green)">#${Number(minR).toLocaleString("de-DE")}</strong></span>

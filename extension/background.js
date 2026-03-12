@@ -242,6 +242,83 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
   return promise;
 }
 
+// ── Amazon page scrape: extract EAN/UPC/GTIN from product page HTML ───────────
+// Fallback when Keepa eanList is empty. Fetches the /dp/ page as background SW
+// (no cookies = anon view) and regex-extracts identifiers from the raw HTML.
+async function _scrapeAmazonPageEan(asin) {
+  try {
+    // ?th=1&psc=1 forces the detail page even for multi-variant products
+    const url = `https://www.amazon.de/dp/${asin}?th=1&psc=1`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(12000),
+      headers: { 'Accept-Language': 'de-DE,de;q=0.9', 'Accept': 'text/html' },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+
+    let m;
+    // 1) productDetails table (2024 layout): <th>EAN</th><td>...</td>
+    const tableRe = /(?:EAN|GTIN|UPC|Barcode No|Product Code)[^<]*<\/th>\s*<td[^>]*>\s*([\d\s]{8,16})\s*<\/td>/gi;
+    while ((m = tableRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1].replace(/\s/g, ''));
+      if (v) return v;
+    }
+
+    // 2) Detail bullets span pair: >UPC<...>622356328579<
+    const bulletRe = />(?:EAN|GTIN|UPC|Barcode)[:\s]*<\/span>\s*<span[^>]*>\s*([\d\s]{8,16})\s*</gi;
+    while ((m = bulletRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1].replace(/\s/g, ''));
+      if (v) return v;
+    }
+
+    // 3) JSON-LD gtin fields: "gtin13":"..."
+    const ldRe = /"gtin(?:13|14|8|12)"\s*:\s*"([\d]{8,14})"/gi;
+    while ((m = ldRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1]);
+      if (v) return v;
+    }
+
+    // 4) Inline JSON: "ean":"...", "barcode_value":"..."
+    const jsonRe = /"(?:ean|gtin13|barcode_value|product_barcode)":\s*"(\d{8,14})"/gi;
+    while ((m = jsonRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1]);
+      if (v) return v;
+    }
+
+    // 5) a-text-bold label/value pattern (new tech details layout)
+    const boldRe = /<span[^>]*class="a-text-bold"[^>]*>(?:EAN|GTIN|Barcode)[^<]*<\/span>\s*<\/td>\s*<td[^>]*>\s*<span[^>]*>([\d\s]{8,16})<\/span>/gi;
+    while ((m = boldRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1].replace(/\s/g, ''));
+      if (v) return v;
+    }
+
+    // 6) Plain text anywhere: label colon digits (last-resort)
+    const textRe = /(?:EAN|GTIN|UPC)[:\s]+([\d]{8,14})/gi;
+    while ((m = textRe.exec(html)) !== null) {
+      const v = _normEanBg(m[1]);
+      if (v) return v;
+    }
+  } catch {}
+  return null;
+}
+
+/** Normalize a raw digit string: UPC-A (12 digits) → EAN-13, validate checksum. */
+function _normEanBg(s) {
+  const d = String(s || '').replace(/\D/g, '');
+  if (!d) return null;
+  // UPC-A: pad to EAN-13
+  const ean = d.length === 12 ? '0' + d : d;
+  if (ean.length < 8 || ean.length > 14) return null;
+  // Luhn-style EAN checksum validation
+  let sum = 0;
+  for (let i = 0; i < ean.length - 1; i++) {
+    sum += parseInt(ean[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const check = (10 - (sum % 10)) % 10;
+  if (check !== parseInt(ean[ean.length - 1])) return null;
+  return ean;
+}
+
 // ── Amazon Check API Call (L1 → L2 → Network) ────────────────────────────────
 async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba', shipIn = 4.99, catId = 'sonstiges', prepFee = 0 }) {
   const ekNum    = parseFloat(ek) || 0;
@@ -447,11 +524,19 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           break;
         }
 
-        // ── ASIN → EAN: resolve via amazon-check (response contains ean field) ─
+        // ── ASIN → EAN: resolve via amazon-check (Keepa), fallback to page scrape ─
         case 'ASIN_TO_EAN': {
           try {
             const asinData = await apiAmazonCheck({ asin: msg.asin, ean: '', ek: 0, mode: 'mid' });
-            reply({ ok: true, ean: asinData?.ean || null, asin: msg.asin, title: asinData?.title || null });
+            const keepaEan = asinData?.ean || null;
+            if (keepaEan) {
+              reply({ ok: true, ean: keepaEan, asin: msg.asin, title: asinData?.title || null });
+              break;
+            }
+            // Keepa returned no EAN — scrape the Amazon product page HTML for
+            // UPC / EAN / GTIN (Amazon.de English locale uses "UPC" label, not "EAN")
+            const scrapeEan = await _scrapeAmazonPageEan(msg.asin);
+            reply({ ok: true, ean: scrapeEan, asin: msg.asin, title: asinData?.title || null });
           } catch {
             reply({ ok: false, ean: null });
           }
