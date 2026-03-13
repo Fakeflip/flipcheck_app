@@ -1732,9 +1732,13 @@ async def repricer_update(items: list[RepricerItem]):
         }
         updates.append(result)
 
-        if status == "UPDATED":
-            ebay_item_id = item.ebay_item_id or item.sku
-            ebay_updates.append({"item_id": ebay_item_id, "new_price": new_price})
+        if status in ("UPDATED", "RAISED"):
+            if not item.ebay_item_id:
+                # No real eBay item ID — can't push. Mark separately so UI can warn.
+                result["status"]     = "NO_EBAY_ID"
+                result["ebay_error"] = "Keine eBay-Item-ID — bitte 'Listings sync' nutzen"
+            else:
+                ebay_updates.append({"item_id": item.ebay_item_id, "new_price": new_price})
 
     # Push to eBay via Trading API ReviseFixedPriceItem
     ebay_result: Dict = {"success": [], "failed": []}
@@ -1748,8 +1752,8 @@ async def repricer_update(items: list[RepricerItem]):
     # Annotate with eBay push outcome
     ebay_fail_ids = {f["item_id"] for f in ebay_result.get("failed", [])}
     for upd in updates:
-        effective_id = upd["ebay_item_id"] or upd["sku"]
-        if upd["status"] == "UPDATED" and effective_id in ebay_fail_ids:
+        effective_id = upd.get("ebay_item_id")
+        if upd["status"] in ("UPDATED", "RAISED") and effective_id and effective_id in ebay_fail_ids:
             fail_err = next(
                 (f["error"] for f in ebay_result["failed"] if f["item_id"] == effective_id),
                 "unknown",

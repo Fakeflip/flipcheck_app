@@ -180,6 +180,7 @@ const RepricerView = (() => {
     if (s === "AT_FLOOR") return `<span class="badge badge-warning" style="font-size:10px">🔒 Floor</span>`;
     if (s === "HOLD")     return `<span class="badge badge-muted"    style="font-size:10px">= Halten</span>`;
     if (s === "EBAY_FAILED") return `<span class="badge badge-danger" style="font-size:10px">✗ Fehler</span>`;
+    if (s === "NO_EBAY_ID")  return `<span class="badge badge-warning" style="font-size:10px">⚠ Keine ID</span>`;
     return `<span class="badge badge-muted" style="font-size:10px">${s}</span>`;
   }
 
@@ -217,6 +218,11 @@ const RepricerView = (() => {
       <div style="padding:8px 20px;background:rgba(239,68,68,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
         <span style="font-size:13px">❌</span>
         <span class="text-xs" style="color:#f87171">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 120))}</span>
+      </div>` :
+    item.status === "NO_EBAY_ID" ? `
+      <div style="padding:8px 20px;background:rgba(245,158,11,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px">⚠️</span>
+        <span class="text-xs" style="color:#fbbf24">Keine eBay-Item-ID gesetzt — klicke <strong>Listings sync</strong> um deine Listings zu importieren, oder trag die eBay-Item-ID manuell ein.</span>
       </div>` : "";
 
     el.innerHTML = `
