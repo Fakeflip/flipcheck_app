@@ -242,6 +242,31 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
   return promise;
 }
 
+// ── eBay chart-only fetch (365d, separate from main check) ────────────────────
+const _chartCache = new Map(); // key → { ts, price_series, qty_series }
+async function apiFlipcheckChart({ ean }) {
+  const key = `chart:${ean}`;
+  const hit = _chartCache.get(key);
+  if (hit && Date.now() - hit.ts < 30 * 60 * 1000) return hit; // 30min TTL
+
+  const token   = await getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  try {
+    const res = await _fetchWithRetry('https://gate.joinflipcheck.app/flipcheck', {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ ean, ek: 0, mode: 'mid', trends_day_range: 365 }),
+    }, 20000);
+    if (!res.ok) return null;
+    const d = await res.json();
+    const entry = { ts: Date.now(), price_series: d.price_series, qty_series: d.qty_series };
+    _chartCache.set(key, entry);
+    return entry;
+  } catch { return null; }
+}
+
 // ── Amazon page scrape: extract EAN/UPC/GTIN from product page HTML ───────────
 // Fallback when Keepa eanList is empty. Fetches the /dp/ page as background SW
 // (no cookies = anon view) and regex-extracts identifiers from the raw HTML.
@@ -449,6 +474,12 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
             await saveRecent(msg.ean, data).catch(() => {});
             reply({ ok: true, data });
           }
+          break;
+        }
+
+        case 'FLIPCHECK_CHART': {
+          const chartData = await apiFlipcheckChart(msg);
+          reply({ ok: !!chartData, data: chartData });
           break;
         }
 

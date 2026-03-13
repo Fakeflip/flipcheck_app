@@ -960,11 +960,10 @@ const FlipcheckView = (() => {
     let chartEntries = [];
 
     if (Array.isArray(price_series) && price_series.length >= 2) {
-      // Convert [[epoch_ms, price], ...] to chart entry objects — trim to last 30 days
-      const cutoff30d = Date.now() - 30 * 86400000;
+      // Convert [[epoch_ms, price], ...] to chart entry objects
       const qtyMap = new Map((qty_series || []).map(([ts, q]) => [ts, q]));
       chartEntries = price_series
-        .filter(([epochMs, p]) => p != null && epochMs >= cutoff30d)
+        .filter(([, p]) => p != null)
         .map(([epochMs, price]) => ({
           ts:           new Date(epochMs).toISOString(),
           research_avg: price,

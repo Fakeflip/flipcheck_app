@@ -641,24 +641,26 @@ async def flipcheck(request: Request):
             body = await request.json()
         except Exception:
             body = {}
-        ean          = (body.get("ean")      or "").strip()
-        ek_raw       = str(body.get("ek", "") if body.get("ek") is not None else "")
-        mode         = (body.get("mode")     or "mid").strip().lower()
-        category     = (body.get("category") or "sonstiges").strip().lower()
-        shipping_in  = float(body.get("shipping_in")  or 0)
-        shipping_out = float(body.get("shipping_out") or 0)
-        vat_mode     = (body.get("vat_mode") or "no_vat").strip().lower()
-        ek_mode      = (body.get("ek_mode")  or "gross").strip().lower()
+        ean              = (body.get("ean")      or "").strip()
+        ek_raw           = str(body.get("ek", "") if body.get("ek") is not None else "")
+        mode             = (body.get("mode")     or "mid").strip().lower()
+        category         = (body.get("category") or "sonstiges").strip().lower()
+        shipping_in      = float(body.get("shipping_in")  or 0)
+        shipping_out     = float(body.get("shipping_out") or 0)
+        vat_mode         = (body.get("vat_mode") or "no_vat").strip().lower()
+        ek_mode          = (body.get("ek_mode")  or "gross").strip().lower()
+        trends_day_range = int(body.get("trends_day_range") or 30)
     else:
         form = await request.form()
-        ean          = (form.get("ean")      or "").strip()
-        ek_raw       = str(form.get("ek", "") if form.get("ek") is not None else "")
-        mode         = (form.get("mode")     or "mid").strip().lower()
-        category     = (form.get("category") or "sonstiges").strip().lower()
-        shipping_in  = float(form.get("shipping_in")  or 0)
-        shipping_out = float(form.get("shipping_out") or 0)
-        vat_mode     = (form.get("vat_mode") or "no_vat").strip().lower()
-        ek_mode      = (form.get("ek_mode")  or "gross").strip().lower()
+        ean              = (form.get("ean")      or "").strip()
+        ek_raw           = str(form.get("ek", "") if form.get("ek") is not None else "")
+        mode             = (form.get("mode")     or "mid").strip().lower()
+        category         = (form.get("category") or "sonstiges").strip().lower()
+        shipping_in      = float(form.get("shipping_in")  or 0)
+        shipping_out     = float(form.get("shipping_out") or 0)
+        vat_mode         = (form.get("vat_mode") or "no_vat").strip().lower()
+        ek_mode          = (form.get("ek_mode")  or "gross").strip().lower()
+        trends_day_range = int(form.get("trends_day_range") or 30)
 
     is_vat = vat_mode == "ust_19"
     vat_factor = 1.19 if is_vat else 1.0
@@ -694,7 +696,7 @@ async def flipcheck(request: Request):
     # ── eBay lookup (sell prices, days_to_cash, sales_30d) ──────────────────
     # Pass a neutral fee_rate — we recalculate everything below with tiered fees.
     try:
-        m = lookup_ebay_metrics(ean, float(ek))
+        m = lookup_ebay_metrics(ean, float(ek), trends_day_range=trends_day_range)
     except Exception as e:
         if is_json:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": str(e), "reason": "ebay_lookup_failed"})

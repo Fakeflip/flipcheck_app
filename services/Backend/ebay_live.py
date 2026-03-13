@@ -611,7 +611,7 @@ def lookup_ebay_metrics_query(
     vat_rate: float = 0.19,
     fee_up_to_200: float = 0.12,
     fee_above_200: float = 0.12,
-    trends_day_range: int = 90,
+    trends_day_range: int = 30,
     bad_words: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     q = (query or "").strip()

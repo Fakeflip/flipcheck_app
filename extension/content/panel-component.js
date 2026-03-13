@@ -1434,6 +1434,8 @@
       this._loadChartSeries(res.data);
       this._checkInventoryStatus(this._identifier);
       this._fetchCrossMarket();
+      // Extra chart fetch for eBay — get 365d series for range buttons (30T/90T/1J)
+      if (this._market === 'ebay') this._fetchEbayChart();
     }
 
     // ── Render Result ───────────────────────────────────────────────────────
@@ -2322,6 +2324,18 @@
     }
 
     // ── Dual-Market Pre-Fetch ─────────────────────────────────────────────
+    _fetchEbayChart() {
+      const ean = this._identifier;
+      if (!ean) return;
+      chrome.runtime.sendMessage({ type: 'FLIPCHECK_CHART', ean }, res => {
+        if (chrome.runtime.lastError || !res?.ok || !res.data) return;
+        const d = res.data;
+        if (Array.isArray(d.price_series) && d.price_series.length >= 2) {
+          this._loadChartSeries(d);
+        }
+      });
+    }
+
     _fetchCrossMarket() {
       if (!this._result || !this._identifier) return;
       const d       = this._result;
