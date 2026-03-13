@@ -25,11 +25,22 @@ const RepricerView = (() => {
   };
 
   const STRATEGY_LABELS = {
-    cheapest:  "Günstigster (Rang 1)",
-    rank_2:    "2. Günstigster (Rang 2)",
-    rank_3:    "3. Günstigster (Rang 3)",
-    avg_top3:  "Ø Durchschnitt Top 3",
-    avg_top5:  "Ø Durchschnitt Top 5",
+    cheapest:   "Günstigster (Rang 1)",
+    rank_2:     "2. Günstigster (Rang 2)",
+    rank_3:     "3. Günstigster (Rang 3)",
+    avg_top3:   "Ø Durchschnitt Top 3",
+    avg_top5:   "Ø Durchschnitt Top 5",
+    avg_30d:    "Ø 30-Tage-Ø (verkauft)",
+    median_30d: "Median 30 Tage (verkauft)",
+  };
+
+  const STATUS_COLORS = {
+    UPDATED:     "#22c55e",
+    RAISED:      "#818cf8",
+    AT_FLOOR:    "#f59e0b",
+    HOLD:        "var(--text-muted)",
+    EBAY_FAILED: "#ef4444",
+    NO_EBAY_ID:  "#f59e0b",
   };
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -113,7 +124,9 @@ const RepricerView = (() => {
       Storage.getSettings(),
       Storage.listInventory().then(r => r.items || []).catch(() => []),
     ]);
-    _connected = await Storage.repricerIsConnected();
+    const connStatus = await Storage.repricerIsConnected();
+    _connected = typeof connStatus === "object" ? connStatus.connected : !!connStatus;
+    if (typeof connStatus === "object" && _status) _status.is_legacy = connStatus.is_legacy;
     _render();
     _wireEvents();
   }
@@ -123,9 +136,13 @@ const RepricerView = (() => {
 
     const badge = _container.querySelector("#reprConnBadge");
     if (badge) {
-      badge.textContent = _connected ? "● Verbunden" : "Nicht verbunden";
+      const isLegacy = _status?.is_legacy;
+      badge.textContent = _connected
+        ? (isLegacy ? "● Verbunden (Team)" : "● Verbunden")
+        : "Nicht verbunden";
       badge.className   = _connected ? "badge badge-success" : "badge badge-muted";
       badge.style.fontSize = "11px";
+      badge.title = isLegacy ? "Legacy Auth'n'Auth Token (Teamzugang)" : "";
     }
     const disconnBtn = _container.querySelector("#btnReprDisconnect");
     if (disconnBtn) disconnBtn.style.display = _connected ? "" : "none";
@@ -140,26 +157,53 @@ const RepricerView = (() => {
   }
 
   function _renderItemList() {
+    const active  = _items.filter(i => i.enabled !== false).length;
+    const updated = _items.filter(i => i.status === "UPDATED" || i.status === "RAISED").length;
+    const lastRun = _status?.lastRun ? fmtAgo(_status.lastRun) : "—";
+    const statsBar = `
+      <div style="padding:8px 12px;display:flex;gap:16px;border-bottom:1px solid var(--border);background:var(--bg-panel)">
+        <span class="text-xs text-muted"><span class="font-semibold text-primary">${_items.length}</span> Gesamt</span>
+        <span class="text-xs text-muted"><span class="font-semibold" style="color:var(--green)">${active}</span> Aktiv</span>
+        <span class="text-xs text-muted"><span class="font-semibold" style="color:#818cf8">${updated}</span> Angepasst</span>
+        <span class="text-xs text-muted" style="margin-left:auto">Letzter Run: ${lastRun}</span>
+      </div>`;
+
     if (!_items.length) {
-      return `<div class="comp-empty-state">
-        <p class="text-xs text-muted" style="padding:16px;text-align:center">Noch keine Artikel.<br>Klicke "Hinzufügen" oder sync deine eBay-Listings.</p>
+      return statsBar + `<div class="comp-empty-state">
+        <p class="text-xs text-muted" style="padding:16px;text-align:center">
+          ${_connected
+            ? `Noch keine Artikel.<br>Klicke <strong>+ Hinzufügen</strong> oder <strong>Listings sync</strong>.`
+            : `eBay nicht verbunden.<br>Klicke auf <strong>● Nicht verbunden</strong> um dich zu verbinden.`
+          }
+        </p>
       </div>`;
     }
-    return _items.map(item => {
-      const isSelected = _selected === item.sku;
-      const statusChip = _renderStatusChip(item);
-      const pausedDot  = item.enabled === false
+
+    return statsBar + _items.map(item => {
+      const isSelected  = _selected === item.sku;
+      const statusChip  = _renderStatusChip(item);
+      const stripeColor = STATUS_COLORS[item.status] || "transparent";
+      const pausedDot   = item.enabled === false
         ? `<span style="color:var(--text-muted);font-size:10px" title="Deaktiviert">⏸ </span>`
         : "";
+      const priceDelta = item.last_price != null && item.old_price != null
+        ? item.last_price - item.old_price : null;
+      const deltaStr = priceDelta != null && Math.abs(priceDelta) >= 0.01
+        ? `<span style="font-size:10px;color:${priceDelta > 0 ? "#22c55e" : "#f87171"}">${priceDelta > 0 ? "+" : ""}${priceDelta.toFixed(2)}€</span>`
+        : "";
       return `
-        <div class="comp-seller-row ${isSelected ? "active" : ""}" data-sku="${_esc(item.sku)}">
+        <div class="comp-seller-row ${isSelected ? "active" : ""}" data-sku="${_esc(item.sku)}"
+             style="border-left:3px solid ${stripeColor};padding-left:9px">
           <div style="flex:1;min-width:0">
             <div class="text-sm font-medium text-primary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pausedDot}${_esc(item.title || item.ean || item.sku)}</div>
             <div class="text-xs text-muted" style="margin-top:2px">${_esc(item.ean || item.sku)}${item.quantity != null ? ` · ${item.quantity}x` : ""}</div>
           </div>
-          <div style="text-align:right;flex-shrink:0">
+          <div style="text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px">
             ${statusChip}
-            ${item.last_price != null ? `<div class="text-xs text-muted" style="margin-top:2px">${fmt(item.last_price)}</div>` : ""}
+            <div style="display:flex;gap:4px;align-items:center">
+              ${deltaStr}
+              ${item.last_price != null ? `<span class="text-xs text-muted">${fmt(item.last_price)}</span>` : ""}
+            </div>
           </div>
         </div>
       `;
@@ -451,13 +495,17 @@ const RepricerView = (() => {
   }
 
   async function _refreshData() {
-    [_items, _log, _status, _inventory] = await Promise.all([
-      Storage.repricerList(),
-      Storage.repricerLog(),
-      Storage.repricerStatus(),
-      Storage.listInventory().then(r => r.items || []).catch(() => []),
+    [[_items, _log, _status, _inventory], connStatus] = await Promise.all([
+      Promise.all([
+        Storage.repricerList(),
+        Storage.repricerLog(),
+        Storage.repricerStatus(),
+        Storage.listInventory().then(r => r.items || []).catch(() => []),
+      ]),
+      Storage.repricerIsConnected(),
     ]);
-    _connected = await Storage.repricerIsConnected();
+    _connected = typeof connStatus === "object" ? connStatus.connected : !!connStatus;
+    if (typeof connStatus === "object" && _status) _status.is_legacy = connStatus.is_legacy;
     _render();
     if (_selected) _renderDetail(_items.find(i => i.sku === _selected));
   }
@@ -686,14 +734,40 @@ const RepricerView = (() => {
 
         <hr style="border:none;border-top:1px solid var(--border)">
 
-        ${!_connected ? `
         <div style="padding:12px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
-          <p class="text-xs text-muted" style="margin-bottom:8px">eBay-Konto nicht verbunden — Preisaktualisierungen + Listing-Sync nicht möglich.</p>
-          <button class="btn btn-primary btn-sm" id="btnConnectEbaySettings">Mit eBay verbinden →</button>
-        </div>` : `
-        <div style="padding:12px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
-          <p class="text-xs" style="color:var(--green)">● eBay-Konto verbunden — Preisaktualisierungen + Listing-Sync aktiv</p>
-        </div>`}
+          ${_connected
+            ? `<div style="display:flex;justify-content:space-between;align-items:center">
+                 <p class="text-xs" style="color:var(--green)">● eBay-Konto verbunden${_status?.is_legacy ? " <span style=\"color:#818cf8\">(Team-Token)</span>" : ""}</p>
+                 <button class="btn btn-ghost btn-xs" id="btnConnectEbaySettings" style="color:var(--text-muted)">Neu verbinden</button>
+               </div>`
+            : `<p class="text-xs text-muted" style="margin-bottom:8px">eBay-Konto nicht verbunden — Preisaktualisierungen + Listing-Sync nicht möglich.</p>
+               <button class="btn btn-primary btn-sm" id="btnConnectEbaySettings">Mit eBay verbinden →</button>`
+          }
+        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border)">
+
+        <div>
+          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+            Team-Zugang / Sub-Account
+          </label>
+          <p class="text-xs text-muted" style="margin-bottom:10px;line-height:1.5">
+            Falls du als Mitverkäufer arbeitest: Legacy Auth'n'Auth Token des <strong>Hauptkontos</strong> eingeben.<br>
+            Zu finden unter: <em>Mein eBay → Konto → API-Zugriff → Auth'n'Auth Token</em>
+          </p>
+          ${_status?.is_legacy
+            ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                 <span class="badge" style="background:rgba(99,102,241,.18);color:#818cf8;font-size:10px">● Team-Token aktiv</span>
+                 <button class="btn btn-ghost btn-xs" id="btnRemoveLegacyToken" style="color:#f87171">Token entfernen</button>
+               </div>`
+            : ""
+          }
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <textarea id="reprLegacyToken" class="input-sm" placeholder="AgAAAA... (optional)" rows="2"
+              style="flex:1;font-size:10px;font-family:monospace;resize:vertical;min-height:36px"></textarea>
+            <button class="btn btn-secondary btn-sm" id="btnSaveLegacyToken" style="flex-shrink:0;margin-top:1px">Speichern</button>
+          </div>
+        </div>
 
       </div>
     `;
@@ -741,6 +815,34 @@ const RepricerView = (() => {
     document.getElementById("btnConnectEbaySettings")?.addEventListener("click", () => {
       Modal.close();
       _connectEbay();
+    });
+
+    document.getElementById("btnSaveLegacyToken")?.addEventListener("click", async () => {
+      const token = document.getElementById("reprLegacyToken")?.value?.trim();
+      if (!token) { Toast.warning("Token leer", "Bitte einen Token eingeben"); return; }
+      const btn = document.getElementById("btnSaveLegacyToken");
+      if (btn) { btn.disabled = true; btn.textContent = "…"; }
+      try {
+        const res = await Storage.repricerSetLegacyToken(token);
+        if (res?.ok) {
+          Modal.close();
+          _connected = true;
+          if (_status) _status.is_legacy = true;
+          _render();
+          Toast.success("Team-Token gespeichert", "eBay Teamzugang ist jetzt aktiv");
+        } else {
+          Toast.error("Fehler", res?.error || "Token konnte nicht gespeichert werden");
+        }
+      } catch { Toast.error("Fehler", "Token konnte nicht gespeichert werden"); }
+      finally { if (btn) { btn.disabled = false; btn.textContent = "Speichern"; } }
+    });
+
+    document.getElementById("btnRemoveLegacyToken")?.addEventListener("click", async () => {
+      await Storage.repricerRemoveLegacyToken();
+      if (_status) _status.is_legacy = false;
+      Modal.close();
+      await _refreshData();
+      Toast.success("Token entfernt", "Team-Token wurde gelöscht");
     });
   }
 

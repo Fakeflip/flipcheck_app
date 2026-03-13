@@ -334,4 +334,12 @@ contextBridge.exposeInMainWorld("fc", {
   repricerSyncListings:  () => ipcRenderer.invoke("repricer:syncListings"),
   /** Revoke eBay seller OAuth token. @returns {Promise<{ok:boolean}>} */
   repricerDisconnect:    () => ipcRenderer.invoke("repricer:disconnect"),
+  /**
+   * Store a legacy Auth'n'Auth token (team/sub-account access).
+   * @param {string} token
+   * @returns {Promise<{ok:boolean}>}
+   */
+  repricerSetLegacyToken:    (token) => ipcRenderer.invoke("repricer:setLegacyToken", token),
+  /** Remove the legacy token. @returns {Promise<{ok:boolean}>} */
+  repricerRemoveLegacyToken: () => ipcRenderer.invoke("repricer:removeLegacyToken"),
 });

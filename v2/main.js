@@ -1378,7 +1378,8 @@ ipcMain.handle("repricer:isConnected", async () => {
   try {
     const base = apiBaseBackend();
     const res  = await mainApiCall(`${base}/seller/auth/status`, await getToken().catch(() => null));
-    return res.data?.connected || false;
+    // Return full status object so frontend can read is_legacy too
+    return res.data || false;
   } catch { return false; }
 });
 
@@ -1406,6 +1407,37 @@ ipcMain.handle("repricer:disconnect", async () => {
       req.end();
     });
   } catch { /* backend may not be running; best-effort */ }
+  return { ok: true };
+});
+
+ipcMain.handle("repricer:setLegacyToken", async (_e, token) => {
+  try {
+    const base  = apiBaseBackend();
+    const auth  = await getToken().catch(() => null);
+    const res   = await mainApiPost(`${base}/seller/auth/legacy`, { token }, auth);
+    return res.data || { ok: false };
+  } catch (e) { return { ok: false, error: String(e) }; }
+});
+
+ipcMain.handle("repricer:removeLegacyToken", async () => {
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const url   = new URL(`${base}/seller/auth/legacy`);
+    const mod   = url.protocol === "https:" ? https : http;
+    await new Promise((resolve) => {
+      const req = mod.request({
+        hostname: url.hostname,
+        port:     url.port || (url.protocol === "https:" ? 443 : 80),
+        path:     url.pathname,
+        method:   "DELETE",
+        headers:  { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+      }, res => { res.resume(); res.on("end", resolve); });
+      req.on("error", resolve);
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+      req.end();
+    });
+  } catch { /* best-effort */ }
   return { ok: true };
 });
 

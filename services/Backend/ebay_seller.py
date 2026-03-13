@@ -157,23 +157,77 @@ async def get_seller_token() -> str:
 
 
 def is_connected() -> bool:
-    return _load_token() is not None
+    data = _load_token()
+    if not data:
+        return False
+    return bool(data.get("legacy_token")) or bool(data.get("access_token"))
+
+
+def is_legacy_mode() -> bool:
+    """True if a legacy Auth'n'Auth token is configured (team access)."""
+    data = _load_token()
+    return bool(data and data.get("legacy_token"))
+
+
+def save_legacy_token(token: str) -> None:
+    """Store a legacy eBay Auth'n'Auth token (for team/sub-account access)."""
+    global _token_cache
+    data = _load_token() or {}
+    data["legacy_token"] = token.strip()
+    _save_token(data)
+
+
+def remove_legacy_token() -> None:
+    """Remove the legacy token. Falls back to OAuth if an access_token still exists."""
+    global _token_cache
+    data = _load_token()
+    if not data:
+        return
+    data.pop("legacy_token", None)
+    _token_cache = data
+    if data.get("access_token"):
+        _save_token(data)
+    else:
+        try:
+            TOKEN_FILE.unlink(missing_ok=True)
+        except Exception:
+            pass
+        _token_cache = None
+
+
+async def get_token_for_trading() -> tuple:
+    """
+    Returns (token: str, is_legacy: bool).
+    Prefers legacy Auth'n'Auth token (team access) over OAuth.
+    """
+    data = _load_token()
+    if not data:
+        raise RuntimeError("No eBay seller token — authorize via /seller/auth/url")
+    legacy = data.get("legacy_token")
+    if legacy:
+        return legacy, True
+    return await get_seller_token(), False
 
 
 # ── Trading API helpers ───────────────────────────────────────────────────────
 
-def _trading_headers(call_name: str, token: str) -> Dict[str, str]:
-    return {
+def _trading_headers(call_name: str, token: str, legacy: bool = False) -> Dict[str, str]:
+    headers: Dict[str, str] = {
         "X-EBAY-API-COMPATIBILITY-LEVEL": EBAY_API_COMPAT,
         "X-EBAY-API-CALL-NAME":           call_name,
         "X-EBAY-API-SITEID":              EBAY_SITE_ID,
         "X-EBAY-API-APP-NAME":            EBAY_CLIENT_ID,
         "X-EBAY-API-DEV-NAME":            EBAY_DEV_ID,
         "X-EBAY-API-CERT-NAME":           EBAY_CLIENT_SECRET,
-        # Use OAuth2 access token (IAF = Identity and Access Framework)
-        "X-EBAY-API-IAF-TOKEN":           token,
         "Content-Type":                   "text/xml",
     }
+    if legacy:
+        # Legacy Auth'n'Auth token (team/sub-account access)
+        headers["X-EBAY-API-AUTH-TOKEN"] = token
+    else:
+        # OAuth2 IAF token (standard user authorization)
+        headers["X-EBAY-API-IAF-TOKEN"] = token
+    return headers
 
 
 def _xml_tag(root: ET.Element, *path: str) -> Optional[str]:
@@ -189,7 +243,7 @@ def _xml_tag(root: ET.Element, *path: str) -> Optional[str]:
 
 # ── ReviseFixedPriceItem ──────────────────────────────────────────────────────
 
-async def revise_fixed_price_item(item_id: str, new_price: float, token: str) -> Dict:
+async def revise_fixed_price_item(item_id: str, new_price: float, token: str, legacy: bool = False) -> Dict:
     """
     Update price of a single eBay listing via Trading API.
     Works for ALL fixed-price listings (not just Inventory API items).
@@ -208,7 +262,7 @@ async def revise_fixed_price_item(item_id: str, new_price: float, token: str) ->
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             EBAY_TRADING_URL,
-            headers=_trading_headers("ReviseFixedPriceItem", token),
+            headers=_trading_headers("ReviseFixedPriceItem", token, legacy=legacy),
             content=xml_body.encode("utf-8"),
             timeout=15,
         )
@@ -234,14 +288,14 @@ async def bulk_revise_prices(updates: List[Dict]) -> Dict:
     updates: [{"item_id": "...", "new_price": 19.99}, ...]
     Returns: {"success": [...item_ids], "failed": [{item_id, error}]}
     """
-    token   = await get_seller_token()
+    token, is_legacy = await get_token_for_trading()
     success: List[str]  = []
     failed:  List[Dict] = []
 
     for upd in updates:
         item_id   = str(upd.get("item_id",   upd.get("sku", "")))
         new_price = float(upd["new_price"])
-        result    = await revise_fixed_price_item(item_id, new_price, token)
+        result    = await revise_fixed_price_item(item_id, new_price, token, legacy=is_legacy)
         if result["ok"]:
             success.append(item_id)
         else:
@@ -273,7 +327,7 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
     Fetch seller's active fixed-price listings via Trading API GetMyeBaySelling.
     Returns list of {item_id, title, price, ean_guess, url}.
     """
-    token   = await get_seller_token()
+    token, is_legacy = await get_token_for_trading()
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <ActiveList>
@@ -292,7 +346,7 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             EBAY_TRADING_URL,
-            headers=_trading_headers("GetMyeBaySelling", token),
+            headers=_trading_headers("GetMyeBaySelling", token, legacy=is_legacy),
             content=xml_body.encode("utf-8"),
             timeout=20,
         )

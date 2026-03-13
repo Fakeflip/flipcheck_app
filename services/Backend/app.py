@@ -1499,7 +1499,8 @@ async def update_research_cookie(request: Request, body: CookieUpdateBody):
 try:
     from ebay_seller import (
         seller_auth_url, seller_token_exchange, bulk_revise_prices,
-        is_connected, get_my_active_listings,
+        is_connected, is_legacy_mode, get_my_active_listings,
+        save_legacy_token, remove_legacy_token,
     )
     _SELLER_AVAILABLE = True
 except ImportError:
@@ -1509,7 +1510,10 @@ except ImportError:
     async def seller_token_exchange(code): return {"ok": False, "error": "ebay_seller module not available"}  # type: ignore[misc]
     async def bulk_revise_prices(updates): return {"success": [], "failed": []}  # type: ignore[misc]
     def is_connected(): return False  # type: ignore[misc]
+    def is_legacy_mode(): return False  # type: ignore[misc]
     async def get_my_active_listings(**_): return {"ok": False, "items": []}  # type: ignore[misc]
+    def save_legacy_token(token): pass  # type: ignore[misc]
+    def remove_legacy_token(): pass  # type: ignore[misc]
 
 
 @app.get("/seller/auth/url")
@@ -1535,7 +1539,43 @@ async def seller_auth_callback(code: str):
 @app.get("/seller/auth/status")
 async def seller_auth_status():
     """Check whether a seller token exists."""
-    return {"ok": True, "connected": is_connected() if _SELLER_AVAILABLE else False}
+    if not _SELLER_AVAILABLE:
+        return {"ok": True, "connected": False, "is_legacy": False}
+    return {
+        "ok":        True,
+        "connected": is_connected(),
+        "is_legacy": is_legacy_mode(),
+    }
+
+
+class LegacyTokenBody(BaseModel):
+    token: str
+
+
+@app.post("/seller/auth/legacy")
+async def seller_auth_legacy_set(body: LegacyTokenBody):
+    """Store a legacy eBay Auth'n'Auth token (for team/sub-account access)."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
+    if not body.token.strip():
+        return JSONResponse({"ok": False, "error": "Token darf nicht leer sein"}, status_code=400)
+    try:
+        save_legacy_token(body.token)
+        return {"ok": True, "is_legacy": True}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+
+@app.delete("/seller/auth/legacy")
+async def seller_auth_legacy_remove():
+    """Remove the legacy token (falls back to OAuth if still authorized)."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
+    try:
+        remove_legacy_token()
+        return {"ok": True, "is_legacy": False}
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.delete("/seller/auth/disconnect")
@@ -1590,12 +1630,34 @@ def _apply_price_strategy(
     candidates: List[float],
     current_price: float,
     raise_when_cheapest: bool,
+    research_avg: Optional[float] = None,
+    research_med: Optional[float] = None,
 ) -> Tuple[float, str]:
     """
     Given a sorted list of candidate prices (cheapest first), return
     (target_price, price_intent).
     price_intent: "match" | "raise" | "no_data"
+
+    Strategies:
+      cheapest   → rank 1 active listing
+      rank_2     → rank 2 active listing
+      rank_3     → rank 3 active listing
+      avg_top3   → mean of top 3 cheapest active listings
+      avg_top5   → mean of top 5 cheapest active listings
+      avg_30d    → 30-day average sold price (Research API)
+      median_30d → 30-day median sold price (Research API)
     """
+    # Research-based strategies (don't need active listings)
+    if strategy == "avg_30d":
+        if research_avg is None:
+            return current_price, "no_data"
+        return round(research_avg, 2), "match"
+
+    if strategy == "median_30d":
+        if research_med is None:
+            return current_price, "no_data"
+        return round(research_med, 2), "match"
+
     if not candidates:
         return current_price, "no_data"
 
@@ -1659,11 +1721,12 @@ async def repricer_update(items: list[RepricerItem]):
         floor_price = round((item.ek * (1 + min_margin / 100) + item.ship_out) / (1 - EBAY_FEE_RATE), 2)
 
         # ── Fetch competitor listings ─────────────────────────────────────────
-        # Need enough candidates for the chosen strategy: rank_3 needs ≥3, avg_top5 needs ≥5
-        fetch_limit = 15  # always fetch generously so filters still leave enough
+        fetch_limit = 15
         candidate_prices: List[float] = []
         competitor_min: Optional[float] = None
         competitor_2nd: Optional[float] = None
+        research_avg: Optional[float] = None
+        research_med: Optional[float] = None
 
         try:
             def _fetch_comp(ean=item.ean, limit=fetch_limit, comm_only=commercial_only, min_fb=commercial_min_fb):
@@ -1679,13 +1742,12 @@ async def repricer_update(items: list[RepricerItem]):
                     for ci in raw_items:
                         f  = _format_listing(ci)
                         fb = f.get("seller_feedback")
-                        # Commercial filter: skip sellers below feedback threshold
                         if comm_only and (fb is None or int(fb) < min_fb):
                             continue
                         p = f.get("total_price") or f.get("price")
                         if p and p > 0:
                             prices.append(round(p, 2))
-                    return prices  # already sorted cheapest-first by eBay
+                    return prices
                 except Exception:
                     pass
                 return []
@@ -1698,9 +1760,26 @@ async def repricer_update(items: list[RepricerItem]):
         except Exception:
             pass
 
+        # ── Research-based strategies: fetch 30-day sold avg/median ──────────
+        if price_strategy in ("avg_30d", "median_30d") and item.ean:
+            try:
+                def _fetch_research(ean=item.ean):
+                    try:
+                        r = fetch_research_stats(ean, day_range=30)
+                        return r
+                    except Exception:
+                        return None
+                research = await loop.run_in_executor(None, _fetch_research)
+                if research:
+                    research_avg = research.get("avg_price")
+                    research_med = research.get("median_price")
+            except Exception:
+                pass
+
         # ── Pricing decision ──────────────────────────────────────────────────
         raw_target, price_intent = _apply_price_strategy(
-            price_strategy, candidate_prices, item.current_price, raise_when_cheapest
+            price_strategy, candidate_prices, item.current_price, raise_when_cheapest,
+            research_avg=research_avg, research_med=research_med,
         )
         new_price = round(max(floor_price, raw_target), 2)
 
@@ -1728,6 +1807,8 @@ async def repricer_update(items: list[RepricerItem]):
             "competitor_2nd":   competitor_2nd,
             "candidate_count":  len(candidate_prices),
             "price_strategy":   price_strategy,
+            "research_avg":     research_avg,
+            "research_med":     research_med,
             "status":           status,
         }
         updates.append(result)
