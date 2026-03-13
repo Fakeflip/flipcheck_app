@@ -147,7 +147,7 @@ const RepricerView = (() => {
       Storage.repricerLog(),
       Storage.repricerStatus(),
       Storage.getSettings(),
-      Storage.listInventory().then(r => r.items || []).catch(() => []),
+      Storage.listInventory().catch(() => []),
     ]);
     const connStatus = await Storage.repricerIsConnected();
     _connected = typeof connStatus === "object" ? connStatus.connected : !!connStatus;
@@ -570,7 +570,6 @@ const RepricerView = (() => {
       const sku = row.dataset.sku;
       _selected = _selected === sku ? null : sku;
       _render();
-      if (_selected) _renderDetail(_items.find(i => i.sku === sku));
     });
 
     if (!_connected) {
@@ -584,12 +583,13 @@ const RepricerView = (() => {
   }
 
   async function _refreshData() {
-    [[_items, _log, _status, _inventory], connStatus] = await Promise.all([
+    [[_items, _log, _status, _settings, _inventory], connStatus] = await Promise.all([
       Promise.all([
         Storage.repricerList(),
         Storage.repricerLog(),
         Storage.repricerStatus(),
-        Storage.listInventory().then(r => r.items || []).catch(() => []),
+        Storage.getSettings(),
+        Storage.listInventory().catch(() => []),
       ]),
       Storage.repricerIsConnected(),
     ]);
@@ -664,7 +664,8 @@ const RepricerView = (() => {
 
   // ── Add Item Modal ─────────────────────────────────────────────────────────
   async function _showAddModal() {
-    _inventory = await Storage.listInventory();
+    const inv = await Storage.listInventory().catch(() => []);
+    _inventory = inv;
     const listed = _inventory.filter(i =>
       ["LISTED", "IN_STOCK", "LISTING_PENDING"].includes(i.status) && i.ean
     );
@@ -779,7 +780,7 @@ const RepricerView = (() => {
               <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
               <div style="display:flex;align-items:center;gap:4px">
                 <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:64px">
-                <span class="text-xs text-muted">%  (Floor = (EK × (1 + Marge%) + Versand) ÷ 0,87)</span>
+                <span class="text-xs text-muted">%  (Floor = (EK × (1+Marge%) + Versand) ÷ (1 − eBay-Fee%)</span>
               </div>
             </div>
 
