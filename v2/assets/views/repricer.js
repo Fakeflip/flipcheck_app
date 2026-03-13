@@ -740,6 +740,10 @@ const RepricerView = (() => {
     const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>
       `<option value="${v}" ${(repricer.global_price_strategy || "cheapest") === v ? "selected" : ""}>${l}</option>`
     ).join("");
+    const globalCat = repricer.global_ebay_category || "sonstiges";
+    const globalCatOpts = Object.entries(EBAY_CATEGORIES).map(([v, c]) =>
+      `<option value="${v}" ${globalCat === v ? "selected" : ""}>${c.label} (${Math.round(c.fee*100*10)/10}%)</option>`
+    ).join("");
     const commOnly = repricer.global_commercial_only ?? false;
 
     const bodyHtml = `
@@ -782,6 +786,11 @@ const RepricerView = (() => {
                 <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:64px">
                 <span class="text-xs text-muted">%  (Floor = (EK × (1+Marge%) + Versand) ÷ (1 − eBay-Fee%)</span>
               </div>
+            </div>
+
+            <div class="row gap-12" style="align-items:center">
+              <label class="text-xs text-muted" style="min-width:110px">eBay-Kategorie</label>
+              <select id="reprGlobalCategory" class="input-sm" style="min-width:200px">${globalCatOpts}</select>
             </div>
 
           </div>
@@ -874,6 +883,7 @@ const RepricerView = (() => {
             ...(s.repricer || {}),
             interval_min:                    parseInt(document.getElementById("reprIntervalMin")?.value      || "30"),
             global_price_strategy:           document.getElementById("reprGlobalStrategy")?.value            || "cheapest",
+            global_ebay_category:            document.getElementById("reprGlobalCategory")?.value             || "sonstiges",
             global_raise_when_cheapest:      document.getElementById("reprGlobalRaiseWhenCheapest")?.checked ?? true,
             global_min_margin_pct:           parseFloat(document.getElementById("reprGlobalMargin")?.value   || "15"),
             global_commercial_only:          document.getElementById("reprGlobalCommOnly")?.checked           ?? false,
