@@ -444,6 +444,68 @@ const Storage = (() => {
     catch { return null; }
   }
 
+  // ── Repricer ──────────────────────────────────────────────────────────────
+
+  /** @returns {Promise<object[]>} */
+  async function repricerList() {
+    try { return await window.fc.repricerList(); }
+    catch { return []; }
+  }
+
+  /** @returns {Promise<object[]>} */
+  async function repricerLog() {
+    try { return await window.fc.repricerLog(); }
+    catch { return []; }
+  }
+
+  /** @param {object} item @returns {Promise<object[]>} */
+  async function repricerAdd(item) {
+    try { return await window.fc.repricerAdd(item); }
+    catch { return []; }
+  }
+
+  /** @param {string} sku @returns {Promise<object[]>} */
+  async function repricerRemove(sku) {
+    try { return await window.fc.repricerRemove(sku); }
+    catch { return []; }
+  }
+
+  /** @param {string} sku @param {object} patch @returns {Promise<object[]>} */
+  async function repricerUpdate(sku, patch) {
+    try { return await window.fc.repricerUpdate(sku, patch); }
+    catch { return []; }
+  }
+
+  /** @returns {Promise<{active:boolean,running:boolean,lastRun:string|null,intervalMin:number,connected:boolean}|null>} */
+  async function repricerStatus() {
+    try { return await window.fc.repricerStatus(); }
+    catch { return null; }
+  }
+
+  /** @param {number} min @returns {Promise<{ok:boolean}|null>} */
+  async function repricerSetInterval(min) {
+    try { return await window.fc.repricerSetInterval(min); }
+    catch { return null; }
+  }
+
+  /** @returns {Promise<string|null>} */
+  async function repricerAuthUrl() {
+    try { return await window.fc.repricerAuthUrl(); }
+    catch { return null; }
+  }
+
+  /** @returns {Promise<boolean>} */
+  async function repricerIsConnected() {
+    try { return await window.fc.repricerIsConnected(); }
+    catch { return false; }
+  }
+
+  /** @returns {Promise<{ok:boolean}|null>} */
+  async function repricerRunNow() {
+    try { return await window.fc.repricerRunNow(); }
+    catch { return null; }
+  }
+
   return {
     listInventory, upsertItem, deleteItem, bulkUpdate,
     savePrice, savePriceSeries, getHistory, listHistory, deleteHistory, deleteHistoryEntry,
@@ -455,5 +517,7 @@ const Storage = (() => {
     monitorStatus, setMonitorInterval,
     getSeenListings, markSeenListings,
     listAlerts, addAlert, removeAlert, updateAlert, resetAlert,
+    repricerList, repricerLog, repricerAdd, repricerRemove, repricerUpdate,
+    repricerStatus, repricerSetInterval, repricerAuthUrl, repricerIsConnected, repricerRunNow,
   };
 })();

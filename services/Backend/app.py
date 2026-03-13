@@ -1495,6 +1495,153 @@ async def update_research_cookie(request: Request, body: CookieUpdateBody):
     return JSONResponse({"ok": True, "msg": "Cookie aktualisiert, Cache geleert."})
 
 
+# ─── eBay Seller Auth + Repricer ──────────────────────────────────────────────
+try:
+    from ebay_seller import seller_auth_url, seller_token_exchange, bulk_update_prices, is_connected
+    _SELLER_AVAILABLE = True
+except ImportError:
+    _SELLER_AVAILABLE = False
+
+    def seller_auth_url(): return ""  # type: ignore[misc]
+    async def seller_token_exchange(code): return {"ok": False, "error": "ebay_seller module not available"}  # type: ignore[misc]
+    async def bulk_update_prices(updates): return {"success": [], "failed": []}  # type: ignore[misc]
+    def is_connected(): return False  # type: ignore[misc]
+
+
+@app.get("/seller/auth/url")
+async def seller_auth_url_endpoint():
+    """Return the eBay OAuth2 consent URL for seller authorization."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
+    return {"ok": True, "url": seller_auth_url()}
+
+
+@app.get("/seller/auth/callback")
+async def seller_auth_callback(code: str):
+    """Exchange authorization code for access token (called after eBay OAuth redirect)."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
+    try:
+        result = await seller_token_exchange(code)
+        return result
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+@app.get("/seller/auth/status")
+async def seller_auth_status():
+    """Check whether a seller token exists."""
+    return {"ok": True, "connected": is_connected() if _SELLER_AVAILABLE else False}
+
+
+class RepricerItem(BaseModel):
+    sku: str
+    ean: str
+    ek: float
+    ship_out: float = 0.0
+    current_price: float
+    rule: dict = {}  # {undercut_pct: 2, min_margin_pct: 15}
+
+
+@app.post("/repricer/update")
+async def repricer_update(items: list[RepricerItem]):
+    """
+    1. For each item: fetch /ean/competition to find cheapest competitor price.
+    2. Apply floor-protected repricing rule.
+    3. Call eBay bulkUpdatePriceQuantity for items that need a price change.
+    4. Return per-item update results.
+    """
+    if not items:
+        return {"ok": True, "updates": []}
+
+    loop = asyncio.get_event_loop()
+    updates = []
+    ebay_updates = []
+
+    for item in items:
+        rule          = item.rule or {}
+        undercut_pct  = float(rule.get("undercut_pct",  2))
+        min_margin    = float(rule.get("min_margin_pct", 15))
+
+        # Floor price: EK × (1 + margin%) + shipping
+        floor_price = round(item.ek * (1 + min_margin / 100) + item.ship_out, 2)
+
+        # Fetch competitor prices
+        competitor_min = None
+        try:
+            def fetch_comp(ean=item.ean):
+                try:
+                    data = ebay_request("GET", "item_summary/search", {
+                        "q":      ean,
+                        "filter": "buyingOptions:{FIXED_PRICE}",
+                        "limit":  "10",
+                        "sort":   "price",
+                    })
+                    comp_items = data.get("itemSummaries") or []
+                    if comp_items:
+                        f = _format_listing(comp_items[0])
+                        return f.get("total_price") or f.get("price")
+                except Exception:
+                    pass
+                return None
+
+            competitor_min = await loop.run_in_executor(None, fetch_comp)
+        except Exception:
+            pass
+
+        # Repricing logic
+        if competitor_min is not None:
+            target = round(competitor_min * (1 - undercut_pct / 100), 2)
+            new_price = round(max(floor_price, target), 2)
+        else:
+            # No competitor data — keep current price but enforce floor
+            new_price = round(max(floor_price, item.current_price), 2)
+
+        # Determine status
+        if abs(new_price - item.current_price) < 0.01:
+            status = "HOLD"
+        elif new_price <= floor_price + 0.01:
+            status = "AT_FLOOR"
+        elif new_price < item.current_price:
+            status = "UPDATED"
+        else:
+            status = "UPDATED"  # price went up (competitor raised)
+
+        result = {
+            "sku":            item.sku,
+            "ean":            item.ean,
+            "old_price":      item.current_price,
+            "new_price":      new_price,
+            "floor_price":    floor_price,
+            "competitor_min": competitor_min,
+            "status":         status,
+        }
+        updates.append(result)
+
+        # Only push UPDATED items to eBay
+        if status == "UPDATED":
+            ebay_updates.append({"sku": item.sku, "new_price": new_price})
+
+    # Push price updates to eBay
+    ebay_result = {"success": [], "failed": []}
+    if ebay_updates and _SELLER_AVAILABLE:
+        try:
+            ebay_result = await bulk_update_prices(ebay_updates)
+        except Exception as e:
+            for u in ebay_updates:
+                ebay_result["failed"].append({"sku": u["sku"], "error": str(e)})  # type: ignore[attr-defined]
+
+    # Annotate results with eBay push status
+    ebay_fail_skus = {f["sku"] for f in ebay_result.get("failed", [])}
+    for upd in updates:
+        if upd["status"] == "UPDATED" and upd["sku"] in ebay_fail_skus:
+            fail_err = next((f["error"] for f in ebay_result["failed"] if f["sku"] == upd["sku"]), "unknown")
+            upd["status"]      = "EBAY_FAILED"
+            upd["ebay_error"]  = fail_err
+
+    return {"ok": True, "updates": updates}
+
+
 if __name__ == "__main__":
     import os
     import uvicorn

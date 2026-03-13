@@ -304,4 +304,27 @@ contextBridge.exposeInMainWorld("fc", {
    * @param {(info: {reason: string}) => void} cb
    */
   onBackendUnavailable: (cb) => ipcRenderer.on("backend:unavailable", (_e, info) => cb(info)),
+
+  // ── Repricer ──────────────────────────────────────────────────────────────
+
+  /** @returns {Promise<object[]>} All repricer-tracked items */
+  repricerList:        () => ipcRenderer.invoke("repricer:list"),
+  /** @returns {Promise<object[]>} Last 200 reprice log entries */
+  repricerLog:         () => ipcRenderer.invoke("repricer:log"),
+  /** @param {object} item @returns {Promise<object[]>} */
+  repricerAdd:         (item)       => ipcRenderer.invoke("repricer:add", item),
+  /** @param {string} sku @returns {Promise<object[]>} */
+  repricerRemove:      (sku)        => ipcRenderer.invoke("repricer:remove", sku),
+  /** @param {string} sku @param {object} patch @returns {Promise<object[]>} */
+  repricerUpdate:      (sku, patch) => ipcRenderer.invoke("repricer:update", sku, patch),
+  /** @returns {Promise<object>} */
+  repricerStatus:      () => ipcRenderer.invoke("repricer:status"),
+  /** @param {number} min @returns {Promise<{ok:boolean}>} */
+  repricerSetInterval: (min)  => ipcRenderer.invoke("repricer:setInterval", min),
+  /** @returns {Promise<string|null>} eBay OAuth consent URL */
+  repricerAuthUrl:     () => ipcRenderer.invoke("repricer:authUrl"),
+  /** @returns {Promise<boolean>} */
+  repricerIsConnected: () => ipcRenderer.invoke("repricer:isConnected"),
+  /** Trigger an immediate repricer run. @returns {Promise<{ok:boolean}>} */
+  repricerRunNow:      () => ipcRenderer.invoke("repricer:runNow"),
 });

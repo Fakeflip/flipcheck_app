@@ -62,6 +62,8 @@
  * @property {string|null}  sold_at     - ISO timestamp of sale (null while unsold)
  * @property {string}       cat_id      - eBay fee category ID (e.g. "sonstiges", "handys")
  * @property {string}       condition   - Item condition: "new" | "like_new" | "very_good" | "good" | "acceptable" | "defective"
+ * @property {string|null}  ebay_offer_id - eBay offerId or SKU for direct Seller API price updates (null if not linked)
+ * @property {{enabled:boolean,undercut_pct:number,min_margin_pct:number}|null} reprice_rule - Per-item reprice rule (overrides global)
  */
 
 // ── Price History ─────────────────────────────────────────────────────────────

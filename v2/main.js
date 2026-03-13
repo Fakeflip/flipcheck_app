@@ -665,6 +665,8 @@ app.whenReady().then(async () => {
 
   // Background competition monitor (webhook fire when undercut / new listings)
   startCompetitionMonitor();
+  // Background repricer monitor (auto-update eBay listing prices)
+  startRepricerMonitor();
 });
 
 app.on("window-all-closed", () => {
@@ -937,14 +939,16 @@ function mainApiCall(urlStr, token) {
 
 // Fire a Discord embed webhook
 function fireDiscordWebhook(webhookUrl, eventId, data) {
-  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1 };
-  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤" };
+  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1, repriced: 0x22C55E, floor: 0xF97316 };
+  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤", repriced: "💱", floor: "🔒" };
   const labels = {
     undercut:       "Günstigster Konkurrent unterboten",
     new_listing:    "Neues Listing von beobachtetem Verkäufer",
     price_drop:     "Preis deutlich gesunken",
     verdict_change: "Flipcheck Verdict geändert",
     new_seller:     "Neuer Konkurrent aufgetaucht",
+    repriced:       "Preis automatisch angepasst",
+    floor:          "Mindestpreis erreicht — kein weiteres Senken möglich",
   };
   const fmt = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
   const fields = [];
@@ -962,6 +966,19 @@ function fireDiscordWebhook(webhookUrl, eventId, data) {
       const sellerUrl = `https://www.ebay.de/sch/${encodeURIComponent(data.username)}/m.html?_sop=10`;
       fields.push({ name: "🔗 Neue Artikel", value: `[eBay öffnen →](${sellerUrl})`, inline: true });
     }
+  } else if (eventId === "repriced") {
+    const fmt2 = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
+    if (data.old_price      != null) fields.push({ name: "Alter VK",    value: fmt2(data.old_price),      inline: true });
+    if (data.new_price      != null) fields.push({ name: "Neuer VK",    value: fmt2(data.new_price),      inline: true });
+    if (data.competitor_min != null) fields.push({ name: "Konkurrent",  value: fmt2(data.competitor_min), inline: true });
+    if (data.old_price != null && data.new_price != null)
+      fields.push({ name: "Änderung", value: `${(data.new_price - data.old_price) > 0 ? "+" : ""}${(data.new_price - data.old_price).toFixed(2)}€`, inline: true });
+  } else if (eventId === "floor") {
+    const fmt2 = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
+    if (data.floor          != null) fields.push({ name: "Floor-Preis",  value: fmt2(data.floor),          inline: true });
+    if (data.competitor_min != null) fields.push({ name: "Konkurrent",   value: fmt2(data.competitor_min), inline: true });
+    if (data.floor != null && data.competitor_min != null)
+      fields.push({ name: "Differenz", value: fmt2(data.floor - data.competitor_min), inline: true });
   }
   const productName = data.product || data.title || data.ean || "Produkt";
   // For new_listing: make the embed title clickable (links to seller's newest listings)
@@ -1225,6 +1242,271 @@ ipcMain.handle("scanner:getInfo", () => {
   const ip = getLocalIP();
   return { url: `https://${ip}:8767`, ip };
 });
+
+// ─── IPC: Repricer ────────────────────────────────────────────────────────────
+const REPRICER_ITEMS_FILE = path.join(app.getPath("userData"), "repricer_items.json");
+const REPRICER_LOG_FILE   = path.join(app.getPath("userData"), "repricer_log.json");
+
+function readRepricerItems() {
+  try {
+    if (!fs.existsSync(REPRICER_ITEMS_FILE)) return [];
+    return JSON.parse(fs.readFileSync(REPRICER_ITEMS_FILE, "utf8") || "[]") || [];
+  } catch { return []; }
+}
+function writeRepricerItems(list) {
+  try { fs.writeFileSync(REPRICER_ITEMS_FILE, JSON.stringify(list, null, 2), "utf8"); } catch {}
+}
+
+function readRepricerLog() {
+  try {
+    if (!fs.existsSync(REPRICER_LOG_FILE)) return [];
+    return JSON.parse(fs.readFileSync(REPRICER_LOG_FILE, "utf8") || "[]") || [];
+  } catch { return []; }
+}
+function appendRepricerLog(entry) {
+  try {
+    const log = readRepricerLog();
+    log.unshift(entry);
+    fs.writeFileSync(REPRICER_LOG_FILE, JSON.stringify(log.slice(0, 200), null, 2), "utf8");
+  } catch {}
+}
+
+// POST helper for main process (used by repricer monitor)
+function mainApiPost(urlStr, body, token) {
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const url     = new URL(urlStr);
+    const mod     = url.protocol === "https:" ? https : http;
+    const opts    = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "POST",
+      headers:  {
+        "Content-Type":   "application/json",
+        "Content-Length": Buffer.byteLength(payload),
+        ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+      },
+    };
+    const req = mod.request(opts, res => {
+      let data = "";
+      res.on("data", c => data += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+ipcMain.handle("repricer:list",    () => readRepricerItems());
+ipcMain.handle("repricer:log",     () => readRepricerLog());
+
+ipcMain.handle("repricer:add", (_e, item) => {
+  const list = readRepricerItems();
+  const existing = list.findIndex(i => i.sku === item.sku || (item.ean && i.ean === item.ean));
+  if (existing !== -1) {
+    list[existing] = { ...list[existing], ...item, updated_at: new Date().toISOString() };
+  } else {
+    list.unshift({ ...item, enabled: true, added_at: new Date().toISOString(), status: "PENDING", last_repriced_at: null });
+  }
+  writeRepricerItems(list);
+  return readRepricerItems();
+});
+
+ipcMain.handle("repricer:remove", (_e, sku) => {
+  writeRepricerItems(readRepricerItems().filter(i => i.sku !== sku));
+  return readRepricerItems();
+});
+
+ipcMain.handle("repricer:update", (_e, sku, patch) => {
+  const list = readRepricerItems();
+  const idx  = list.findIndex(i => i.sku === sku);
+  if (idx !== -1) Object.assign(list[idx], patch, { updated_at: new Date().toISOString() });
+  writeRepricerItems(list);
+  return readRepricerItems();
+});
+
+ipcMain.handle("repricer:status", () => {
+  const settings = loadSettings();
+  const repricer = settings.repricer || {};
+  const logEntries = readRepricerLog();
+  return {
+    active:      !!_repricerTimer,
+    running:     _repricerRunning,
+    lastRun:     logEntries[0]?.ts ? new Date(logEntries[0].ts).toISOString() : null,
+    intervalMin: repricer.interval_min || 30,
+    connected:   false,  // checked via /seller/auth/status
+  };
+});
+
+ipcMain.handle("repricer:setInterval", (_e, min) => {
+  const s = loadSettings();
+  saveSettings({ ...s, repricer: { ...(s.repricer || {}), interval_min: Math.max(10, min || 30) } });
+  startRepricerMonitor();
+  return { ok: true };
+});
+
+ipcMain.handle("repricer:authUrl", async () => {
+  try {
+    const base = apiBaseBackend();
+    const res  = await mainApiCall(`${base}/seller/auth/url`, await getToken().catch(() => null));
+    return res.data?.url || null;
+  } catch { return null; }
+});
+
+ipcMain.handle("repricer:isConnected", async () => {
+  try {
+    const base = apiBaseBackend();
+    const res  = await mainApiCall(`${base}/seller/auth/status`, await getToken().catch(() => null));
+    return res.data?.connected || false;
+  } catch { return false; }
+});
+
+ipcMain.handle("repricer:runNow", async () => {
+  await runRepricerMonitor();
+  return { ok: true };
+});
+
+// ─── Background Repricer Monitor ──────────────────────────────────────────────
+let _repricerTimer   = null;
+let _repricerRunning = false;
+
+async function runRepricerMonitor() {
+  if (_repricerRunning) return;
+  _repricerRunning = true;
+  console.log("[Repricer] Monitor started");
+  try {
+    const settings  = loadSettings();
+    const repricer  = settings.repricer || {};
+    const token     = await getToken().catch(() => null);
+    const base      = apiBaseBackend();
+    const invData   = readInv();
+    const invItems  = invData.items || [];
+    const rItems    = readRepricerItems().filter(i => i.enabled !== false);
+
+    if (!rItems.length) { console.log("[Repricer] No items configured."); return; }
+
+    // Build request body
+    const body = rItems.map(ri => {
+      const inv = invItems.find(i =>
+        (ri.ean && i.ean === ri.ean) || (ri.sku && i.sku === ri.sku)
+      );
+      if (!inv || !inv.ek || !inv.sell_price) return null;
+      return {
+        sku:           ri.sku || inv.ean || inv.id,
+        ean:           ri.ean || inv.ean || "",
+        ek:            inv.ek,
+        ship_out:      inv.ship_out || 0,
+        current_price: inv.sell_price,
+        rule:          ri.rule || {
+          undercut_pct:  repricer.global_undercut_pct  || 2,
+          min_margin_pct: repricer.global_min_margin_pct || 15,
+        },
+      };
+    }).filter(Boolean);
+
+    if (!body.length) { console.log("[Repricer] No items with EK+VK set."); return; }
+
+    // POST /repricer/update
+    const res = await mainApiPost(`${base}/repricer/update`, body, token);
+    if (res.status !== 200 || !res.data?.ok) {
+      console.error("[Repricer] API error:", res.status, JSON.stringify(res.data)?.slice(0, 200));
+      return;
+    }
+
+    const updates = res.data.updates || [];
+    const now     = new Date().toISOString();
+
+    // Process results
+    for (const upd of updates) {
+      // Update repricer item status
+      const rList = readRepricerItems();
+      const idx   = rList.findIndex(i => i.sku === upd.sku || i.ean === upd.ean);
+      if (idx !== -1) {
+        Object.assign(rList[idx], {
+          status:           upd.status,
+          last_price:       upd.new_price,
+          last_repriced_at: now,
+          competitor_min:   upd.competitor_min,
+          floor_price:      upd.floor_price,
+        });
+        writeRepricerItems(rList);
+      }
+
+      // Sync inventory sell_price when price changed
+      if (upd.status === "UPDATED") {
+        const invList = readInv();
+        const invIdx  = (invList.items || []).findIndex(i =>
+          (upd.ean && i.ean === upd.ean) || (upd.sku && i.sku === upd.sku)
+        );
+        if (invIdx !== -1) {
+          invList.items[invIdx].sell_price  = upd.new_price;
+          invList.items[invIdx].updated_at  = now;
+          writeInv(invList);
+        }
+
+        // Log the event
+        appendRepricerLog({
+          ts:             Date.now(),
+          sku:            upd.sku,
+          ean:            upd.ean,
+          old_price:      upd.old_price,
+          new_price:      upd.new_price,
+          competitor_min: upd.competitor_min,
+          floor_price:    upd.floor_price,
+          status:         upd.status,
+        });
+
+        // Discord webhook for UPDATED events
+        const webhookUrl = settings.webhook_url;
+        if (webhookUrl && repricer.webhook_repriced !== false) {
+          const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
+          fireDiscordWebhook(webhookUrl, "repriced", {
+            product:        invItem?.title || upd.ean || upd.sku,
+            old_price:      upd.old_price,
+            new_price:      upd.new_price,
+            competitor_min: upd.competitor_min,
+          }).catch(e => console.error("[Repricer] webhook error:", e.message));
+        }
+      }
+
+      // Discord webhook for AT_FLOOR events
+      if (upd.status === "AT_FLOOR") {
+        const webhookUrl = settings.webhook_url;
+        if (webhookUrl && repricer.webhook_floor !== false) {
+          const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
+          fireDiscordWebhook(webhookUrl, "floor", {
+            product:        invItem?.title || upd.ean || upd.sku,
+            floor:          upd.floor_price,
+            competitor_min: upd.competitor_min,
+          }).catch(e => console.error("[Repricer] webhook floor error:", e.message));
+        }
+      }
+    }
+
+    console.log(`[Repricer] Done — ${updates.filter(u => u.status === "UPDATED").length} updated, ${updates.filter(u => u.status === "HOLD").length} held, ${updates.filter(u => u.status === "AT_FLOOR").length} at floor`);
+  } catch (e) {
+    console.error("[Repricer] Monitor error:", e.message);
+  } finally {
+    _repricerRunning = false;
+  }
+}
+
+function startRepricerMonitor() {
+  if (_repricerTimer) { clearInterval(_repricerTimer); _repricerTimer = null; }
+  const settings    = loadSettings();
+  const repricer    = settings.repricer || {};
+  const intervalMin = Math.max(10, repricer.interval_min || 30);
+  _repricerTimer = setInterval(runRepricerMonitor, intervalMin * 60 * 1000);
+  // First run after 60s (give backend time to start)
+  setTimeout(runRepricerMonitor, 60 * 1000);
+  console.log(`[Repricer] Started — interval: ${intervalMin} min`);
+}
 
 // ─── IPC: Auto-Updater ────────────────────────────────────────────────────────
 ipcMain.handle("updater:check", async () => {
