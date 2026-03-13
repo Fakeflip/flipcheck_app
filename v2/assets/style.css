@@ -171,8 +171,7 @@ img { display: block; max-width: 100%; }
   display: flex;
   flex-direction: column;
   padding: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden; /* nav scrolls independently; footer stays pinned at bottom */
 }
 
 .sidebar-brand {

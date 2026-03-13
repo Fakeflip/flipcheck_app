@@ -341,7 +341,7 @@ const RepricerView = (() => {
     el.querySelector("#reprToggleEnabled")?.addEventListener("change", async (e) => {
       await Storage.repricerUpdate(item.sku, { enabled: e.target.checked });
       await _refreshData();
-      Toast.show(e.target.checked ? "Aktiviert" : "Pausiert", "success");
+      Toast.success(e.target.checked ? "Aktiviert" : "Pausiert");
     });
   }
 
@@ -355,9 +355,9 @@ const RepricerView = (() => {
       try {
         await Storage.repricerRunNow();
         await _refreshData();
-        Toast.show("Repricer ausgeführt", "success");
+        Toast.success("Repricer ausgeführt");
       } catch {
-        Toast.show("Fehler beim Ausführen", "error");
+        Toast.error("Fehler beim Ausführen");
       } finally {
         if (btn) {
           btn.disabled = false;
@@ -418,7 +418,7 @@ const RepricerView = (() => {
       }
     });
     await _refreshData();
-    Toast.show("Regel gespeichert", "success");
+    Toast.success("Regel gespeichert");
   }
 
   async function _removeItem(item) {
@@ -426,20 +426,20 @@ const RepricerView = (() => {
     await Storage.repricerRemove(item.sku);
     _selected = null;
     await _refreshData();
-    Toast.show("Artikel entfernt", "success");
+    Toast.success("Artikel entfernt");
   }
 
   async function _connectEbay() {
     const url = await Storage.repricerAuthUrl();
-    if (!url) { Toast.show("eBay OAuth nicht konfiguriert", "error"); return; }
+    if (!url) { Toast.error("eBay OAuth nicht konfiguriert"); return; }
     window.open(url, "_blank");
-    Toast.show("eBay-Login im Browser geöffnet", "info");
+    Toast.info("eBay-Login im Browser geöffnet");
   }
 
   // ── Sync eBay listings ─────────────────────────────────────────────────────
   async function _syncListings() {
     if (!_connected) {
-      Toast.show("Zuerst mit eBay verbinden", "warning");
+      Toast.warning("Zuerst mit eBay verbinden");
       _connectEbay();
       return;
     }
@@ -451,9 +451,9 @@ const RepricerView = (() => {
       const added   = result?.added   ?? 0;
       const updated = result?.updated ?? 0;
       const total   = result?.total   ?? 0;
-      Toast.show(`Sync: ${total} Listings · ${added} neu · ${updated} aktualisiert`, "success");
+      Toast.success(`Sync: ${total} Listings · ${added} neu · ${updated} aktualisiert`);
     } catch (e) {
-      Toast.show("Sync fehlgeschlagen", "error");
+      Toast.error("Sync fehlgeschlagen");
     } finally {
       if (btn) {
         btn.disabled = false;
@@ -527,7 +527,7 @@ const RepricerView = (() => {
         const ebayItemId = row.querySelector(".repr-ebay-id")?.value?.trim() || null;
         await Storage.repricerAdd({ sku, ean, title: title || ean, ebay_item_id: ebayItemId, rule: null, enabled: true });
         btn.closest("div[style]").innerHTML = `<span class="badge badge-success" style="font-size:10px">✓ Hinzugefügt</span>`;
-        Toast.show(`"${title || ean}" hinzugefügt`, "success");
+        Toast.success(`"${title || ean}" hinzugefügt`);
         await _refreshData();
       });
     });
@@ -658,7 +658,7 @@ const RepricerView = (() => {
           await Storage.repricerSetInterval(newRepricer.interval_min);
           _settings = { ...s, repricer: newRepricer };
           Modal.close();
-          Toast.show("Einstellungen gespeichert", "success");
+          Toast.success("Einstellungen gespeichert");
         }},
       ],
     });
