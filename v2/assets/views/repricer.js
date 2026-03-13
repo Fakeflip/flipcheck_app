@@ -367,7 +367,8 @@ const RepricerView = (() => {
         const ship = parseFloat(marginInput.dataset.ship || "0");
         const pct  = parseFloat(marginInput.value);
         if (!isNaN(ek) && !isNaN(pct)) {
-          const floor = ek * (1 + pct / 100) + ship;
+          const EBAY_FEE = 0.13;
+          const floor = (ek * (1 + pct / 100) + ship) / (1 - EBAY_FEE);
           floorDisplay.textContent = `€${floor.toFixed(2)}`;
         }
       });
@@ -634,7 +635,7 @@ const RepricerView = (() => {
               <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
               <div style="display:flex;align-items:center;gap:4px">
                 <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:64px">
-                <span class="text-xs text-muted">%  (Floor = EK × (1 + Marge%) + Versandkosten)</span>
+                <span class="text-xs text-muted">%  (Floor = (EK × (1 + Marge%) + Versand) ÷ 0,87)</span>
               </div>
             </div>
 

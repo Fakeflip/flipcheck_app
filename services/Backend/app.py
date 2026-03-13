@@ -1653,7 +1653,10 @@ async def repricer_update(items: list[RepricerItem]):
         commercial_min_fb    = int(  rule.get("commercial_min_feedback", 10))
 
         # Floor price: never sell below this
-        floor_price = round(item.ek * (1 + min_margin / 100) + item.ship_out, 2)
+        # Formula: (EK * (1 + margin%) + ship_out) / (1 - eBay_fee)
+        # eBay DE flat fee ~13% — ensures margin is kept after eBay deducts their cut
+        EBAY_FEE_RATE = 0.13
+        floor_price = round((item.ek * (1 + min_margin / 100) + item.ship_out) / (1 - EBAY_FEE_RATE), 2)
 
         # ── Fetch competitor listings ─────────────────────────────────────────
         # Need enough candidates for the chosen strategy: rank_3 needs ≥3, avg_top5 needs ≥5
