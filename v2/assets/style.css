@@ -4204,3 +4204,40 @@ details.fc-accordion > summary + * { margin-top: 8px; }
 .wz-lang-row .lang-selector {
   justify-content: center;
 }
+
+/* ── Toggle Switch (Repricer enable/disable) ─────────────────────────── */
+.toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 34px;
+  height: 20px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+.toggle-track {
+  position: absolute;
+  inset: 0;
+  background: var(--border2, #334155);
+  border-radius: 99px;
+  transition: background 0.18s;
+}
+.toggle-switch input:checked ~ .toggle-track { background: var(--accent, #6366f1); }
+.toggle-track::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 14px;
+  height: 14px;
+  background: #fff;
+  border-radius: 50%;
+  transition: transform 0.18s;
+}
+.toggle-switch input:checked ~ .toggle-track::after { transform: translateX(14px); }

@@ -326,5 +326,10 @@ contextBridge.exposeInMainWorld("fc", {
   /** @returns {Promise<boolean>} */
   repricerIsConnected: () => ipcRenderer.invoke("repricer:isConnected"),
   /** Trigger an immediate repricer run. @returns {Promise<{ok:boolean}>} */
-  repricerRunNow:      () => ipcRenderer.invoke("repricer:runNow"),
+  repricerRunNow:        () => ipcRenderer.invoke("repricer:runNow"),
+  /**
+   * Pull all active eBay listings (all pages) and upsert into repricer_items.json.
+   * @returns {Promise<{ok:boolean, total:number, added:number, updated:number}>}
+   */
+  repricerSyncListings:  () => ipcRenderer.invoke("repricer:syncListings"),
 });

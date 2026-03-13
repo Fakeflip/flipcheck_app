@@ -1497,15 +1497,19 @@ async def update_research_cookie(request: Request, body: CookieUpdateBody):
 
 # ─── eBay Seller Auth + Repricer ──────────────────────────────────────────────
 try:
-    from ebay_seller import seller_auth_url, seller_token_exchange, bulk_update_prices, is_connected
+    from ebay_seller import (
+        seller_auth_url, seller_token_exchange, bulk_revise_prices,
+        is_connected, get_my_active_listings,
+    )
     _SELLER_AVAILABLE = True
 except ImportError:
     _SELLER_AVAILABLE = False
 
     def seller_auth_url(): return ""  # type: ignore[misc]
     async def seller_token_exchange(code): return {"ok": False, "error": "ebay_seller module not available"}  # type: ignore[misc]
-    async def bulk_update_prices(updates): return {"success": [], "failed": []}  # type: ignore[misc]
+    async def bulk_revise_prices(updates): return {"success": [], "failed": []}  # type: ignore[misc]
     def is_connected(): return False  # type: ignore[misc]
+    async def get_my_active_listings(**_): return {"ok": False, "items": []}  # type: ignore[misc]
 
 
 @app.get("/seller/auth/url")
@@ -1537,109 +1541,216 @@ async def seller_auth_status():
 class RepricerItem(BaseModel):
     sku: str
     ean: str
+    ebay_item_id: Optional[str] = None   # eBay ItemID (from GetMyeBaySelling)
     ek: float
     ship_out: float = 0.0
     current_price: float
-    rule: dict = {}  # {undercut_pct: 2, min_margin_pct: 15}
+    rule: dict = {}
+    # rule keys:
+    #   min_margin_pct:        float  (default 15)
+    #     Floor protection: EK × (1 + min_margin%) + ship_out
+    #
+    #   price_strategy:        str    (default "cheapest")
+    #     "cheapest"  → match rank 1 (cheapest in market)
+    #     "rank_2"    → match rank 2 (2nd cheapest)
+    #     "rank_3"    → match rank 3 (3rd cheapest)
+    #     "avg_top3"  → average of 3 cheapest
+    #     "avg_top5"  → average of 5 cheapest
+    #
+    #   raise_when_cheapest:   bool   (default True)
+    #     Only applies to price_strategy="cheapest":
+    #     if you ARE already cheapest → raise to rank 2 instead of staying
+    #
+    #   commercial_only:       bool   (default False)
+    #     Filter out private/new sellers (feedbackScore < commercial_min_feedback)
+    #
+    #   commercial_min_feedback: int  (default 10)
+    #     Minimum seller feedbackScore to be considered a commercial competitor
+
+
+# ── Repricer helpers ──────────────────────────────────────────────────────────
+
+def _apply_price_strategy(
+    strategy: str,
+    candidates: List[float],
+    current_price: float,
+    raise_when_cheapest: bool,
+) -> Tuple[float, str]:
+    """
+    Given a sorted list of candidate prices (cheapest first), return
+    (target_price, price_intent).
+    price_intent: "match" | "raise" | "no_data"
+    """
+    if not candidates:
+        return current_price, "no_data"
+
+    if strategy == "rank_2":
+        target = candidates[1] if len(candidates) >= 2 else candidates[0]
+        return target, "match"
+
+    if strategy == "rank_3":
+        target = candidates[2] if len(candidates) >= 3 else candidates[-1]
+        return target, "match"
+
+    if strategy == "avg_top3":
+        pool   = candidates[:3]
+        target = round(sum(pool) / len(pool), 2)
+        return target, "match"
+
+    if strategy == "avg_top5":
+        pool   = candidates[:5]
+        target = round(sum(pool) / len(pool), 2)
+        return target, "match"
+
+    # Default: "cheapest" — match rank 1, optionally raise if already cheapest
+    cheapest = candidates[0]
+    seller_is_cheapest = current_price <= cheapest + 0.005
+    if seller_is_cheapest and raise_when_cheapest and len(candidates) >= 2:
+        return candidates[1], "raise"
+    return cheapest, "match"
 
 
 @app.post("/repricer/update")
 async def repricer_update(items: list[RepricerItem]):
     """
-    1. For each item: fetch /ean/competition to find cheapest competitor price.
-    2. Apply floor-protected repricing rule.
-    3. Call eBay bulkUpdatePriceQuantity for items that need a price change.
-    4. Return per-item update results.
+    For each item:
+      1. Fetch up to 15 competitor listings via Browse API (sorted cheapest first).
+      2. Optionally filter out private/new sellers (commercial_only).
+      3. Apply price_strategy to select target price.
+      4. Floor-protect: new_price = max(floor_price, target).
+      5. Call eBay ReviseFixedPriceItem (Trading API) via ebay_item_id.
+
+    Statuses: UPDATED | RAISED | HOLD | AT_FLOOR | EBAY_FAILED
     """
     if not items:
         return {"ok": True, "updates": []}
 
-    loop = asyncio.get_event_loop()
-    updates = []
+    loop         = asyncio.get_event_loop()
+    updates      = []
     ebay_updates = []
 
     for item in items:
-        rule          = item.rule or {}
-        undercut_pct  = float(rule.get("undercut_pct",  2))
-        min_margin    = float(rule.get("min_margin_pct", 15))
+        rule                 = item.rule or {}
+        min_margin           = float(rule.get("min_margin_pct",        15))
+        price_strategy       = str(  rule.get("price_strategy",        "cheapest"))
+        raise_when_cheapest  = bool( rule.get("raise_when_cheapest",   True))
+        commercial_only      = bool( rule.get("commercial_only",       False))
+        commercial_min_fb    = int(  rule.get("commercial_min_feedback", 10))
 
-        # Floor price: EK × (1 + margin%) + shipping
+        # Floor price: never sell below this
         floor_price = round(item.ek * (1 + min_margin / 100) + item.ship_out, 2)
 
-        # Fetch competitor prices
-        competitor_min = None
+        # ── Fetch competitor listings ─────────────────────────────────────────
+        # Need enough candidates for the chosen strategy: rank_3 needs ≥3, avg_top5 needs ≥5
+        fetch_limit = 15  # always fetch generously so filters still leave enough
+        candidate_prices: List[float] = []
+        competitor_min: Optional[float] = None
+        competitor_2nd: Optional[float] = None
+
         try:
-            def fetch_comp(ean=item.ean):
+            def _fetch_comp(ean=item.ean, limit=fetch_limit, comm_only=commercial_only, min_fb=commercial_min_fb):
                 try:
                     data = ebay_request("GET", "item_summary/search", {
                         "q":      ean,
                         "filter": "buyingOptions:{FIXED_PRICE}",
-                        "limit":  "10",
+                        "limit":  str(limit),
                         "sort":   "price",
                     })
-                    comp_items = data.get("itemSummaries") or []
-                    if comp_items:
-                        f = _format_listing(comp_items[0])
-                        return f.get("total_price") or f.get("price")
+                    raw_items = data.get("itemSummaries") or []
+                    prices = []
+                    for ci in raw_items:
+                        f  = _format_listing(ci)
+                        fb = f.get("seller_feedback")
+                        # Commercial filter: skip sellers below feedback threshold
+                        if comm_only and (fb is None or int(fb) < min_fb):
+                            continue
+                        p = f.get("total_price") or f.get("price")
+                        if p and p > 0:
+                            prices.append(round(p, 2))
+                    return prices  # already sorted cheapest-first by eBay
                 except Exception:
                     pass
-                return None
+                return []
 
-            competitor_min = await loop.run_in_executor(None, fetch_comp)
+            candidate_prices = await loop.run_in_executor(None, _fetch_comp)
+            if candidate_prices:
+                competitor_min = candidate_prices[0]
+            if len(candidate_prices) >= 2:
+                competitor_2nd = candidate_prices[1]
         except Exception:
             pass
 
-        # Repricing logic
-        if competitor_min is not None:
-            target = round(competitor_min * (1 - undercut_pct / 100), 2)
-            new_price = round(max(floor_price, target), 2)
-        else:
-            # No competitor data — keep current price but enforce floor
-            new_price = round(max(floor_price, item.current_price), 2)
+        # ── Pricing decision ──────────────────────────────────────────────────
+        raw_target, price_intent = _apply_price_strategy(
+            price_strategy, candidate_prices, item.current_price, raise_when_cheapest
+        )
+        new_price = round(max(floor_price, raw_target), 2)
 
-        # Determine status
-        if abs(new_price - item.current_price) < 0.01:
+        # ── Status ────────────────────────────────────────────────────────────
+        diff = new_price - item.current_price
+        if abs(diff) < 0.01:
             status = "HOLD"
-        elif new_price <= floor_price + 0.01:
+        elif price_intent == "raise" and diff > 0.01:
+            status = "RAISED"
+        elif new_price <= floor_price + 0.01 and competitor_min is not None and competitor_min < floor_price:
             status = "AT_FLOOR"
-        elif new_price < item.current_price:
-            status = "UPDATED"
+        elif price_intent == "no_data":
+            status = "HOLD"   # no competitors found — keep current price
         else:
-            status = "UPDATED"  # price went up (competitor raised)
+            status = "UPDATED"
 
         result = {
-            "sku":            item.sku,
-            "ean":            item.ean,
-            "old_price":      item.current_price,
-            "new_price":      new_price,
-            "floor_price":    floor_price,
-            "competitor_min": competitor_min,
-            "status":         status,
+            "sku":              item.sku,
+            "ean":              item.ean,
+            "ebay_item_id":     item.ebay_item_id,
+            "old_price":        item.current_price,
+            "new_price":        new_price,
+            "floor_price":      floor_price,
+            "competitor_min":   competitor_min,
+            "competitor_2nd":   competitor_2nd,
+            "candidate_count":  len(candidate_prices),
+            "price_strategy":   price_strategy,
+            "status":           status,
         }
         updates.append(result)
 
-        # Only push UPDATED items to eBay
         if status == "UPDATED":
-            ebay_updates.append({"sku": item.sku, "new_price": new_price})
+            ebay_item_id = item.ebay_item_id or item.sku
+            ebay_updates.append({"item_id": ebay_item_id, "new_price": new_price})
 
-    # Push price updates to eBay
-    ebay_result = {"success": [], "failed": []}
+    # Push to eBay via Trading API ReviseFixedPriceItem
+    ebay_result: Dict = {"success": [], "failed": []}
     if ebay_updates and _SELLER_AVAILABLE:
         try:
-            ebay_result = await bulk_update_prices(ebay_updates)
+            ebay_result = await bulk_revise_prices(ebay_updates)
         except Exception as e:
             for u in ebay_updates:
-                ebay_result["failed"].append({"sku": u["sku"], "error": str(e)})  # type: ignore[attr-defined]
+                ebay_result.setdefault("failed", []).append({"item_id": u["item_id"], "error": str(e)})
 
-    # Annotate results with eBay push status
-    ebay_fail_skus = {f["sku"] for f in ebay_result.get("failed", [])}
+    # Annotate with eBay push outcome
+    ebay_fail_ids = {f["item_id"] for f in ebay_result.get("failed", [])}
     for upd in updates:
-        if upd["status"] == "UPDATED" and upd["sku"] in ebay_fail_skus:
-            fail_err = next((f["error"] for f in ebay_result["failed"] if f["sku"] == upd["sku"]), "unknown")
-            upd["status"]      = "EBAY_FAILED"
-            upd["ebay_error"]  = fail_err
+        effective_id = upd["ebay_item_id"] or upd["sku"]
+        if upd["status"] == "UPDATED" and effective_id in ebay_fail_ids:
+            fail_err = next(
+                (f["error"] for f in ebay_result["failed"] if f["item_id"] == effective_id),
+                "unknown",
+            )
+            upd["status"]     = "EBAY_FAILED"
+            upd["ebay_error"] = fail_err
 
     return {"ok": True, "updates": updates}
+
+
+@app.get("/seller/listings/active")
+async def seller_active_listings(page: int = 1, per_page: int = 100):
+    """Fetch seller's own active eBay listings (for repricer auto-match)."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
+    try:
+        return await get_my_active_listings(page=page, per_page=min(int(per_page), 200))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
 if __name__ == "__main__":

@@ -1,13 +1,13 @@
 /* Flipcheck v2 — Auto-Repricer View */
 const RepricerView = (() => {
   let _container  = null;
-  let _items      = [];     // repricer_items.json entries
-  let _log        = [];     // repricer_log.json entries
-  let _selected   = null;   // selected item sku
+  let _items      = [];
+  let _log        = [];
+  let _selected   = null;
   let _connected  = false;
   let _status     = null;
   let _settings   = {};
-  let _inventory  = [];     // full inventory for "add item" modal
+  let _inventory  = [];
   let _debounce   = null;
 
   const fmt = (v) => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
@@ -22,6 +22,14 @@ const RepricerView = (() => {
     if (s < 60)  return `vor ${s}s`;
     if (s < 3600) return `vor ${Math.round(s/60)}m`;
     return `vor ${Math.round(s/3600)}h`;
+  };
+
+  const STRATEGY_LABELS = {
+    cheapest:  "Günstigster (Rang 1)",
+    rank_2:    "2. Günstigster (Rang 2)",
+    rank_3:    "3. Günstigster (Rang 3)",
+    avg_top3:  "Ø Durchschnitt Top 3",
+    avg_top5:  "Ø Durchschnitt Top 5",
   };
 
   // ── Lifecycle ──────────────────────────────────────────────────────────────
@@ -47,11 +55,19 @@ const RepricerView = (() => {
         </div>
         <div class="page-header-right" id="reprHeaderRight">
           <span id="reprConnBadge" class="badge badge-muted" style="font-size:11px">Nicht verbunden</span>
+          <button class="btn btn-secondary btn-sm" id="btnReprSync" title="eBay-Listings synchronisieren">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+              <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            Listings sync
+          </button>
           <button class="btn btn-secondary btn-sm" id="btnReprSettings" title="Einstellungen">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
               <circle cx="8" cy="8" r="2.5" stroke="currentColor" stroke-width="1.5"/>
               <path d="M8 1.5v1M8 13.5v1M1.5 8h1M13.5 8h1M3.2 3.2l.7.7M12.1 12.1l.7.7M12.1 3.9l-.7.7M4.6 11.4l-.7.7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
             </svg>
+            Einstellungen
           </button>
           <button class="btn btn-primary btn-sm" id="btnReprRun">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -63,19 +79,17 @@ const RepricerView = (() => {
       </div>
 
       <div class="comp-layout" id="reprLayout">
-        <!-- Left panel: item list -->
         <div class="comp-left" id="reprLeft">
           <div class="comp-list-header">
             <span class="text-xs text-muted" id="reprItemCount">0 Artikel</span>
             <button class="btn btn-ghost btn-xs" id="btnReprAdd">
               <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
-              Artikel hinzufügen
+              Hinzufügen
             </button>
           </div>
           <div id="reprItemList" class="comp-seller-list"></div>
         </div>
 
-        <!-- Right panel: detail -->
         <div class="comp-right" id="reprRight">
           <div id="reprDetail" class="comp-detail-empty">
             <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style="opacity:.25;margin-bottom:8px">
@@ -105,7 +119,6 @@ const RepricerView = (() => {
   function _render() {
     if (!_container) return;
 
-    // Connection badge
     const badge = _container.querySelector("#reprConnBadge");
     if (badge) {
       badge.textContent = _connected ? "● Verbunden" : "Nicht verbunden";
@@ -113,32 +126,32 @@ const RepricerView = (() => {
       badge.style.fontSize = "11px";
     }
 
-    // Item count
     const countEl = _container.querySelector("#reprItemCount");
     if (countEl) countEl.textContent = `${_items.length} Artikel`;
 
-    // Item list
     const listEl = _container.querySelector("#reprItemList");
     if (listEl) listEl.innerHTML = _renderItemList();
 
-    // Re-select if applicable
     if (_selected) _renderDetail(_items.find(i => i.sku === _selected));
   }
 
   function _renderItemList() {
     if (!_items.length) {
       return `<div class="comp-empty-state">
-        <p class="text-xs text-muted" style="padding:16px;text-align:center">Noch keine Artikel hinzugefügt.<br>Klicke "+ Artikel hinzufügen" um zu starten.</p>
+        <p class="text-xs text-muted" style="padding:16px;text-align:center">Noch keine Artikel.<br>Klicke "Hinzufügen" oder sync deine eBay-Listings.</p>
       </div>`;
     }
     return _items.map(item => {
       const isSelected = _selected === item.sku;
       const statusChip = _renderStatusChip(item);
+      const pausedDot  = item.enabled === false
+        ? `<span style="color:var(--text-muted);font-size:10px" title="Deaktiviert">⏸ </span>`
+        : "";
       return `
         <div class="comp-seller-row ${isSelected ? "active" : ""}" data-sku="${_esc(item.sku)}">
           <div style="flex:1;min-width:0">
-            <div class="text-sm font-medium text-primary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(item.title || item.ean || item.sku)}</div>
-            <div class="text-xs text-muted" style="margin-top:2px">${_esc(item.ean || item.sku)}</div>
+            <div class="text-sm font-medium text-primary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${pausedDot}${_esc(item.title || item.ean || item.sku)}</div>
+            <div class="text-xs text-muted" style="margin-top:2px">${_esc(item.ean || item.sku)}${item.quantity != null ? ` · ${item.quantity}x` : ""}</div>
           </div>
           <div style="text-align:right;flex-shrink:0">
             ${statusChip}
@@ -156,6 +169,10 @@ const RepricerView = (() => {
       const diff = item.last_price != null && item.old_price != null ? item.last_price - item.old_price : null;
       return `<span class="badge badge-success" style="font-size:10px">↓ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
     }
+    if (s === "RAISED") {
+      const diff = item.last_price != null && item.old_price != null ? item.last_price - item.old_price : null;
+      return `<span class="badge" style="font-size:10px;background:rgba(99,102,241,.18);color:#818cf8">↑ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
+    }
     if (s === "AT_FLOOR") return `<span class="badge badge-warning" style="font-size:10px">🔒 Floor</span>`;
     if (s === "HOLD")     return `<span class="badge badge-muted"    style="font-size:10px">= Halten</span>`;
     if (s === "EBAY_FAILED") return `<span class="badge badge-danger" style="font-size:10px">✗ Fehler</span>`;
@@ -169,18 +186,37 @@ const RepricerView = (() => {
       el.innerHTML = `<div class="comp-detail-empty"><p class="text-sm text-muted">Artikel auswählen</p></div>`;
       return;
     }
-    const repricer  = _settings?.repricer || {};
-    const rule      = item.rule || {};
-    const undercut  = rule.undercut_pct   ?? repricer.global_undercut_pct   ?? 2;
-    const minMargin = rule.min_margin_pct ?? repricer.global_min_margin_pct ?? 15;
-    const itemLog   = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 10);
+    const repricer           = _settings?.repricer || {};
+    const rule               = item.rule || {};
+    const minMargin          = rule.min_margin_pct           ?? repricer.global_min_margin_pct           ?? 15;
+    const strategy           = rule.price_strategy           ?? repricer.global_price_strategy           ?? "cheapest";
+    const raiseWhenCheapest  = rule.raise_when_cheapest      ?? repricer.global_raise_when_cheapest      ?? true;
+    const commercialOnly     = rule.commercial_only          ?? repricer.global_commercial_only          ?? false;
+    const commercialMinFb    = rule.commercial_min_feedback  ?? repricer.global_commercial_min_feedback  ?? 10;
+    const isEnabled          = item.enabled !== false;
+    const itemLog            = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 10);
+
+    const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>
+      `<option value="${v}" ${strategy === v ? "selected" : ""}>${l}</option>`
+    ).join("");
 
     el.innerHTML = `
       <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-        <div class="text-base font-semibold text-primary" style="margin-bottom:4px">${_esc(item.title || item.ean || item.sku)}</div>
-        <div class="text-xs text-muted">EAN: ${_esc(item.ean || "—")} · SKU: ${_esc(item.sku || "—")}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+          <div class="text-base font-semibold text-primary">${_esc(item.title || item.ean || item.sku)}</div>
+          <label class="toggle-switch" title="${isEnabled ? "Aktiv" : "Pausiert"}">
+            <input type="checkbox" id="reprToggleEnabled" ${isEnabled ? "checked" : ""}>
+            <span class="toggle-track"></span>
+          </label>
+        </div>
+        <div class="text-xs text-muted">
+          EAN: ${_esc(item.ean || "—")} · SKU: ${_esc(item.sku || "—")}
+          ${item.quantity != null ? ` · <strong style="color:var(--text-primary)">${item.quantity}x</strong> auf Lager` : ""}
+          ${item.ebay_item_id ? ` · <a href="https://www.ebay.de/itm/${_esc(item.ebay_item_id)}" target="_blank" style="color:var(--indigo)">eBay #${_esc(item.ebay_item_id)}</a>` : ""}
+        </div>
       </div>
 
+      <!-- Stats row -->
       <div style="padding:12px 20px;border-bottom:1px solid var(--border)">
         <div class="row gap-20" style="flex-wrap:wrap">
           <div>
@@ -188,16 +224,24 @@ const RepricerView = (() => {
             <div class="text-sm font-semibold text-primary">${fmt(item.last_price)}</div>
           </div>
           <div>
-            <div class="text-xs text-muted">Konkurrent Min</div>
+            <div class="text-xs text-muted">Günstigster</div>
             <div class="text-sm font-semibold ${item.competitor_min != null ? "text-primary" : "text-muted"}">${fmt(item.competitor_min)}</div>
           </div>
           <div>
-            <div class="text-xs text-muted">Floor-Preis</div>
+            <div class="text-xs text-muted">2. Günstigster</div>
+            <div class="text-sm font-semibold text-muted">${fmt(item.competitor_2nd)}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">Konkurrenten</div>
+            <div class="text-sm font-semibold text-muted">${item.candidate_count ?? "—"}</div>
+          </div>
+          <div>
+            <div class="text-xs text-muted">Floor</div>
             <div class="text-sm font-semibold text-muted">${fmt(item.floor_price)}</div>
           </div>
           <div>
             <div class="text-xs text-muted">Letzter Run</div>
-            <div class="text-sm font-semibold text-secondary">${fmtAgo(item.last_repriced_at)}</div>
+            <div class="text-sm text-secondary">${fmtAgo(item.last_repriced_at)}</div>
           </div>
           <div>
             <div class="text-xs text-muted">Status</div>
@@ -206,54 +250,105 @@ const RepricerView = (() => {
         </div>
       </div>
 
+      <!-- Rule editor -->
       <div style="padding:12px 20px;border-bottom:1px solid var(--border)">
-        <div class="text-xs font-semibold text-secondary" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Regel</div>
-        <div class="row gap-12 mb-8" style="align-items:center;flex-wrap:wrap">
-          <label class="text-xs text-muted">Undercut</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" class="input-sm" id="ruleUndercut" value="${undercut}" min="0" max="50" step="0.5" style="width:60px">
-            <span class="text-xs text-muted">%</span>
+        <div class="text-xs font-semibold text-secondary" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Regel (artikel-spezifisch)</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+
+          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
+            <label class="text-xs text-muted" style="min-width:110px">Preis-Strategie</label>
+            <select id="ruleStrategy" class="input-sm" style="min-width:200px">${strategyOpts}</select>
           </div>
-          <label class="text-xs text-muted" style="margin-left:8px">Min. Marge</label>
-          <div style="display:flex;align-items:center;gap:4px">
-            <input type="number" class="input-sm" id="ruleMinMargin" value="${minMargin}" min="0" max="200" step="1" style="width:60px">
-            <span class="text-xs text-muted">%</span>
+
+          <div id="ruleRaiseRow" class="row gap-12" style="align-items:center;flex-wrap:wrap;${strategy !== "cheapest" ? "opacity:.4;pointer-events:none" : ""}">
+            <label class="text-xs text-muted" style="min-width:110px">Wenn günstigster</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="ruleRaiseWhenCheapest" ${raiseWhenCheapest ? "checked" : ""}>
+              <span class="text-xs">Auf 2. Günstigsten anheben</span>
+            </label>
+          </div>
+
+          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
+            <label class="text-xs text-muted" style="min-width:110px">Nur Gewerbliche</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="ruleCommercialOnly" ${commercialOnly ? "checked" : ""}>
+              <span class="text-xs">Private Verkäufer ignorieren</span>
+            </label>
+            <div id="ruleCommFbRow" style="${commercialOnly ? "" : "opacity:.4;pointer-events:none"}display:flex;align-items:center;gap:4px">
+              <span class="text-xs text-muted">min. Feedback</span>
+              <input type="number" id="ruleCommFb" class="input-sm" value="${commercialMinFb}" min="1" max="9999" style="width:64px">
+            </div>
+          </div>
+
+          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
+            <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
+            <div style="display:flex;align-items:center;gap:4px">
+              <input type="number" id="ruleMinMargin" class="input-sm" value="${minMargin}" min="0" max="200" step="1" style="width:64px">
+              <span class="text-xs text-muted">%  → Floor: ${item.floor_price != null ? fmt(item.floor_price) : "—"}</span>
+            </div>
           </div>
         </div>
-        <div class="row gap-8">
+
+        <div class="row gap-8" style="margin-top:12px">
           <button class="btn btn-primary btn-sm" id="btnSaveRule">Speichern</button>
           <button class="btn btn-ghost btn-sm" id="btnRemoveItem" style="color:var(--red)">Entfernen</button>
         </div>
       </div>
 
+      <!-- History -->
       ${itemLog.length ? `
       <div style="padding:12px 20px">
         <div class="text-xs font-semibold text-secondary" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Verlauf</div>
         <div style="display:flex;flex-direction:column;gap:4px">
-          ${itemLog.map(e => `
-            <div style="display:flex;justify-content:space-between;align-items:center;padding:4px 8px;background:var(--bg-panel);border-radius:4px;border:1px solid var(--border)">
-              <span class="text-xs text-muted">${fmtDate(e.ts)}</span>
-              <span class="text-xs text-secondary">${fmt(e.old_price)} → <strong style="color:${e.new_price < e.old_price ? "var(--green)" : "var(--text-primary)"}">${fmt(e.new_price)}</strong></span>
-              <span class="text-xs" style="color:${e.new_price < e.old_price ? "var(--green)" : "var(--red)"}">
-                ${e.new_price < e.old_price ? "−" : "+"}${Math.abs(e.new_price - e.old_price).toFixed(2)}€
-              </span>
-              <span class="badge badge-muted" style="font-size:10px">${e.status}</span>
-            </div>
-          `).join("")}
+          ${itemLog.map(e => {
+            const raised  = e.status === "RAISED";
+            const lowered = (e.new_price || 0) < (e.old_price || 0);
+            const arrow = raised ? "↑" : (lowered ? "↓" : "→");
+            const color = raised ? "#818cf8" : (lowered ? "var(--green)" : "var(--text-secondary)");
+            const stratLabel = e.price_strategy ? `<span class="badge badge-muted" style="font-size:9px">${STRATEGY_LABELS[e.price_strategy] || e.price_strategy}</span>` : "";
+            return `
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-panel);border-radius:4px;border:1px solid var(--border)">
+                <span class="text-xs text-muted" style="flex-shrink:0">${fmtDate(e.ts)}</span>
+                <span class="text-xs text-secondary">${fmt(e.old_price)} ${arrow} <strong style="color:${color}">${fmt(e.new_price)}</strong></span>
+                <span class="text-xs" style="color:${color};flex-shrink:0">
+                  ${raised ? "+" : (lowered ? "−" : "")}${Math.abs((e.new_price||0)-(e.old_price||0)).toFixed(2)}€
+                </span>
+                ${stratLabel}
+                <span class="badge badge-muted" style="font-size:9px">${e.status}</span>
+              </div>
+            `;
+          }).join("")}
         </div>
       </div>` : ""}
     `;
 
-    // Wire rule buttons
+    // Wire rule section dynamics
+    const stratSel  = el.querySelector("#ruleStrategy");
+    const raiseRow  = el.querySelector("#ruleRaiseRow");
+    const commCheck = el.querySelector("#ruleCommercialOnly");
+    const commFbRow = el.querySelector("#ruleCommFbRow");
+
+    stratSel?.addEventListener("change", () => {
+      const isCheapest = stratSel.value === "cheapest";
+      if (raiseRow) { raiseRow.style.opacity = isCheapest ? "1" : ".4"; raiseRow.style.pointerEvents = isCheapest ? "" : "none"; }
+    });
+    commCheck?.addEventListener("change", () => {
+      if (commFbRow) { commFbRow.style.opacity = commCheck.checked ? "1" : ".4"; commFbRow.style.pointerEvents = commCheck.checked ? "" : "none"; }
+    });
+
     el.querySelector("#btnSaveRule")?.addEventListener("click", () => _saveRule(item));
     el.querySelector("#btnRemoveItem")?.addEventListener("click", () => _removeItem(item));
+    el.querySelector("#reprToggleEnabled")?.addEventListener("change", async (e) => {
+      await Storage.repricerUpdate(item.sku, { enabled: e.target.checked });
+      await _refreshData();
+      Toast.show(e.target.checked ? "Aktiviert" : "Pausiert", "success");
+    });
   }
 
   // ── Events ─────────────────────────────────────────────────────────────────
   function _wireEvents() {
     if (!_container) return;
 
-    // Run now
     _container.querySelector("#btnReprRun")?.addEventListener("click", async () => {
       const btn = _container.querySelector("#btnReprRun");
       if (btn) { btn.disabled = true; btn.textContent = "Läuft…"; }
@@ -261,33 +356,29 @@ const RepricerView = (() => {
         await Storage.repricerRunNow();
         await _refreshData();
         Toast.show("Repricer ausgeführt", "success");
-      } catch (e) {
+      } catch {
         Toast.show("Fehler beim Ausführen", "error");
       } finally {
-        if (btn) { btn.disabled = false; btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polygon points="3,2 13,8 3,14" fill="currentColor"/></svg> Jetzt ausführen`; }
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polygon points="3,2 13,8 3,14" fill="currentColor"/></svg> Jetzt ausführen`;
+        }
       }
     });
 
-    // Settings
     _container.querySelector("#btnReprSettings")?.addEventListener("click", _showSettings);
-
-    // Add item
     _container.querySelector("#btnReprAdd")?.addEventListener("click", _showAddModal);
+    _container.querySelector("#btnReprSync")?.addEventListener("click", _syncListings);
 
-    // Item list click
     _container.querySelector("#reprItemList")?.addEventListener("click", e => {
       const row = e.target.closest(".comp-seller-row");
       if (!row) return;
       const sku = row.dataset.sku;
       _selected = _selected === sku ? null : sku;
       _render();
-      if (_selected) {
-        const item = _items.find(i => i.sku === sku);
-        _renderDetail(item);
-      }
+      if (_selected) _renderDetail(_items.find(i => i.sku === sku));
     });
 
-    // Connect eBay button (if not connected)
     if (!_connected) {
       const badge = _container.querySelector("#reprConnBadge");
       if (badge) {
@@ -310,9 +401,22 @@ const RepricerView = (() => {
   }
 
   async function _saveRule(item) {
-    const undercut  = parseFloat(_container.querySelector("#ruleUndercut")?.value  || "2");
-    const minMargin = parseFloat(_container.querySelector("#ruleMinMargin")?.value || "15");
-    await Storage.repricerUpdate(item.sku, { rule: { undercut_pct: undercut, min_margin_pct: minMargin } });
+    const el = _container?.querySelector("#reprDetail");
+    if (!el) return;
+    const strategy       = el.querySelector("#ruleStrategy")?.value           || "cheapest";
+    const raise          = el.querySelector("#ruleRaiseWhenCheapest")?.checked ?? true;
+    const commOnly       = el.querySelector("#ruleCommercialOnly")?.checked    ?? false;
+    const commFb         = parseInt(el.querySelector("#ruleCommFb")?.value     || "10");
+    const minMargin      = parseFloat(el.querySelector("#ruleMinMargin")?.value || "15");
+    await Storage.repricerUpdate(item.sku, {
+      rule: {
+        price_strategy:          strategy,
+        raise_when_cheapest:     raise,
+        commercial_only:         commOnly,
+        commercial_min_feedback: commFb,
+        min_margin_pct:          minMargin,
+      }
+    });
     await _refreshData();
     Toast.show("Regel gespeichert", "success");
   }
@@ -328,9 +432,34 @@ const RepricerView = (() => {
   async function _connectEbay() {
     const url = await Storage.repricerAuthUrl();
     if (!url) { Toast.show("eBay OAuth nicht konfiguriert", "error"); return; }
-    // Open in system browser (shell.openExternal equivalent via window.open)
     window.open(url, "_blank");
     Toast.show("eBay-Login im Browser geöffnet", "info");
+  }
+
+  // ── Sync eBay listings ─────────────────────────────────────────────────────
+  async function _syncListings() {
+    if (!_connected) {
+      Toast.show("Zuerst mit eBay verbinden", "warning");
+      _connectEbay();
+      return;
+    }
+    const btn = _container?.querySelector("#btnReprSync");
+    if (btn) { btn.disabled = true; btn.textContent = "Syncing…"; }
+    try {
+      const result = await Storage.repricerSyncListings();
+      await _refreshData();
+      const added   = result?.added   ?? 0;
+      const updated = result?.updated ?? 0;
+      const total   = result?.total   ?? 0;
+      Toast.show(`Sync: ${total} Listings · ${added} neu · ${updated} aktualisiert`, "success");
+    } catch (e) {
+      Toast.show("Sync fehlgeschlagen", "error");
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> Listings sync`;
+      }
+    }
   }
 
   // ── Add Item Modal ─────────────────────────────────────────────────────────
@@ -345,19 +474,33 @@ const RepricerView = (() => {
       <div style="margin-bottom:12px">
         <input type="text" id="reprAddSearch" class="input-sm" placeholder="Suche nach Titel oder EAN…" style="width:100%">
       </div>
-      <div id="reprAddList" style="max-height:320px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
-        ${listed.map(inv => `
-          <div class="comp-seller-row ${alreadyAdded.has(inv.ean) ? "opacity-50" : ""}" data-inv-id="${inv.id}" data-ean="${_esc(inv.ean)}" data-sku="${_esc(inv.sku || inv.ean)}" data-title="${_esc(inv.title || "")}">
-            <div style="flex:1;min-width:0">
-              <div class="text-sm text-primary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(inv.title || inv.ean)}</div>
-              <div class="text-xs text-muted">EAN: ${_esc(inv.ean)} · VK: ${fmt(inv.sell_price)}</div>
+      <div id="reprAddList" style="max-height:300px;overflow-y:auto;display:flex;flex-direction:column;gap:4px">
+        ${listed.map(inv => {
+          const added = alreadyAdded.has(inv.ean);
+          return `
+            <div class="comp-seller-row${added ? " opacity-50" : ""}"
+                 data-inv-id="${inv.id}" data-ean="${_esc(inv.ean)}"
+                 data-sku="${_esc(inv.sku || inv.ean)}" data-title="${_esc(inv.title || "")}">
+              <div style="flex:1;min-width:0">
+                <div class="text-sm text-primary" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(inv.title || inv.ean)}</div>
+                <div class="text-xs text-muted">EAN: ${_esc(inv.ean)} · VK: ${fmt(inv.sell_price)}</div>
+              </div>
+              ${added
+                ? `<span class="badge badge-muted" style="font-size:10px">Bereits hinzugefügt</span>`
+                : `<div style="display:flex;align-items:center;gap:6px">
+                     <input type="text" class="input-sm repr-ebay-id" placeholder="eBay-ID (opt.)" style="width:120px;font-size:11px" title="eBay ItemID aus ebay.de/itm/XXXXXXXXX">
+                     <button class="btn btn-primary btn-xs btn-repr-add-item">Hinzufügen</button>
+                   </div>`
+              }
             </div>
-            ${alreadyAdded.has(inv.ean)
-              ? `<span class="badge badge-muted" style="font-size:10px">Bereits hinzugefügt</span>`
-              : `<button class="btn btn-primary btn-xs btn-repr-add-item">Hinzufügen</button>`
-            }
-          </div>
-        `).join("") || `<p class="text-sm text-muted" style="padding:12px;text-align:center">Keine LISTED-Artikel mit EAN gefunden</p>`}
+          `;
+        }).join("") || `<p class="text-sm text-muted" style="padding:12px;text-align:center">Keine LISTED-Artikel mit EAN gefunden.<br><small>Tipp: "Listings sync" zieht alle eBay-Artikel automatisch rein.</small></p>`}
+      </div>
+      <div style="margin-top:10px;padding:8px 10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
+        <p class="text-xs text-muted">
+          💡 <strong>eBay-ID</strong> optional — wird für automatische Preisaktualisierungen gebraucht.
+          Zu finden in: <em>ebay.de/itm/<strong>123456789</strong></em> — oder nutze "Listings sync" für automatisches Matching.
+        </p>
       </div>
     `;
 
@@ -367,7 +510,6 @@ const RepricerView = (() => {
       actions: [{ label: "Schließen", type: "secondary", onClick: () => Modal.close() }],
     });
 
-    // Search filter
     document.getElementById("reprAddSearch")?.addEventListener("input", e => {
       const q = e.target.value.toLowerCase();
       document.querySelectorAll("#reprAddList .comp-seller-row").forEach(row => {
@@ -376,24 +518,15 @@ const RepricerView = (() => {
       });
     });
 
-    // Add buttons
     document.querySelectorAll(".btn-repr-add-item").forEach(btn => {
       btn.addEventListener("click", async () => {
-        const row   = btn.closest(".comp-seller-row");
-        const ean   = row.dataset.ean;
-        const sku   = row.dataset.sku;
-        const title = row.dataset.title;
-        const inv   = _inventory.find(i => i.id === row.dataset.invId);
-        await Storage.repricerAdd({
-          sku,
-          ean,
-          title:   title || ean,
-          rule:    null,  // use global defaults
-          enabled: true,
-        });
-        btn.textContent = "✓ Hinzugefügt";
-        btn.disabled    = true;
-        btn.className   = "btn btn-ghost btn-xs";
+        const row        = btn.closest(".comp-seller-row");
+        const ean        = row.dataset.ean;
+        const sku        = row.dataset.sku;
+        const title      = row.dataset.title;
+        const ebayItemId = row.querySelector(".repr-ebay-id")?.value?.trim() || null;
+        await Storage.repricerAdd({ sku, ean, title: title || ean, ebay_item_id: ebayItemId, rule: null, enabled: true });
+        btn.closest("div[style]").innerHTML = `<span class="badge badge-success" style="font-size:10px">✓ Hinzugefügt</span>`;
         Toast.show(`"${title || ean}" hinzugefügt`, "success");
         await _refreshData();
       });
@@ -403,38 +536,103 @@ const RepricerView = (() => {
   // ── Settings Modal ─────────────────────────────────────────────────────────
   function _showSettings() {
     const repricer = _settings?.repricer || {};
+    const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>
+      `<option value="${v}" ${(repricer.global_price_strategy || "cheapest") === v ? "selected" : ""}>${l}</option>`
+    ).join("");
+    const commOnly = repricer.global_commercial_only ?? false;
+
     const bodyHtml = `
-      <div style="display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;flex-direction:column;gap:16px">
+
         <div>
-          <label class="text-xs text-muted" style="display:block;margin-bottom:4px">Ausführungs-Intervall (Minuten, min. 10)</label>
-          <input type="number" id="reprIntervalMin" class="input-sm" value="${repricer.interval_min || 30}" min="10" max="1440" style="width:100px">
+          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Ausführung</label>
+          <div class="row gap-8" style="align-items:center">
+            <label class="text-xs text-muted">Intervall</label>
+            <input type="number" id="reprIntervalMin" class="input-sm" value="${repricer.interval_min || 30}" min="10" max="1440" style="width:80px">
+            <span class="text-xs text-muted">Minuten (min. 10)</span>
+          </div>
         </div>
+
+        <hr style="border:none;border-top:1px solid var(--border)">
+
         <div>
-          <label class="text-xs text-muted" style="display:block;margin-bottom:4px">Globaler Undercut (%)</label>
-          <input type="number" id="reprGlobalUndercut" class="input-sm" value="${repricer.global_undercut_pct ?? 2}" min="0" max="50" step="0.5" style="width:100px">
+          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Repricing-Strategie (Global)</label>
+          <div style="display:flex;flex-direction:column;gap:12px">
+
+            <div class="row gap-12" style="align-items:center">
+              <label class="text-xs text-muted" style="min-width:110px">Preis-Strategie</label>
+              <select id="reprGlobalStrategy" class="input-sm" style="min-width:200px">${strategyOpts}</select>
+            </div>
+
+            <div id="settRaiseRow" style="padding:10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
+              <div class="text-xs font-semibold text-secondary" style="margin-bottom:6px">Wenn du der günstigste bist (nur bei Rang 1):</div>
+              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+                <input type="checkbox" id="reprGlobalRaiseWhenCheapest" ${repricer.global_raise_when_cheapest !== false ? "checked" : ""} style="margin-top:2px">
+                <div>
+                  <div class="text-xs">Preis auf 2. Günstigsten anheben</div>
+                  <div class="text-xs text-muted" style="margin-top:2px">Verhindert, dass du den Marktpreis nach unten ziehst.</div>
+                </div>
+              </label>
+            </div>
+
+            <div class="row gap-12" style="align-items:center">
+              <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
+              <div style="display:flex;align-items:center;gap:4px">
+                <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:64px">
+                <span class="text-xs text-muted">%  (Floor = EK × (1 + Marge%) + Versandkosten)</span>
+              </div>
+            </div>
+
+          </div>
         </div>
+
+        <hr style="border:none;border-top:1px solid var(--border)">
+
         <div>
-          <label class="text-xs text-muted" style="display:block;margin-bottom:4px">Globale Mindest-Marge (%)</label>
-          <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:100px">
+          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Gewerblich-Filter (Global)</label>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
+              <input type="checkbox" id="reprGlobalCommOnly" ${commOnly ? "checked" : ""} style="margin-top:2px">
+              <div>
+                <div class="text-xs">Nur gewerbliche Verkäufer berücksichtigen</div>
+                <div class="text-xs text-muted" style="margin-top:2px">Filtert Privatverkäufer mit wenig Feedback heraus.</div>
+              </div>
+            </label>
+            <div id="settCommFbRow" style="${commOnly ? "" : "opacity:.4;pointer-events:none"}display:flex;align-items:center;gap:8px;padding-left:24px">
+              <label class="text-xs text-muted">Min. Feedback-Punkte</label>
+              <input type="number" id="reprGlobalCommFb" class="input-sm" value="${repricer.global_commercial_min_feedback ?? 10}" min="1" max="9999" style="width:72px">
+              <span class="text-xs text-muted">(Verkäufer darunter werden ignoriert)</span>
+            </div>
+          </div>
         </div>
+
+        <hr style="border:none;border-top:1px solid var(--border)">
+
         <div>
-          <label class="text-xs text-muted" style="display:block;margin-bottom:4px">Discord Webhook bei Preisänderung</label>
-          <input type="checkbox" id="reprWebhookRepriced" ${repricer.webhook_repriced !== false ? "checked" : ""}>
-          <label class="text-xs" for="reprWebhookRepriced"> Benachrichtigung bei Preisanpassung</label>
+          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Discord-Benachrichtigungen</label>
+          <div style="display:flex;flex-direction:column;gap:8px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="reprWebhookRepriced" ${repricer.webhook_repriced !== false ? "checked" : ""}>
+              <span class="text-xs">Bei Preisanpassung (gesenkt oder angehoben)</span>
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="reprWebhookFloor" ${repricer.webhook_floor !== false ? "checked" : ""}>
+              <span class="text-xs">Wenn Mindestpreis erreicht (🔒 Floor)</span>
+            </label>
+          </div>
         </div>
-        <div>
-          <label class="text-xs text-muted" style="display:block;margin-bottom:4px"></label>
-          <input type="checkbox" id="reprWebhookFloor" ${repricer.webhook_floor !== false ? "checked" : ""}>
-          <label class="text-xs" for="reprWebhookFloor"> Benachrichtigung bei Mindestpreis-Erreichen</label>
-        </div>
+
+        <hr style="border:none;border-top:1px solid var(--border)">
+
         ${!_connected ? `
-        <div style="padding:10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
-          <p class="text-xs text-muted" style="margin-bottom:8px">eBay-Verkäufer-Konto noch nicht verbunden</p>
+        <div style="padding:12px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
+          <p class="text-xs text-muted" style="margin-bottom:8px">eBay-Konto nicht verbunden — Preisaktualisierungen + Listing-Sync nicht möglich.</p>
           <button class="btn btn-primary btn-sm" id="btnConnectEbaySettings">Mit eBay verbinden →</button>
         </div>` : `
-        <div style="padding:10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
-          <p class="text-xs" style="color:var(--green)">● eBay-Konto verbunden</p>
+        <div style="padding:12px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
+          <p class="text-xs" style="color:var(--green)">● eBay-Konto verbunden — Preisaktualisierungen + Listing-Sync aktiv</p>
         </div>`}
+
       </div>
     `;
 
@@ -447,11 +645,14 @@ const RepricerView = (() => {
           const s = await Storage.getSettings();
           const newRepricer = {
             ...(s.repricer || {}),
-            interval_min:          parseInt(document.getElementById("reprIntervalMin")?.value || "30"),
-            global_undercut_pct:   parseFloat(document.getElementById("reprGlobalUndercut")?.value || "2"),
-            global_min_margin_pct: parseFloat(document.getElementById("reprGlobalMargin")?.value || "15"),
-            webhook_repriced:      document.getElementById("reprWebhookRepriced")?.checked ?? true,
-            webhook_floor:         document.getElementById("reprWebhookFloor")?.checked ?? true,
+            interval_min:                    parseInt(document.getElementById("reprIntervalMin")?.value      || "30"),
+            global_price_strategy:           document.getElementById("reprGlobalStrategy")?.value            || "cheapest",
+            global_raise_when_cheapest:      document.getElementById("reprGlobalRaiseWhenCheapest")?.checked ?? true,
+            global_min_margin_pct:           parseFloat(document.getElementById("reprGlobalMargin")?.value   || "15"),
+            global_commercial_only:          document.getElementById("reprGlobalCommOnly")?.checked           ?? false,
+            global_commercial_min_feedback:  parseInt(document.getElementById("reprGlobalCommFb")?.value      || "10"),
+            webhook_repriced:                document.getElementById("reprWebhookRepriced")?.checked           ?? true,
+            webhook_floor:                   document.getElementById("reprWebhookFloor")?.checked              ?? true,
           };
           await Storage.saveSettings({ ...s, repricer: newRepricer });
           await Storage.repricerSetInterval(newRepricer.interval_min);
@@ -462,6 +663,19 @@ const RepricerView = (() => {
       ],
     });
 
+    // Settings modal dynamics
+    const globalStratEl = document.getElementById("reprGlobalStrategy");
+    const raiseRowEl    = document.getElementById("settRaiseRow");
+    const commOnlyEl    = document.getElementById("reprGlobalCommOnly");
+    const commFbRowEl   = document.getElementById("settCommFbRow");
+
+    globalStratEl?.addEventListener("change", () => {
+      const dim = globalStratEl.value !== "cheapest";
+      if (raiseRowEl) { raiseRowEl.style.opacity = dim ? ".4" : "1"; raiseRowEl.style.pointerEvents = dim ? "none" : ""; }
+    });
+    commOnlyEl?.addEventListener("change", () => {
+      if (commFbRowEl) { commFbRowEl.style.opacity = commOnlyEl.checked ? "1" : ".4"; commFbRowEl.style.pointerEvents = commOnlyEl.checked ? "" : "none"; }
+    });
     document.getElementById("btnConnectEbaySettings")?.addEventListener("click", () => {
       Modal.close();
       _connectEbay();

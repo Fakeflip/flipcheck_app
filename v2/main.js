@@ -939,15 +939,16 @@ function mainApiCall(urlStr, token) {
 
 // Fire a Discord embed webhook
 function fireDiscordWebhook(webhookUrl, eventId, data) {
-  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1, repriced: 0x22C55E, floor: 0xF97316 };
-  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤", repriced: "💱", floor: "🔒" };
+  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1, repriced: 0x22C55E, raised: 0x818CF8, floor: 0xF97316 };
+  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤", repriced: "💱", raised: "📈", floor: "🔒" };
   const labels = {
     undercut:       "Günstigster Konkurrent unterboten",
     new_listing:    "Neues Listing von beobachtetem Verkäufer",
     price_drop:     "Preis deutlich gesunken",
     verdict_change: "Flipcheck Verdict geändert",
     new_seller:     "Neuer Konkurrent aufgetaucht",
-    repriced:       "Preis automatisch angepasst",
+    repriced:       "Preis gesenkt — Konkurrenz gematcht",
+    raised:         "Preis angehoben — du warst der Günstigste",
     floor:          "Mindestpreis erreicht — kein weiteres Senken möglich",
   };
   const fmt = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
@@ -973,6 +974,14 @@ function fireDiscordWebhook(webhookUrl, eventId, data) {
     if (data.competitor_min != null) fields.push({ name: "Konkurrent",  value: fmt2(data.competitor_min), inline: true });
     if (data.old_price != null && data.new_price != null)
       fields.push({ name: "Änderung", value: `${(data.new_price - data.old_price) > 0 ? "+" : ""}${(data.new_price - data.old_price).toFixed(2)}€`, inline: true });
+  } else if (eventId === "raised") {
+    const fmt2 = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
+    if (data.old_price      != null) fields.push({ name: "Alter VK",      value: fmt2(data.old_price),      inline: true });
+    if (data.new_price      != null) fields.push({ name: "Neuer VK",      value: fmt2(data.new_price),      inline: true });
+    if (data.competitor_min != null) fields.push({ name: "1. Günstigster", value: fmt2(data.competitor_min), inline: true });
+    if (data.competitor_2nd != null) fields.push({ name: "2. Günstigster", value: fmt2(data.competitor_2nd), inline: true });
+    if (data.old_price != null && data.new_price != null)
+      fields.push({ name: "Angehoben um", value: `+${(data.new_price - data.old_price).toFixed(2)}€`, inline: true });
   } else if (eventId === "floor") {
     const fmt2 = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
     if (data.floor          != null) fields.push({ name: "Floor-Preis",  value: fmt2(data.floor),          inline: true });
@@ -1372,6 +1381,96 @@ ipcMain.handle("repricer:runNow", async () => {
   return { ok: true };
 });
 
+ipcMain.handle("repricer:syncListings", async () => {
+  /**
+   * Pull ALL active eBay listings via /seller/listings/active (all pages),
+   * then upsert into repricer_items.json with quantity + ebay_item_id.
+   * Also cross-references inventory by EAN to fill in title/ean/sku.
+   * Returns { ok, total, added, updated }
+   */
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const inv   = readInv();
+    const invItems = inv.items || [];
+
+    // Fetch all pages
+    let allListings = [];
+    let page = 1;
+    while (true) {
+      const res = await mainApiCall(`${base}/seller/listings/active?page=${page}&per_page=100`, token);
+      if (res.status !== 200 || !res.data?.ok) break;
+      const listings = res.data.items || [];
+      allListings = allListings.concat(listings);
+      if (page >= (res.data.total_pages || 1)) break;
+      page++;
+    }
+
+    if (!allListings.length) return { ok: true, total: 0, added: 0, updated: 0 };
+
+    const list    = readRepricerItems();
+    let   added   = 0;
+    let   updated = 0;
+
+    for (const listing of allListings) {
+      const item_id = listing.item_id;
+      if (!item_id) continue;
+
+      // Try to match an inventory item by EAN guess from title
+      const ean      = listing.ean_guess || null;
+      const invMatch = ean ? invItems.find(i => i.ean === ean) : null;
+
+      const sku   = invMatch?.sku || invMatch?.ean || ean || item_id;
+      const title = invMatch?.title || listing.title || sku;
+
+      const existing = list.findIndex(i =>
+        i.ebay_item_id === item_id ||
+        (ean && i.ean === ean) ||
+        i.sku === sku
+      );
+
+      if (existing !== -1) {
+        // Update eBay-specific fields (preserve rule + enabled)
+        list[existing] = {
+          ...list[existing],
+          ebay_item_id: item_id,
+          quantity:     listing.quantity ?? list[existing].quantity,
+          last_price:   listing.price    ?? list[existing].last_price,
+          updated_at:   new Date().toISOString(),
+          // Fill in missing fields from inventory match
+          ...(ean   && !list[existing].ean   ? { ean }   : {}),
+          ...(title && !list[existing].title ? { title } : {}),
+          ...(sku   && !list[existing].sku   ? { sku }   : {}),
+        };
+        updated++;
+      } else {
+        // New repricer entry from eBay listing
+        list.unshift({
+          sku,
+          ean,
+          title,
+          ebay_item_id: item_id,
+          quantity:     listing.quantity ?? null,
+          last_price:   listing.price    ?? null,
+          enabled:      true,
+          rule:         null,
+          status:       "PENDING",
+          added_at:     new Date().toISOString(),
+          last_repriced_at: null,
+        });
+        added++;
+      }
+    }
+
+    writeRepricerItems(list);
+    console.log(`[Repricer] Sync: ${allListings.length} listings, ${added} added, ${updated} updated`);
+    return { ok: true, total: allListings.length, added, updated };
+  } catch (e) {
+    console.error("[Repricer] Sync error:", e.message);
+    return { ok: false, error: e.message };
+  }
+});
+
 // ─── Background Repricer Monitor ──────────────────────────────────────────────
 let _repricerTimer   = null;
 let _repricerRunning = false;
@@ -1403,9 +1502,13 @@ async function runRepricerMonitor() {
         ek:            inv.ek,
         ship_out:      inv.ship_out || 0,
         current_price: inv.sell_price,
+        ebay_item_id:  ri.ebay_item_id || null,
         rule:          ri.rule || {
-          undercut_pct:  repricer.global_undercut_pct  || 2,
-          min_margin_pct: repricer.global_min_margin_pct || 15,
+          min_margin_pct:          repricer.global_min_margin_pct          || 15,
+          price_strategy:          repricer.global_price_strategy          || "cheapest",
+          raise_when_cheapest:     repricer.global_raise_when_cheapest     !== false,
+          commercial_only:         repricer.global_commercial_only         || false,
+          commercial_min_feedback: repricer.global_commercial_min_feedback || 10,
         },
       };
     }).filter(Boolean);
@@ -1428,18 +1531,23 @@ async function runRepricerMonitor() {
       const rList = readRepricerItems();
       const idx   = rList.findIndex(i => i.sku === upd.sku || i.ean === upd.ean);
       if (idx !== -1) {
+        // Keep old_price for list chip diff calculation
+        const prevPrice = rList[idx].last_price;
         Object.assign(rList[idx], {
           status:           upd.status,
           last_price:       upd.new_price,
+          old_price:        upd.old_price ?? prevPrice,
           last_repriced_at: now,
           competitor_min:   upd.competitor_min,
+          competitor_2nd:   upd.competitor_2nd,
           floor_price:      upd.floor_price,
         });
         writeRepricerItems(rList);
       }
 
-      // Sync inventory sell_price when price changed
-      if (upd.status === "UPDATED") {
+      // Sync inventory sell_price when price actually changed
+      const priceChanged = upd.status === "UPDATED" || upd.status === "RAISED";
+      if (priceChanged) {
         const invList = readInv();
         const invIdx  = (invList.items || []).findIndex(i =>
           (upd.ean && i.ean === upd.ean) || (upd.sku && i.sku === upd.sku)
@@ -1452,25 +1560,29 @@ async function runRepricerMonitor() {
 
         // Log the event
         appendRepricerLog({
-          ts:             Date.now(),
-          sku:            upd.sku,
-          ean:            upd.ean,
-          old_price:      upd.old_price,
-          new_price:      upd.new_price,
-          competitor_min: upd.competitor_min,
-          floor_price:    upd.floor_price,
-          status:         upd.status,
+          ts:              Date.now(),
+          sku:             upd.sku,
+          ean:             upd.ean,
+          old_price:       upd.old_price,
+          new_price:       upd.new_price,
+          competitor_min:  upd.competitor_min,
+          competitor_2nd:  upd.competitor_2nd,
+          floor_price:     upd.floor_price,
+          candidate_count: upd.candidate_count,
+          price_strategy:  upd.price_strategy,
+          status:          upd.status,
         });
 
-        // Discord webhook for UPDATED events
+        // Discord webhook for UPDATED / RAISED events
         const webhookUrl = settings.webhook_url;
         if (webhookUrl && repricer.webhook_repriced !== false) {
           const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
-          fireDiscordWebhook(webhookUrl, "repriced", {
+          fireDiscordWebhook(webhookUrl, upd.status === "RAISED" ? "raised" : "repriced", {
             product:        invItem?.title || upd.ean || upd.sku,
             old_price:      upd.old_price,
             new_price:      upd.new_price,
             competitor_min: upd.competitor_min,
+            competitor_2nd: upd.competitor_2nd,
           }).catch(e => console.error("[Repricer] webhook error:", e.message));
         }
       }
@@ -1489,7 +1601,11 @@ async function runRepricerMonitor() {
       }
     }
 
-    console.log(`[Repricer] Done — ${updates.filter(u => u.status === "UPDATED").length} updated, ${updates.filter(u => u.status === "HOLD").length} held, ${updates.filter(u => u.status === "AT_FLOOR").length} at floor`);
+    const nUpdated = updates.filter(u => u.status === "UPDATED").length;
+    const nRaised  = updates.filter(u => u.status === "RAISED").length;
+    const nHeld    = updates.filter(u => u.status === "HOLD").length;
+    const nFloor   = updates.filter(u => u.status === "AT_FLOOR").length;
+    console.log(`[Repricer] Done — ↓${nUpdated} updated, ↑${nRaised} raised, =${nHeld} held, 🔒${nFloor} at floor`);
   } catch (e) {
     console.error("[Repricer] Monitor error:", e.message);
   } finally {
