@@ -512,6 +512,12 @@ const Storage = (() => {
     catch { return null; }
   }
 
+  /** @returns {Promise<{ok:boolean}>} */
+  async function repricerDisconnect() {
+    try { return await window.fc.repricerDisconnect(); }
+    catch { return { ok: false }; }
+  }
+
   return {
     listInventory, upsertItem, deleteItem, bulkUpdate,
     savePrice, savePriceSeries, getHistory, listHistory, deleteHistory, deleteHistoryEntry,
@@ -524,6 +530,6 @@ const Storage = (() => {
     getSeenListings, markSeenListings,
     listAlerts, addAlert, removeAlert, updateAlert, resetAlert,
     repricerList, repricerLog, repricerAdd, repricerRemove, repricerUpdate,
-    repricerStatus, repricerSetInterval, repricerAuthUrl, repricerIsConnected, repricerRunNow, repricerSyncListings,
+    repricerStatus, repricerSetInterval, repricerAuthUrl, repricerIsConnected, repricerRunNow, repricerSyncListings, repricerDisconnect,
   };
 })();

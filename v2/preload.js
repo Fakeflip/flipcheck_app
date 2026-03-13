@@ -332,4 +332,6 @@ contextBridge.exposeInMainWorld("fc", {
    * @returns {Promise<{ok:boolean, total:number, added:number, updated:number}>}
    */
   repricerSyncListings:  () => ipcRenderer.invoke("repricer:syncListings"),
+  /** Revoke eBay seller OAuth token. @returns {Promise<{ok:boolean}>} */
+  repricerDisconnect:    () => ipcRenderer.invoke("repricer:disconnect"),
 });

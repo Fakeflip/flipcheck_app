@@ -939,8 +939,8 @@ function mainApiCall(urlStr, token) {
 
 // Fire a Discord embed webhook
 function fireDiscordWebhook(webhookUrl, eventId, data) {
-  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1, repriced: 0x22C55E, raised: 0x818CF8, floor: 0xF97316 };
-  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤", repriced: "💱", raised: "📈", floor: "🔒" };
+  const colors = { undercut: 0xEF4444, new_listing: 0xF59E0B, price_drop: 0xF59E0B, verdict_change: 0x6366F1, new_seller: 0x6366F1, repriced: 0x22C55E, raised: 0x818CF8, floor: 0xF97316, ebay_failed: 0xEF4444 };
+  const icons  = { undercut: "⚠️",    new_listing: "🆕",      price_drop: "📉",      verdict_change: "🔄",     new_seller: "👤", repriced: "💱", raised: "📈", floor: "🔒",  ebay_failed: "❌" };
   const labels = {
     undercut:       "Günstigster Konkurrent unterboten",
     new_listing:    "Neues Listing von beobachtetem Verkäufer",
@@ -950,6 +950,7 @@ function fireDiscordWebhook(webhookUrl, eventId, data) {
     repriced:       "Preis gesenkt — Konkurrenz gematcht",
     raised:         "Preis angehoben — du warst der Günstigste",
     floor:          "Mindestpreis erreicht — kein weiteres Senken möglich",
+    ebay_failed:    "eBay-Preisupdate fehlgeschlagen",
   };
   const fmt = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
   const fields = [];
@@ -988,6 +989,11 @@ function fireDiscordWebhook(webhookUrl, eventId, data) {
     if (data.competitor_min != null) fields.push({ name: "Konkurrent",   value: fmt2(data.competitor_min), inline: true });
     if (data.floor != null && data.competitor_min != null)
       fields.push({ name: "Differenz", value: fmt2(data.floor - data.competitor_min), inline: true });
+  } else if (eventId === "ebay_failed") {
+    const fmt2 = v => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
+    if (data.current_price  != null) fields.push({ name: "Aktueller VK",  value: fmt2(data.current_price),  inline: true });
+    if (data.ebay_item_id   != null) fields.push({ name: "eBay ItemID",   value: String(data.ebay_item_id), inline: true });
+    if (data.error          != null) fields.push({ name: "Fehler",        value: String(data.error).slice(0, 100), inline: false });
   }
   const productName = data.product || data.title || data.ean || "Produkt";
   // For new_listing: make the embed title clickable (links to seller's newest listings)
@@ -1381,6 +1387,28 @@ ipcMain.handle("repricer:runNow", async () => {
   return { ok: true };
 });
 
+ipcMain.handle("repricer:disconnect", async () => {
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const url   = new URL(`${base}/seller/auth/disconnect`);
+    const mod   = url.protocol === "https:" ? https : http;
+    await new Promise((resolve) => {
+      const req = mod.request({
+        hostname: url.hostname,
+        port:     url.port || (url.protocol === "https:" ? 443 : 80),
+        path:     url.pathname,
+        method:   "DELETE",
+        headers:  { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
+      }, res => { res.resume(); res.on("end", resolve); });
+      req.on("error", resolve); // best-effort
+      req.setTimeout(5000, () => { req.destroy(); resolve(); });
+      req.end();
+    });
+  } catch { /* backend may not be running; best-effort */ }
+  return { ok: true };
+});
+
 ipcMain.handle("repricer:syncListings", async () => {
   /**
    * Pull ALL active eBay listings via /seller/listings/active (all pages),
@@ -1541,6 +1569,8 @@ async function runRepricerMonitor() {
           competitor_min:   upd.competitor_min,
           competitor_2nd:   upd.competitor_2nd,
           floor_price:      upd.floor_price,
+          candidate_count:  upd.candidate_count,
+          ebay_error:       upd.ebay_error ?? null,
         });
         writeRepricerItems(rList);
       }
@@ -1597,6 +1627,21 @@ async function runRepricerMonitor() {
             floor:          upd.floor_price,
             competitor_min: upd.competitor_min,
           }).catch(e => console.error("[Repricer] webhook floor error:", e.message));
+        }
+      }
+
+      // Discord webhook for EBAY_FAILED events
+      if (upd.status === "EBAY_FAILED") {
+        const webhookUrl = settings.webhook_url;
+        if (webhookUrl) {
+          const rItem   = readRepricerItems().find(i => i.sku === upd.sku || i.ean === upd.ean);
+          const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
+          fireDiscordWebhook(webhookUrl, "ebay_failed", {
+            product:       invItem?.title || upd.ean || upd.sku,
+            current_price: upd.current_price ?? upd.new_price,
+            ebay_item_id:  rItem?.ebay_item_id || upd.ebay_item_id,
+            error:         upd.ebay_error || "unbekannt",
+          }).catch(e => console.error("[Repricer] webhook ebay_failed error:", e.message));
         }
       }
     }

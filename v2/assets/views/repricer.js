@@ -55,6 +55,7 @@ const RepricerView = (() => {
         </div>
         <div class="page-header-right" id="reprHeaderRight">
           <span id="reprConnBadge" class="badge badge-muted" style="font-size:11px">Nicht verbunden</span>
+          <button class="btn btn-ghost btn-sm" id="btnReprDisconnect" title="eBay-Konto trennen" style="display:none;color:var(--text-muted);font-size:11px">Trennen</button>
           <button class="btn btn-secondary btn-sm" id="btnReprSync" title="eBay-Listings synchronisieren">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
               <path d="M1 4v6h6M23 20v-6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
@@ -105,11 +106,12 @@ const RepricerView = (() => {
   // ── Init ──────────────────────────────────────────────────────────────────
   async function _init() {
     if (!_container) return;
-    [_items, _log, _status, _settings] = await Promise.all([
+    [_items, _log, _status, _settings, _inventory] = await Promise.all([
       Storage.repricerList(),
       Storage.repricerLog(),
       Storage.repricerStatus(),
       Storage.getSettings(),
+      Storage.listInventory().then(r => r.items || []).catch(() => []),
     ]);
     _connected = await Storage.repricerIsConnected();
     _render();
@@ -125,6 +127,8 @@ const RepricerView = (() => {
       badge.className   = _connected ? "badge badge-success" : "badge badge-muted";
       badge.style.fontSize = "11px";
     }
+    const disconnBtn = _container.querySelector("#btnReprDisconnect");
+    if (disconnBtn) disconnBtn.style.display = _connected ? "" : "none";
 
     const countEl = _container.querySelector("#reprItemCount");
     if (countEl) countEl.textContent = `${_items.length} Artikel`;
@@ -195,10 +199,25 @@ const RepricerView = (() => {
     const commercialMinFb    = rule.commercial_min_feedback  ?? repricer.global_commercial_min_feedback  ?? 10;
     const isEnabled          = item.enabled !== false;
     const itemLog            = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 10);
+    // Look up EK+ship_out from inventory for live floor calculation
+    const invMatch = _inventory.find(i => (item.ean && i.ean === item.ean) || (item.sku && i.sku === item.sku));
+    const itemEk   = invMatch?.ek   ?? null;
+    const itemShip = invMatch?.ship_out ?? 0;
 
     const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>
       `<option value="${v}" ${strategy === v ? "selected" : ""}>${l}</option>`
     ).join("");
+
+    const noEanWarning = !item.ean ? `
+      <div style="padding:8px 20px;background:rgba(245,158,11,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px">⚠️</span>
+        <span class="text-xs" style="color:#f59e0b">Keine EAN — Konkurrenzsuche nicht möglich. EAN im Inventar ergänzen.</span>
+      </div>` : "";
+    const ebayFailedBanner = item.status === "EBAY_FAILED" && item.ebay_error ? `
+      <div style="padding:8px 20px;background:rgba(239,68,68,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+        <span style="font-size:13px">❌</span>
+        <span class="text-xs" style="color:#f87171">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 120))}</span>
+      </div>` : "";
 
     el.innerHTML = `
       <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
@@ -215,6 +234,8 @@ const RepricerView = (() => {
           ${item.ebay_item_id ? ` · <a href="https://www.ebay.de/itm/${_esc(item.ebay_item_id)}" target="_blank" style="color:var(--indigo)">eBay #${_esc(item.ebay_item_id)}</a>` : ""}
         </div>
       </div>
+      ${noEanWarning}
+      ${ebayFailedBanner}
 
       <!-- Stats row -->
       <div style="padding:12px 20px;border-bottom:1px solid var(--border)">
@@ -283,8 +304,9 @@ const RepricerView = (() => {
           <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
             <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
             <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" id="ruleMinMargin" class="input-sm" value="${minMargin}" min="0" max="200" step="1" style="width:64px">
-              <span class="text-xs text-muted">%  → Floor: ${item.floor_price != null ? fmt(item.floor_price) : "—"}</span>
+              <input type="number" id="ruleMinMargin" class="input-sm" value="${minMargin}" min="0" max="200" step="1" style="width:64px"
+                data-ek="${itemEk ?? ""}" data-ship="${itemShip}">
+              <span class="text-xs text-muted">% → Floor: <span id="floorDisplay">${item.floor_price != null ? fmt(item.floor_price) : "—"}</span></span>
             </div>
           </div>
         </div>
@@ -336,6 +358,21 @@ const RepricerView = (() => {
       if (commFbRow) { commFbRow.style.opacity = commCheck.checked ? "1" : ".4"; commFbRow.style.pointerEvents = commCheck.checked ? "" : "none"; }
     });
 
+    // Live floor price recalculation
+    const marginInput  = el.querySelector("#ruleMinMargin");
+    const floorDisplay = el.querySelector("#floorDisplay");
+    if (marginInput && floorDisplay) {
+      marginInput.addEventListener("input", () => {
+        const ek   = parseFloat(marginInput.dataset.ek);
+        const ship = parseFloat(marginInput.dataset.ship || "0");
+        const pct  = parseFloat(marginInput.value);
+        if (!isNaN(ek) && !isNaN(pct)) {
+          const floor = ek * (1 + pct / 100) + ship;
+          floorDisplay.textContent = `€${floor.toFixed(2)}`;
+        }
+      });
+    }
+
     el.querySelector("#btnSaveRule")?.addEventListener("click", () => _saveRule(item));
     el.querySelector("#btnRemoveItem")?.addEventListener("click", () => _removeItem(item));
     el.querySelector("#reprToggleEnabled")?.addEventListener("change", async (e) => {
@@ -370,6 +407,23 @@ const RepricerView = (() => {
     _container.querySelector("#btnReprAdd")?.addEventListener("click", _showAddModal);
     _container.querySelector("#btnReprSync")?.addEventListener("click", _syncListings);
 
+    _container.querySelector("#btnReprDisconnect")?.addEventListener("click", async () => {
+      const ok = confirm("eBay-Verbindung trennen? Der gespeicherte Token wird gelöscht. Du musst dich erneut verbinden, um den Repricer zu nutzen.");
+      if (!ok) return;
+      const btn = _container.querySelector("#btnReprDisconnect");
+      if (btn) { btn.disabled = true; btn.textContent = "…"; }
+      try {
+        await Storage.repricerDisconnect();
+        _connected = false;
+        _render();
+        Toast.success("Getrennt", "eBay-Verbindung wurde entfernt");
+      } catch {
+        Toast.error("Fehler", "Trennen fehlgeschlagen");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Trennen"; }
+      }
+    });
+
     _container.querySelector("#reprItemList")?.addEventListener("click", e => {
       const row = e.target.closest(".comp-seller-row");
       if (!row) return;
@@ -390,10 +444,11 @@ const RepricerView = (() => {
   }
 
   async function _refreshData() {
-    [_items, _log, _status] = await Promise.all([
+    [_items, _log, _status, _inventory] = await Promise.all([
       Storage.repricerList(),
       Storage.repricerLog(),
       Storage.repricerStatus(),
+      Storage.listInventory().then(r => r.items || []).catch(() => []),
     ]);
     _connected = await Storage.repricerIsConnected();
     _render();

@@ -1538,6 +1538,21 @@ async def seller_auth_status():
     return {"ok": True, "connected": is_connected() if _SELLER_AVAILABLE else False}
 
 
+@app.delete("/seller/auth/disconnect")
+async def seller_auth_disconnect():
+    """Delete the stored seller token (logout from eBay seller account)."""
+    from ebay_seller import TOKEN_FILE  # type: ignore[import]
+    try:
+        if TOKEN_FILE.exists():
+            TOKEN_FILE.unlink()
+        # Also clear in-memory cache
+        import ebay_seller as _es  # type: ignore[import]
+        _es._token_cache = None
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    return {"ok": True}
+
+
 class RepricerItem(BaseModel):
     sku: str
     ean: str
