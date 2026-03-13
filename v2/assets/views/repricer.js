@@ -43,6 +43,31 @@ const RepricerView = (() => {
     NO_EBAY_ID:  "#f59e0b",
   };
 
+  const EBAY_CATEGORIES = {
+    sonstiges:         { label: "Sonstiges / Standard",    fee: 0.13  },
+    handy_zubehoer:    { label: "Handy-Zubehör",           fee: 0.11  },
+    kabel:             { label: "Kabel & Adapter",         fee: 0.11  },
+    audio_zubehoer:    { label: "Audio-Zubehör",           fee: 0.11  },
+    pc_zubehoer:       { label: "PC-Zubehör",              fee: 0.11  },
+    tv_zubehoer:       { label: "TV-Zubehör",              fee: 0.11  },
+    tastaturen_maeuse: { label: "Tastaturen & Mäuse",      fee: 0.11  },
+    drucker_zubehoer:  { label: "Drucker-Zubehör",         fee: 0.11  },
+    batterien:         { label: "Batterien",               fee: 0.11  },
+    kameras_zubehoer:  { label: "Kamera-Zubehör",          fee: 0.11  },
+    notebook_zubehoer: { label: "Notebook-Zubehör",        fee: 0.11  },
+    objektive:         { label: "Objektive",               fee: 0.11  },
+    stative:           { label: "Stative",                 fee: 0.11  },
+    tablet_zubehoer:   { label: "Tablet-Zubehör",          fee: 0.11  },
+    sport_freizeit:    { label: "Sport & Freizeit",        fee: 0.115 },
+    spielzeug:         { label: "Spielzeug",               fee: 0.115 },
+    haushalt_garten:   { label: "Haushalt & Garten",       fee: 0.115 },
+  };
+
+  function _calcFloor(ek, ship, marginPct, categoryId) {
+    const feeRate = EBAY_CATEGORIES[categoryId || "sonstiges"]?.fee ?? 0.13;
+    return Math.round(((ek * (1 + marginPct / 100) + ship) / (1 - feeRate)) * 100) / 100;
+  }
+
   // ── Lifecycle ──────────────────────────────────────────────────────────────
   function mount(container) {
     _container = container;
@@ -153,7 +178,7 @@ const RepricerView = (() => {
     const listEl = _container.querySelector("#reprItemList");
     if (listEl) listEl.innerHTML = _renderItemList();
 
-    if (_selected) _renderDetail(_items.find(i => i.sku === _selected));
+    _renderDetail(_selected ? (_items.find(i => i.sku === _selected) || null) : null);
   }
 
   function _renderItemList() {
@@ -232,197 +257,261 @@ const RepricerView = (() => {
     const el = _container?.querySelector("#reprDetail");
     if (!el) return;
     if (!item) {
-      el.innerHTML = `<div class="comp-detail-empty"><p class="text-sm text-muted">Artikel auswählen</p></div>`;
+      el.innerHTML = `
+        <div class="comp-detail-empty">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" style="opacity:.2;margin-bottom:10px">
+            <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <p class="text-sm text-muted">Artikel auswählen</p>
+          <p class="text-xs text-muted" style="margin-top:4px;opacity:.6">Details, Regel und Verlauf</p>
+        </div>`;
       return;
     }
-    const repricer           = _settings?.repricer || {};
-    const rule               = item.rule || {};
-    const minMargin          = rule.min_margin_pct           ?? repricer.global_min_margin_pct           ?? 15;
-    const strategy           = rule.price_strategy           ?? repricer.global_price_strategy           ?? "cheapest";
-    const raiseWhenCheapest  = rule.raise_when_cheapest      ?? repricer.global_raise_when_cheapest      ?? true;
-    const commercialOnly     = rule.commercial_only          ?? repricer.global_commercial_only          ?? false;
-    const commercialMinFb    = rule.commercial_min_feedback  ?? repricer.global_commercial_min_feedback  ?? 10;
-    const isEnabled          = item.enabled !== false;
-    const itemLog            = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 10);
-    // Look up EK+ship_out from inventory for live floor calculation
-    const invMatch = _inventory.find(i => (item.ean && i.ean === item.ean) || (item.sku && i.sku === item.sku));
-    const itemEk   = invMatch?.ek   ?? null;
-    const itemShip = invMatch?.ship_out ?? 0;
+
+    const repricer          = _settings?.repricer || {};
+    const rule              = item.rule || {};
+    const minMargin         = rule.min_margin_pct           ?? repricer.global_min_margin_pct           ?? 15;
+    const strategy          = rule.price_strategy           ?? repricer.global_price_strategy           ?? "cheapest";
+    const raiseWhenCheapest = rule.raise_when_cheapest      ?? repricer.global_raise_when_cheapest      ?? true;
+    const commercialOnly    = rule.commercial_only          ?? repricer.global_commercial_only          ?? false;
+    const commercialMinFb   = rule.commercial_min_feedback  ?? repricer.global_commercial_min_feedback  ?? 10;
+    const ebayCategory      = rule.ebay_category            ?? repricer.global_ebay_category            ?? "sonstiges";
+    const isEnabled         = item.enabled !== false;
+    const itemLog           = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 15);
+    const invMatch          = _inventory.find(i => (item.ean && i.ean === item.ean) || (item.sku && i.sku === item.sku));
+    const itemEk            = invMatch?.ek   ?? null;
+    const itemShip          = invMatch?.ship_out ?? 0;
+    const currentFloor      = itemEk != null ? _calcFloor(itemEk, itemShip, minMargin, ebayCategory) : item.floor_price;
+    const feeRate           = EBAY_CATEGORIES[ebayCategory]?.fee ?? 0.13;
+    const feePct            = Math.round(feeRate * 100 * 10) / 10;
 
     const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>
       `<option value="${v}" ${strategy === v ? "selected" : ""}>${l}</option>`
     ).join("");
+    const categoryOpts = Object.entries(EBAY_CATEGORIES).map(([v, c]) =>
+      `<option value="${v}" ${ebayCategory === v ? "selected" : ""}>${c.label} (${Math.round(c.fee*100*10)/10}%)</option>`
+    ).join("");
 
-    const noEanWarning = !item.ean ? `
-      <div style="padding:8px 20px;background:rgba(245,158,11,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px">⚠️</span>
-        <span class="text-xs" style="color:#f59e0b">Keine EAN — Konkurrenzsuche nicht möglich. EAN im Inventar ergänzen.</span>
+    // Banners
+    const noEanBanner = !item.ean ? `
+      <div style="padding:8px 16px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);display:flex;gap:8px;align-items:flex-start">
+        <span style="font-size:12px;flex-shrink:0;margin-top:1px">⚠️</span>
+        <span class="text-xs" style="color:#fbbf24;line-height:1.4">Keine EAN — Konkurrenzsuche nicht möglich. EAN im Inventar ergänzen.</span>
       </div>` : "";
-    const ebayFailedBanner = item.status === "EBAY_FAILED" && item.ebay_error ? `
-      <div style="padding:8px 20px;background:rgba(239,68,68,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px">❌</span>
-        <span class="text-xs" style="color:#f87171">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 120))}</span>
+    const errorBanner = item.status === "EBAY_FAILED" && item.ebay_error ? `
+      <div style="padding:8px 16px;background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.2);display:flex;gap:8px;align-items:flex-start">
+        <span style="font-size:12px;flex-shrink:0;margin-top:1px">❌</span>
+        <span class="text-xs" style="color:#f87171;line-height:1.4">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 160))}</span>
       </div>` :
-    item.status === "NO_EBAY_ID" ? `
-      <div style="padding:8px 20px;background:rgba(245,158,11,.08);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
-        <span style="font-size:13px">⚠️</span>
-        <span class="text-xs" style="color:#fbbf24">Keine eBay-Item-ID gesetzt — klicke <strong>Listings sync</strong> um deine Listings zu importieren, oder trag die eBay-Item-ID manuell ein.</span>
+      item.status === "NO_EBAY_ID" ? `
+      <div style="padding:8px 16px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);display:flex;gap:8px;align-items:flex-start">
+        <span style="font-size:12px;flex-shrink:0;margin-top:1px">⚠️</span>
+        <span class="text-xs" style="color:#fbbf24;line-height:1.4">Keine eBay-Item-ID — klicke <strong>Listings sync</strong> oder trage die eBay-ID manuell ein.</span>
       </div>` : "";
+
+    // Price comparison color
+    const cmpColor = item.competitor_min != null && item.last_price != null
+      ? (item.last_price > item.competitor_min + 0.01 ? "#f87171" : item.last_price < item.competitor_min - 0.01 ? "#22c55e" : "var(--text-primary)")
+      : "var(--text-muted)";
 
     el.innerHTML = `
-      <div style="padding:16px 20px;border-bottom:1px solid var(--border)">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-          <div class="text-base font-semibold text-primary">${_esc(item.title || item.ean || item.sku)}</div>
-          <label class="toggle-switch" title="${isEnabled ? "Aktiv" : "Pausiert"}">
+      <!-- ─ Header ────────────────────────────────────────────── -->
+      <div style="padding:14px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px">
+          <div class="text-sm font-semibold text-primary" style="line-height:1.3;flex:1;min-width:0">${_esc(item.title || item.ean || item.sku)}</div>
+          <label class="toggle-switch" style="flex-shrink:0;margin-top:1px" title="${isEnabled ? "Aktiv — klicken zum Pausieren" : "Pausiert — klicken zum Aktivieren"}">
             <input type="checkbox" id="reprToggleEnabled" ${isEnabled ? "checked" : ""}>
             <span class="toggle-track"></span>
           </label>
         </div>
-        <div class="text-xs text-muted">
-          EAN: ${_esc(item.ean || "—")} · SKU: ${_esc(item.sku || "—")}
-          ${item.quantity != null ? ` · <strong style="color:var(--text-primary)">${item.quantity}x</strong> auf Lager` : ""}
-          ${item.ebay_item_id ? ` · <a href="https://www.ebay.de/itm/${_esc(item.ebay_item_id)}" target="_blank" style="color:var(--indigo)">eBay #${_esc(item.ebay_item_id)}</a>` : ""}
+        <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+          ${item.ean ? `<span class="badge badge-muted" style="font-size:10px">EAN: ${_esc(item.ean)}</span>` : ""}
+          ${item.quantity != null ? `<span class="badge badge-muted" style="font-size:10px">${item.quantity}x Lager</span>` : ""}
+          ${item.ebay_item_id
+            ? `<a href="https://www.ebay.de/itm/${_esc(item.ebay_item_id)}" target="_blank"
+                 style="font-size:10px;color:var(--indigo);text-decoration:none;background:rgba(99,102,241,.1);padding:2px 6px;border-radius:4px;border:1px solid rgba(99,102,241,.2)">
+                 eBay #${_esc(item.ebay_item_id)} ↗
+               </a>`
+            : `<span class="badge badge-muted" style="font-size:10px;opacity:.5">Keine eBay-ID</span>`}
+          ${_renderStatusChip(item)}
         </div>
       </div>
-      ${noEanWarning}
-      ${ebayFailedBanner}
 
-      <!-- Stats row -->
-      <div style="padding:12px 20px;border-bottom:1px solid var(--border)">
-        <div class="row gap-20" style="flex-wrap:wrap">
-          <div>
-            <div class="text-xs text-muted">Aktueller Preis</div>
-            <div class="text-sm font-semibold text-primary">${fmt(item.last_price)}</div>
+      ${noEanBanner}${errorBanner}
+
+      <!-- ─ Metrics grid ─────────────────────────────────────── -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">Aktueller Preis</div>
+            <div class="text-sm font-semibold text-primary">${fmt(item.last_price ?? item.current_price)}</div>
           </div>
-          <div>
-            <div class="text-xs text-muted">Günstigster</div>
-            <div class="text-sm font-semibold ${item.competitor_min != null ? "text-primary" : "text-muted"}">${fmt(item.competitor_min)}</div>
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">Günstigster</div>
+            <div class="text-sm font-semibold" style="color:${cmpColor}">${fmt(item.competitor_min)}</div>
           </div>
-          <div>
-            <div class="text-xs text-muted">2. Günstigster</div>
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">2. Günstigster</div>
             <div class="text-sm font-semibold text-muted">${fmt(item.competitor_2nd)}</div>
           </div>
-          <div>
-            <div class="text-xs text-muted">Konkurrenten</div>
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">Floor</div>
+            <div class="text-sm font-semibold" style="color:var(--text-secondary)">${item.floor_price != null ? fmt(item.floor_price) : fmt(currentFloor)}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px">
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">Konkurrenten</div>
             <div class="text-sm font-semibold text-muted">${item.candidate_count ?? "—"}</div>
           </div>
-          <div>
-            <div class="text-xs text-muted">Floor</div>
-            <div class="text-sm font-semibold text-muted">${fmt(item.floor_price)}</div>
-          </div>
-          <div>
-            <div class="text-xs text-muted">Letzter Run</div>
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">Letzter Run</div>
             <div class="text-sm text-secondary">${fmtAgo(item.last_repriced_at)}</div>
           </div>
-          <div>
-            <div class="text-xs text-muted">Status</div>
-            <div>${_renderStatusChip(item)}</div>
+          <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px">
+            <div class="text-xs text-muted" style="margin-bottom:3px">eBay-Gebühr</div>
+            <div class="text-sm font-semibold text-muted">${feePct}%</div>
           </div>
         </div>
       </div>
 
-      <!-- Rule editor -->
-      <div style="padding:12px 20px;border-bottom:1px solid var(--border)">
-        <div class="text-xs font-semibold text-secondary" style="margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Regel (artikel-spezifisch)</div>
-        <div style="display:flex;flex-direction:column;gap:10px">
+      <!-- ─ Rule editor ──────────────────────────────────────── -->
+      <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">Regel (Artikel-spezifisch)</span>
+          <span class="text-xs text-muted">${item.rule ? "Eigene Regel" : "Global-Einstellungen"}</span>
+        </div>
+        <div style="background:var(--bg-panel);border:1px solid var(--border);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px">
 
-          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
-            <label class="text-xs text-muted" style="min-width:110px">Preis-Strategie</label>
-            <select id="ruleStrategy" class="input-sm" style="min-width:200px">${strategyOpts}</select>
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">Strategie</label>
+            <select id="ruleStrategy" class="input-sm">${strategyOpts}</select>
           </div>
 
-          <div id="ruleRaiseRow" class="row gap-12" style="align-items:center;flex-wrap:wrap;${strategy !== "cheapest" ? "opacity:.4;pointer-events:none" : ""}">
-            <label class="text-xs text-muted" style="min-width:110px">Wenn günstigster</label>
+          <div id="ruleRaiseRow" style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center;${strategy !== "cheapest" ? "opacity:.35;pointer-events:none" : ""}">
+            <label class="text-xs text-muted">Wenn günstigster</label>
             <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
               <input type="checkbox" id="ruleRaiseWhenCheapest" ${raiseWhenCheapest ? "checked" : ""}>
               <span class="text-xs">Auf 2. Günstigsten anheben</span>
             </label>
           </div>
 
-          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
-            <label class="text-xs text-muted" style="min-width:110px">Nur Gewerbliche</label>
-            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
-              <input type="checkbox" id="ruleCommercialOnly" ${commercialOnly ? "checked" : ""}>
-              <span class="text-xs">Private Verkäufer ignorieren</span>
-            </label>
-            <div id="ruleCommFbRow" style="${commercialOnly ? "" : "opacity:.4;pointer-events:none"}display:flex;align-items:center;gap:4px">
-              <span class="text-xs text-muted">min. Feedback</span>
-              <input type="number" id="ruleCommFb" class="input-sm" value="${commercialMinFb}" min="1" max="9999" style="width:64px">
+          <div style="height:1px;background:var(--border);margin:0 -12px"></div>
+
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">Nur Gewerbliche</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="ruleCommercialOnly" ${commercialOnly ? "checked" : ""}>
+                <span class="text-xs">Private ignorieren</span>
+              </label>
+              <div id="ruleCommFbRow" style="${commercialOnly ? "" : "opacity:.35;pointer-events:none;"}display:flex;align-items:center;gap:4px">
+                <span class="text-xs text-muted">min.</span>
+                <input type="number" id="ruleCommFb" class="input-sm" value="${commercialMinFb}" min="1" max="9999" style="width:56px">
+                <span class="text-xs text-muted">Feedback</span>
+              </div>
             </div>
           </div>
 
-          <div class="row gap-12" style="align-items:center;flex-wrap:wrap">
-            <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
-            <div style="display:flex;align-items:center;gap:4px">
-              <input type="number" id="ruleMinMargin" class="input-sm" value="${minMargin}" min="0" max="200" step="1" style="width:64px"
-                data-ek="${itemEk ?? ""}" data-ship="${itemShip}">
-              <span class="text-xs text-muted">% → Floor: <span id="floorDisplay">${item.floor_price != null ? fmt(item.floor_price) : "—"}</span></span>
+          <div style="height:1px;background:var(--border);margin:0 -12px"></div>
+
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">Mindest-Marge</label>
+            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+              <input type="number" id="ruleMinMargin" class="input-sm" value="${minMargin}" min="0" max="200" step="1" style="width:56px"
+                data-ek="${itemEk ?? ""}" data-ship="${itemShip}" data-cat="${ebayCategory}">
+              <span class="text-xs text-muted">%</span>
+              <span class="text-xs" style="color:var(--text-secondary)">→ Floor: <strong id="floorDisplay">${currentFloor != null ? fmt(currentFloor) : "—"}</strong></span>
             </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">eBay-Kategorie</label>
+            <select id="ruleEbayCategory" class="input-sm">${categoryOpts}</select>
           </div>
         </div>
 
-        <div class="row gap-8" style="margin-top:12px">
+        <div style="display:flex;gap:8px;margin-top:10px">
           <button class="btn btn-primary btn-sm" id="btnSaveRule">Speichern</button>
           <button class="btn btn-ghost btn-sm" id="btnRemoveItem" style="color:var(--red)">Entfernen</button>
         </div>
       </div>
 
-      <!-- History -->
+      <!-- ─ History ────────────────────────────────────────── -->
       ${itemLog.length ? `
-      <div style="padding:12px 20px">
+      <div style="padding:12px 16px">
         <div class="text-xs font-semibold text-secondary" style="margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Verlauf</div>
-        <div style="display:flex;flex-direction:column;gap:4px">
-          ${itemLog.map(e => {
-            const raised  = e.status === "RAISED";
-            const lowered = (e.new_price || 0) < (e.old_price || 0);
-            const arrow = raised ? "↑" : (lowered ? "↓" : "→");
-            const color = raised ? "#818cf8" : (lowered ? "var(--green)" : "var(--text-secondary)");
-            const stratLabel = e.price_strategy ? `<span class="badge badge-muted" style="font-size:9px">${STRATEGY_LABELS[e.price_strategy] || e.price_strategy}</span>` : "";
-            return `
-              <div style="display:flex;justify-content:space-between;align-items:center;gap:6px;padding:4px 8px;background:var(--bg-panel);border-radius:4px;border:1px solid var(--border)">
-                <span class="text-xs text-muted" style="flex-shrink:0">${fmtDate(e.ts)}</span>
-                <span class="text-xs text-secondary">${fmt(e.old_price)} ${arrow} <strong style="color:${color}">${fmt(e.new_price)}</strong></span>
-                <span class="text-xs" style="color:${color};flex-shrink:0">
-                  ${raised ? "+" : (lowered ? "−" : "")}${Math.abs((e.new_price||0)-(e.old_price||0)).toFixed(2)}€
-                </span>
-                ${stratLabel}
-                <span class="badge badge-muted" style="font-size:9px">${e.status}</span>
-              </div>
-            `;
-          }).join("")}
-        </div>
-      </div>` : ""}
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="border-bottom:1px solid var(--border)">
+              <th class="text-xs text-muted" style="text-align:left;padding:0 6px 5px 0;font-weight:500">Zeit</th>
+              <th class="text-xs text-muted" style="text-align:left;padding:0 6px 5px;font-weight:500">Preisänderung</th>
+              <th class="text-xs text-muted" style="text-align:right;padding:0 0 5px 6px;font-weight:500">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemLog.map((e, i) => {
+              const raised  = e.status === "RAISED";
+              const lowered = (e.new_price || 0) < (e.old_price || 0);
+              const color   = raised ? "#818cf8" : (lowered ? "#22c55e" : "var(--text-muted)");
+              const arrow   = raised ? "↑" : (lowered ? "↓" : "→");
+              const delta   = Math.abs((e.new_price||0)-(e.old_price||0));
+              const statusBadge = _renderStatusChip({ status: e.status });
+              const stratBadge  = e.price_strategy
+                ? `<span style="font-size:9px;color:var(--text-muted)">${STRATEGY_LABELS[e.price_strategy] || e.price_strategy}</span>`
+                : "";
+              return `
+                <tr style="border-bottom:${i < itemLog.length-1 ? "1px solid var(--border)" : "none"}">
+                  <td class="text-xs text-muted" style="padding:6px 6px 6px 0;white-space:nowrap">${fmtDate(e.ts)}</td>
+                  <td style="padding:6px">
+                    <div style="display:flex;align-items:center;gap:6px">
+                      <span class="text-xs text-secondary">${fmt(e.old_price)}</span>
+                      <span style="font-size:11px;color:${color}">${arrow}</span>
+                      <span class="text-xs font-semibold" style="color:${color}">${fmt(e.new_price)}</span>
+                      ${delta >= 0.01 ? `<span class="text-xs" style="color:${color};opacity:.8">${raised ? "+" : "−"}${delta.toFixed(2)}€</span>` : ""}
+                    </div>
+                    ${stratBadge}
+                  </td>
+                  <td style="padding:6px 0 6px 6px;text-align:right;white-space:nowrap">${statusBadge}</td>
+                </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>` : `
+      <div style="padding:20px 16px;text-align:center">
+        <p class="text-xs text-muted" style="opacity:.5">Noch kein Verlauf vorhanden</p>
+      </div>`}
     `;
 
-    // Wire rule section dynamics
-    const stratSel  = el.querySelector("#ruleStrategy");
-    const raiseRow  = el.querySelector("#ruleRaiseRow");
-    const commCheck = el.querySelector("#ruleCommercialOnly");
-    const commFbRow = el.querySelector("#ruleCommFbRow");
+    // Wire dynamics
+    const stratSel   = el.querySelector("#ruleStrategy");
+    const raiseRow   = el.querySelector("#ruleRaiseRow");
+    const commCheck  = el.querySelector("#ruleCommercialOnly");
+    const commFbRow  = el.querySelector("#ruleCommFbRow");
+    const catSel     = el.querySelector("#ruleEbayCategory");
+    const marginInp  = el.querySelector("#ruleMinMargin");
+    const floorDisp  = el.querySelector("#floorDisplay");
+
+    const updateFloor = () => {
+      const ek  = parseFloat(marginInp?.dataset.ek || "");
+      const sh  = parseFloat(marginInp?.dataset.ship || "0");
+      const pct = parseFloat(marginInp?.value || "0");
+      const cat = catSel?.value || "sonstiges";
+      if (!isNaN(ek) && !isNaN(pct) && floorDisp) {
+        floorDisp.textContent = fmt(_calcFloor(ek, sh, pct, cat));
+      }
+      if (marginInp) marginInp.dataset.cat = catSel?.value || "sonstiges";
+    };
 
     stratSel?.addEventListener("change", () => {
-      const isCheapest = stratSel.value === "cheapest";
-      if (raiseRow) { raiseRow.style.opacity = isCheapest ? "1" : ".4"; raiseRow.style.pointerEvents = isCheapest ? "" : "none"; }
+      const ok = stratSel.value === "cheapest";
+      if (raiseRow) { raiseRow.style.opacity = ok ? "1" : ".35"; raiseRow.style.pointerEvents = ok ? "" : "none"; }
     });
     commCheck?.addEventListener("change", () => {
-      if (commFbRow) { commFbRow.style.opacity = commCheck.checked ? "1" : ".4"; commFbRow.style.pointerEvents = commCheck.checked ? "" : "none"; }
+      if (commFbRow) { commFbRow.style.opacity = commCheck.checked ? "1" : ".35"; commFbRow.style.pointerEvents = commCheck.checked ? "" : "none"; }
     });
-
-    // Live floor price recalculation
-    const marginInput  = el.querySelector("#ruleMinMargin");
-    const floorDisplay = el.querySelector("#floorDisplay");
-    if (marginInput && floorDisplay) {
-      marginInput.addEventListener("input", () => {
-        const ek   = parseFloat(marginInput.dataset.ek);
-        const ship = parseFloat(marginInput.dataset.ship || "0");
-        const pct  = parseFloat(marginInput.value);
-        if (!isNaN(ek) && !isNaN(pct)) {
-          const EBAY_FEE = 0.13;
-          const floor = (ek * (1 + pct / 100) + ship) / (1 - EBAY_FEE);
-          floorDisplay.textContent = `€${floor.toFixed(2)}`;
-        }
-      });
-    }
+    marginInp?.addEventListener("input", updateFloor);
+    catSel?.addEventListener("change", updateFloor);
 
     el.querySelector("#btnSaveRule")?.addEventListener("click", () => _saveRule(item));
     el.querySelector("#btnRemoveItem")?.addEventListener("click", () => _removeItem(item));
@@ -507,7 +596,6 @@ const RepricerView = (() => {
     _connected = typeof connStatus === "object" ? connStatus.connected : !!connStatus;
     if (typeof connStatus === "object" && _status) _status.is_legacy = connStatus.is_legacy;
     _render();
-    if (_selected) _renderDetail(_items.find(i => i.sku === _selected));
   }
 
   async function _saveRule(item) {
@@ -518,6 +606,7 @@ const RepricerView = (() => {
     const commOnly       = el.querySelector("#ruleCommercialOnly")?.checked    ?? false;
     const commFb         = parseInt(el.querySelector("#ruleCommFb")?.value     || "10");
     const minMargin      = parseFloat(el.querySelector("#ruleMinMargin")?.value || "15");
+    const ebayCategory   = el.querySelector("#ruleEbayCategory")?.value        || "sonstiges";
     await Storage.repricerUpdate(item.sku, {
       rule: {
         price_strategy:          strategy,
@@ -525,6 +614,7 @@ const RepricerView = (() => {
         commercial_only:         commOnly,
         commercial_min_feedback: commFb,
         min_margin_pct:          minMargin,
+        ebay_category:           ebayCategory,
       }
     });
     await _refreshData();

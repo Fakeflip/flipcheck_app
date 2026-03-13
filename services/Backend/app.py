@@ -1713,12 +1713,14 @@ async def repricer_update(items: list[RepricerItem]):
         raise_when_cheapest  = bool( rule.get("raise_when_cheapest",   True))
         commercial_only      = bool( rule.get("commercial_only",       False))
         commercial_min_fb    = int(  rule.get("commercial_min_feedback", 10))
+        ebay_category        = str(  rule.get("ebay_category",         "sonstiges"))
 
         # Floor price: never sell below this
         # Formula: (EK * (1 + margin%) + ship_out) / (1 - eBay_fee)
-        # eBay DE flat fee ~13% — ensures margin is kept after eBay deducts their cut
-        EBAY_FEE_RATE = 0.13
-        floor_price = round((item.ek * (1 + min_margin / 100) + item.ship_out) / (1 - EBAY_FEE_RATE), 2)
+        # eBay_fee is tiered by category — use _effective_fee_rate() for accurate calculation
+        ref_price   = item.ek * (1 + min_margin / 100) + item.ship_out
+        ebay_fee    = _effective_fee_rate(ref_price, ebay_category)
+        floor_price = round(ref_price / (1 - ebay_fee), 2)
 
         # ── Fetch competitor listings ─────────────────────────────────────────
         fetch_limit = 15
@@ -1803,6 +1805,8 @@ async def repricer_update(items: list[RepricerItem]):
             "old_price":        item.current_price,
             "new_price":        new_price,
             "floor_price":      floor_price,
+            "ebay_fee_pct":     round(ebay_fee * 100, 1),
+            "ebay_category":    ebay_category,
             "competitor_min":   competitor_min,
             "competitor_2nd":   competitor_2nd,
             "candidate_count":  len(candidate_prices),
