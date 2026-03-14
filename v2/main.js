@@ -333,6 +333,39 @@ function startScannerServer() {
       return;
     }
 
+    // GET /inventory/lookup?ean=X — aggregated stats for a single EAN
+    if (req.method === "GET" && req.url.startsWith("/inventory/lookup")) {
+      try {
+        const urlObj   = new URL(req.url, "http://localhost");
+        const ean      = urlObj.searchParams.get("ean") || "";
+        const { items } = readInv();
+        const matched  = Array.isArray(items) ? items.filter(i => i.ean === ean) : [];
+        const inStock  = matched.filter(i => i.status !== "SOLD");
+        const sold     = matched.filter(i => i.status === "SOLD");
+        const inStockQty = inStock.reduce((s, i) => s + (i.qty || 1), 0);
+        const avgEk      = inStock.length
+          ? inStock.reduce((s, i) => s + (parseFloat(i.ek) || 0), 0) / inStock.length
+          : null;
+        const soldQty = sold.reduce((s, i) => s + (i.qty || 1), 0);
+        const soldWithProfit = sold.filter(i => i.sell_price && i.ek);
+        const avgProfit = soldWithProfit.length
+          ? soldWithProfit.reduce((s, i) => s + (parseFloat(i.sell_price) - parseFloat(i.ek)), 0) / soldWithProfit.length
+          : null;
+        res.writeHead(200, { ...cors, "Content-Type": "application/json" });
+        res.end(JSON.stringify({
+          ok: true, ean,
+          in_stock:   inStockQty,
+          avg_ek:     avgEk     != null ? parseFloat(avgEk.toFixed(2))     : null,
+          sold_count: soldQty,
+          avg_profit: avgProfit != null ? parseFloat(avgProfit.toFixed(2)) : null,
+        }));
+      } catch {
+        res.writeHead(200, { ...cors, "Content-Type": "application/json" });
+        res.end(JSON.stringify({ ok: true, ean: "", in_stock: 0, avg_ek: null, sold_count: 0, avg_profit: null }));
+      }
+      return;
+    }
+
     // POST /inventory — upsert item from extension (uses same normalizeItem() as IPC path)
     if (req.method === "POST" && req.url === "/inventory") {
       let body = "";

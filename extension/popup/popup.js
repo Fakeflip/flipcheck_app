@@ -677,6 +677,7 @@ function renderSingleResult(d) {
         <button class="fc-act-btn" id="fcAlertBtn">Alarm</button>
         ${isAmz && d.ean ? `<button class="fc-act-btn" id="fcEanCopyBtn" title="${esc(d.ean)}">EAN kopieren</button>` : ''}
       </div>
+      <div id="fcInvPanel"></div>
       <div class="fc-result-links">
         <a class="fc-link-btn" id="fcEbayVkBtn" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener">
           🛒 eBay Verkäufe ↗
@@ -690,6 +691,29 @@ function renderSingleResult(d) {
   const resultEl = $('fcResult');
   resultEl.innerHTML = html;
   resultEl.classList.add('visible');
+
+  // Async: fetch inventory stats from desktop app and inject panel
+  const lookupEan = d.ean || _currentEan;
+  if (lookupEan) {
+    chrome.runtime.sendMessage({ type: 'INVENTORY_LOOKUP', ean: lookupEan }, res => {
+      const panel = resultEl.querySelector('#fcInvPanel');
+      if (!panel || !res?.ok || !res.data) return;
+      const { in_stock, avg_ek, sold_count, avg_profit } = res.data;
+      if (!in_stock && !sold_count) return; // nothing to show
+      const rows = [];
+      if (in_stock > 0) {
+        const ekStr = avg_ek != null ? ` · EK ø€${Number(avg_ek).toFixed(2)}` : '';
+        rows.push(`<span style="color:#10B981">📦 ${in_stock}× im Lager${ekStr}</span>`);
+      }
+      if (sold_count > 0) {
+        const profitStr = avg_profit != null
+          ? ` · Ø ${avg_profit >= 0 ? '+' : ''}€${Number(avg_profit).toFixed(2)}`
+          : '';
+        rows.push(`<span style="color:#6366F1">📈 ${sold_count}× verkauft${profitStr}</span>`);
+      }
+      panel.innerHTML = `<div style="border-top:1px solid rgba(99,102,241,.15);margin:8px 0 4px;padding-top:8px;display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:600;">${rows.join('')}</div>`;
+    });
+  }
 
   resultEl.querySelector('#fcInvBtn')?.addEventListener('click', addToInventory);
   resultEl.querySelector('#fcAlertBtn')?.addEventListener('click', () => chrome.runtime.openOptionsPage());

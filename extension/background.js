@@ -524,6 +524,16 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           break;
         }
 
+        case 'INVENTORY_LOOKUP': {
+          try {
+            const data = await bridgeGet(`/inventory/lookup?ean=${encodeURIComponent(msg.ean || '')}`);
+            reply({ ok: true, data });
+          } catch {
+            reply({ ok: false, data: null });
+          }
+          break;
+        }
+
         case 'PRICE_HISTORY_GET': {
           try {
             const data = await bridgeGet(`/price-history?ean=${encodeURIComponent(msg.ean)}`);
