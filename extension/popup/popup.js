@@ -579,8 +579,9 @@ function runSingleCheck() {
         setSingleError(`Tageslimit: ${res.dailyLimit || 20} kostenlose Checks/Tag verbraucht.`);
       } else if (res?.error === 'not_found') {
         setSingleError('Kein Produkt für diese EAN gefunden.');
-      } else if (res?.error === 'unauthorized') {
-        setSingleError('Token abgelaufen — bitte neu anmelden.');
+      } else if (res?.error === 'unauthorized' || res?.error === 'HTTP 403') {
+        setSingleError('Nicht eingeloggt oder Token abgelaufen — bitte neu anmelden.');
+        $('authBanner').style.display = '';
       } else {
         setSingleError('Verbindung fehlgeschlagen. Backend nicht erreichbar.', true);
       }
