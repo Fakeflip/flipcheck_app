@@ -3,7 +3,9 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/dashboard/(.*)", "destination": "/dashboard/index.html" },
-    { "source": "/account",        "destination": "/account/index.html" }
+    { "source": "/account",        "destination": "/account/index.html" },
+    { "source": "/guides",         "destination": "/guides/index.html" },
+    { "source": "/guides/repricer","destination": "/guides/repricer/index.html" }
   ],
   "headers": [
     {

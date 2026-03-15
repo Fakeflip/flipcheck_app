@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guides — FLIPCHECK</title>
+  <meta name="description" content="Lerne alle Flipcheck-Features kennen — von Flipcheck über Inventar bis zum Auto-Repricer." />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .guides-wrap { max-width: 860px; margin: 0 auto; padding: 72px 24px 100px; }
+
+    .guides-hero { margin-bottom: 56px; }
+    .guides-hero .eyebrow {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--accent); background: var(--accent-sub); border: 1px solid var(--accent-bdr);
+      padding: 4px 10px; border-radius: var(--r-full); margin-bottom: 18px;
+    }
+    .guides-hero h1 { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15; margin-bottom: 14px; }
+    .guides-hero p  { font-size: 16px; color: var(--text2); max-width: 520px; line-height: 1.7; }
+
+    .guides-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px; }
+
+    .guide-card {
+      display: flex; flex-direction: column; gap: 12px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r-lg); padding: 24px;
+      transition: border-color .15s, background .15s;
+      text-decoration: none; color: inherit;
+    }
+    .guide-card:hover { border-color: var(--accent-bdr); background: var(--surface2); }
+
+    .guide-card-icon {
+      width: 40px; height: 40px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; flex-shrink: 0;
+    }
+    .guide-card-icon.indigo { background: var(--accent-sub); }
+    .guide-card-icon.green  { background: var(--green-sub); }
+    .guide-card-icon.yellow { background: var(--yellow-sub); }
+
+    .guide-card-title { font-size: 15px; font-weight: 700; color: var(--text); }
+    .guide-card-desc  { font-size: 13px; color: var(--text2); line-height: 1.65; flex: 1; }
+    .guide-card-meta  {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 11px; font-weight: 500; color: var(--dim);
+    }
+    .guide-card-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--dim); }
+    .guide-card-arrow {
+      font-size: 13px; color: var(--accent); margin-top: 4px;
+      transition: transform .15s;
+    }
+    .guide-card:hover .guide-card-arrow { transform: translateX(4px); }
+
+    .section-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--dim); margin: 40px 0 16px;
+    }
+    .section-label:first-of-type { margin-top: 0; }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a href="/" class="logo">▲ FLIPCHECK</a>
+      <nav class="nav">
+        <a href="/#features">Features</a>
+        <a href="/#extension">Extension</a>
+        <a href="/#pricing">Preise</a>
+        <a href="/guides" style="color:var(--text)">Guides</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
+      </nav>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)">Mein Konto</a>
+        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="guides-wrap">
+
+    <div class="guides-hero">
+      <div class="eyebrow">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 4.5H14l-3.7 2.7 1.4 4.3L8 11 4.3 13.5l1.4-4.3L2 6.5h4.5z" fill="currentColor"/></svg>
+        Dokumentation
+      </div>
+      <h1>Guides & Anleitungen</h1>
+      <p>Alles was du brauchst, um das Beste aus Flipcheck herauszuholen — Schritt für Schritt erklärt.</p>
+    </div>
+
+    <p class="section-label">Features</p>
+
+    <div class="guides-grid">
+
+      <a href="/guides/repricer" class="guide-card">
+        <div class="guide-card-icon indigo">⚡</div>
+        <div>
+          <div class="guide-card-title">Auto-Repricer</div>
+          <div class="guide-card-desc">eBay-Preise automatisch an die Konkurrenz anpassen — mit Floor-Schutz, Strategien und artikelspezifischen Regeln.</div>
+        </div>
+        <div class="guide-card-meta">
+          <span>~8 Min. Lesezeit</span>
+          <div class="dot"></div>
+          <span>Fortgeschritten</span>
+        </div>
+        <div class="guide-card-arrow">→ Jetzt lesen</div>
+      </a>
+
+      <a href="/guides/flipcheck" class="guide-card" style="opacity:.45;pointer-events:none">
+        <div class="guide-card-icon green">🔍</div>
+        <div>
+          <div class="guide-card-title">Flipcheck & Batch-Scan</div>
+          <div class="guide-card-desc">EAN eingeben, sofort BUY / HOLD / SKIP bekommen — Einzelabfrage und CSV-Batch-Upload erklärt.</div>
+        </div>
+        <div class="guide-card-meta">
+          <span>~4 Min. Lesezeit</span>
+          <div class="dot"></div>
+          <span>Einsteiger</span>
+        </div>
+        <div class="guide-card-arrow" style="color:var(--dim)">Bald verfügbar</div>
+      </a>
+
+      <a href="/guides/inventory" class="guide-card" style="opacity:.45;pointer-events:none">
+        <div class="guide-card-icon yellow">📦</div>
+        <div>
+          <div class="guide-card-title">Inventarverwaltung</div>
+          <div class="guide-card-desc">Einkäufe tracken, Status pflegen, Verkäufe markieren und Analytics auswerten.</div>
+        </div>
+        <div class="guide-card-meta">
+          <span>~5 Min. Lesezeit</span>
+          <div class="dot"></div>
+          <span>Einsteiger</span>
+        </div>
+        <div class="guide-card-arrow" style="color:var(--dim)">Bald verfügbar</div>
+      </a>
+
+    </div>
+
+  </div>
+
+  <footer style="border-top:1px solid var(--border);padding:32px 24px;text-align:center">
+    <p style="font-size:13px;color:var(--dim)">
+      © 2025 Flipcheck ·
+      <a href="/privacy" style="color:var(--dim);margin:0 8px">Datenschutz</a>·
+      <a href="/terms"   style="color:var(--dim);margin:0 8px">AGB</a>·
+      <a href="/imprint" style="color:var(--dim);margin:0 8px">Impressum</a>
+    </p>
+  </footer>
+
+</body>
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto-Repricer Guide — FLIPCHECK</title>
+  <meta name="description" content="Lerne wie du den Flipcheck Auto-Repricer einrichtest und optimal nutzt — eBay-Preise automatisch anpassen, Floor-Schutz, Strategien und mehr." />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    /* ── Layout ── */
+    .guide-layout {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      gap: 48px;
+      max-width: 1040px;
+      margin: 0 auto;
+      padding: 56px 24px 100px;
+      align-items: start;
+    }
+    @media (max-width: 760px) {
+      .guide-layout { grid-template-columns: 1fr; }
+      .guide-toc { display: none; }
+    }
+
+    /* ── Sidebar ToC ── */
+    .guide-toc { position: sticky; top: 76px; }
+    .guide-toc-label {
+      font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--dim); margin-bottom: 12px;
+    }
+    .guide-toc ol { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+    .guide-toc ol li a {
+      font-size: 13px; color: var(--text2); padding: 4px 8px; border-radius: 6px;
+      display: block; transition: color .12s, background .12s; line-height: 1.4;
+    }
+    .guide-toc ol li a:hover { color: var(--text); background: var(--surface); }
+    .guide-toc ol li a.active { color: var(--accent); background: var(--accent-sub); }
+
+    /* ── Content ── */
+    .guide-content { min-width: 0; }
+
+    .guide-breadcrumb {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 13px; color: var(--dim); margin-bottom: 32px;
+    }
+    .guide-breadcrumb a { color: var(--dim); transition: color .12s; }
+    .guide-breadcrumb a:hover { color: var(--text2); }
+    .guide-breadcrumb .sep { opacity: .4; }
+
+    .guide-content h1 {
+      font-size: 36px; font-weight: 800; letter-spacing: -.03em; line-height: 1.15;
+      margin-bottom: 12px;
+    }
+    .guide-meta {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 12px; color: var(--dim); margin-bottom: 40px; flex-wrap: wrap;
+    }
+    .guide-meta .tag {
+      background: var(--accent-sub); color: var(--accent); border: 1px solid var(--accent-bdr);
+      padding: 2px 8px; border-radius: var(--r-full); font-weight: 600;
+    }
+    .guide-meta .dot { width: 3px; height: 3px; border-radius: 50%; background: var(--dim); }
+
+    /* Sections */
+    .guide-section { margin-bottom: 56px; scroll-margin-top: 80px; }
+    .guide-section h2 {
+      font-size: 20px; font-weight: 700; letter-spacing: -.02em;
+      margin-bottom: 16px; padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .guide-section h2 .num {
+      width: 26px; height: 26px; border-radius: 6px; flex-shrink: 0;
+      background: var(--accent-sub); border: 1px solid var(--accent-bdr);
+      font-size: 12px; font-weight: 700; color: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+    }
+    .guide-section p { font-size: 14px; color: var(--text2); line-height: 1.8; margin-bottom: 12px; }
+    .guide-section p:last-child { margin-bottom: 0; }
+    .guide-section strong { color: var(--text); font-weight: 600; }
+
+    /* Steps */
+    .steps { display: flex; flex-direction: column; gap: 10px; margin: 16px 0; }
+    .step {
+      display: flex; gap: 14px; align-items: flex-start;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 14px 16px;
+    }
+    .step-num {
+      width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+      background: var(--accent); color: #fff;
+      font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center; margin-top: 1px;
+    }
+    .step-body { font-size: 13px; color: var(--text2); line-height: 1.65; }
+    .step-body strong { color: var(--text); }
+
+    /* Callouts */
+    .callout {
+      border-radius: var(--r); padding: 14px 16px;
+      display: flex; gap: 10px; align-items: flex-start;
+      margin: 16px 0; font-size: 13px; line-height: 1.65;
+    }
+    .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+    .callout-body { color: var(--text2); }
+    .callout-body strong { color: var(--text); }
+    .callout.tip    { background: var(--accent-sub); border: 1px solid var(--accent-bdr); }
+    .callout.warn   { background: var(--yellow-sub); border: 1px solid var(--yellow-bdr); }
+    .callout.info   { background: var(--surface);    border: 1px solid var(--border2); }
+
+    /* Formula box */
+    .formula-box {
+      background: var(--surface2); border: 1px solid var(--border2);
+      border-radius: var(--r); padding: 16px 20px; margin: 16px 0;
+      font-family: 'Courier New', monospace; font-size: 13px; color: var(--text);
+      overflow-x: auto;
+    }
+    .formula-box .comment { color: var(--dim); font-size: 12px; margin-top: 6px; font-family: inherit; }
+
+    /* Strategy table */
+    .strategy-grid { display: flex; flex-direction: column; gap: 8px; margin: 16px 0; }
+    .strategy-row {
+      display: grid; grid-template-columns: 200px 1fr;
+      gap: 12px; align-items: start;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--r); padding: 12px 14px;
+    }
+    .strategy-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .strategy-desc { font-size: 13px; color: var(--text2); line-height: 1.6; }
+    .strategy-row.recommended { border-color: var(--accent-bdr); background: var(--accent-sub); }
+    .strategy-row.recommended .strategy-name { color: var(--accent); }
+
+    /* Status table */
+    .status-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    .status-table th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); padding: 0 12px 10px 0; }
+    .status-table td { padding: 10px 12px 10px 0; border-top: 1px solid var(--border); color: var(--text2); vertical-align: top; line-height: 1.6; }
+    .status-table td:first-child { white-space: nowrap; }
+
+    .badge-status {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 600; padding: 2px 8px;
+      border-radius: var(--r-full); white-space: nowrap;
+    }
+    .badge-updated { background: rgba(16,185,129,.15); color: #10B981; border: 1px solid rgba(16,185,129,.25); }
+    .badge-raised  { background: rgba(99,102,241,.15);  color: #818cf8; border: 1px solid rgba(99,102,241,.25); }
+    .badge-floor   { background: var(--yellow-sub);     color: var(--yellow); border: 1px solid var(--yellow-bdr); }
+    .badge-hold    { background: var(--surface2);       color: var(--dim);    border: 1px solid var(--border2); }
+    .badge-failed  { background: var(--red-sub);        color: var(--red);    border: 1px solid var(--red-bdr); }
+    .badge-noid    { background: var(--yellow-sub);     color: var(--yellow); border: 1px solid var(--yellow-bdr); }
+
+    /* Troubleshoot table */
+    .trouble-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+    .trouble-table th { text-align: left; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--dim); padding: 0 0 10px; border-bottom: 1px solid var(--border); }
+    .trouble-table td { padding: 12px 16px 12px 0; border-bottom: 1px solid var(--border); color: var(--text2); vertical-align: top; line-height: 1.6; }
+    .trouble-table td:first-child { color: var(--text); font-weight: 500; min-width: 200px; }
+    .trouble-table tr:last-child td { border-bottom: none; }
+
+    /* Back nav */
+    .guide-footer-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      padding-top: 32px; border-top: 1px solid var(--border); margin-top: 16px;
+    }
+    .guide-footer-nav a {
+      font-size: 13px; color: var(--dim); display: flex; align-items: center; gap: 6px;
+      transition: color .12s;
+    }
+    .guide-footer-nav a:hover { color: var(--text2); }
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a href="/" class="logo">▲ FLIPCHECK</a>
+      <nav class="nav">
+        <a href="/#features">Features</a>
+        <a href="/#extension">Extension</a>
+        <a href="/#pricing">Preise</a>
+        <a href="/guides" style="color:var(--text)">Guides</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
+      </nav>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)">Mein Konto</a>
+        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="guide-layout">
+
+    <!-- ── Sidebar ── -->
+    <aside class="guide-toc">
+      <div class="guide-toc-label">Inhalt</div>
+      <ol>
+        <li><a href="#was-ist">Was ist der Repricer?</a></li>
+        <li><a href="#einrichtung">1. eBay verbinden</a></li>
+        <li><a href="#artikel">2. Artikel hinzufügen</a></li>
+        <li><a href="#status">3. Status verstehen</a></li>
+        <li><a href="#floor">4. Floor-Preis</a></li>
+        <li><a href="#strategien">5. Strategien</a></li>
+        <li><a href="#raise">6. Preis anheben</a></li>
+        <li><a href="#gewerblich">7. Gewerbliche filtern</a></li>
+        <li><a href="#regeln">8. Global vs. Artikel-Regel</a></li>
+        <li><a href="#intervall">9. Intervall & manuell</a></li>
+        <li><a href="#verlauf">10. Preisverlauf</a></li>
+        <li><a href="#pause">11. Pausieren & Entfernen</a></li>
+        <li><a href="#probleme">12. Häufige Probleme</a></li>
+      </ol>
+    </aside>
+
+    <!-- ── Main ── -->
+    <main class="guide-content">
+
+      <div class="guide-breadcrumb">
+        <a href="/guides">Guides</a>
+        <span class="sep">›</span>
+        <span style="color:var(--text2)">Auto-Repricer</span>
+      </div>
+
+      <h1>Auto-Repricer</h1>
+      <div class="guide-meta">
+        <span class="tag">⚡ Feature-Guide</span>
+        <div class="dot"></div>
+        <span>~8 Min. Lesezeit</span>
+        <div class="dot"></div>
+        <span>Stand: März 2026</span>
+      </div>
+
+      <!-- 0 ── Was ist der Repricer -->
+      <div class="guide-section" id="was-ist">
+        <h2>Was ist der Auto-Repricer?</h2>
+        <p>Der Auto-Repricer beobachtet die eBay-Konkurrenz deiner Listings und passt deine Preise <strong>vollautomatisch</strong> an — nach deinen Regeln und immer mit einem Mindestpreis-Schutz (Floor).</p>
+        <p>Du entscheidest wie aggressiv du vorgehst: günstigster Anbieter, zweiter Platz, oder am Marktdurchschnitt orientiert. Der Repricer stellt sicher, dass du dabei nie unter deinen kalkulierten Mindestpreis gehst.</p>
+
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">Der Repricer läuft vollständig automatisch im Hintergrund, solange die App geöffnet ist. Du kannst ihn auch jederzeit manuell anstoßen.</div>
+        </div>
+      </div>
+
+      <!-- 1 ── Einrichtung -->
+      <div class="guide-section" id="einrichtung">
+        <h2><span class="num">1</span> eBay verbinden</h2>
+        <p>Bevor du den Repricer nutzen kannst, musst du dein eBay-Konto autorisieren.</p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Öffne den <strong>Auto-Repricer</strong> in der linken Seitenleiste.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Oben rechts siehst du den Badge <strong>"Nicht verbunden"</strong> (grau) — klicke darauf.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Ein eBay-Login-Fenster öffnet sich im Browser. Melde dich an und <strong>autorisiere Flipcheck</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Sobald die Autorisierung abgeschlossen ist, wechselt der Badge zu <strong style="color:#10B981">● Verbunden</strong>.</div>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-body">Ohne eBay-Verbindung kann der Repricer keine Preise ändern — Daten werden weiterhin angezeigt, aber Preisänderungen sind blockiert.</div>
+        </div>
+      </div>
+
+      <!-- 2 ── Artikel hinzufügen -->
+      <div class="guide-section" id="artikel">
+        <h2><span class="num">2</span> Artikel hinzufügen</h2>
+        <p>Es gibt zwei Wege, Artikel in den Repricer zu bringen:</p>
+
+        <p><strong>Weg A: Listings sync (empfohlen)</strong></p>
+        <p>Klicke oben rechts auf <strong>„Listings sync"</strong>. Flipcheck holt automatisch alle aktiven eBay-Listings von deinem Konto — inklusive eBay-Item-ID und aktuellem Preis. Das ist der schnellste Weg, da du nichts manuell eintragen musst.</p>
+
+        <p><strong>Weg B: Manuell hinzufügen</strong></p>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Klicke auf <strong>„+ Hinzufügen"</strong> oben links in der Artikelliste.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Es erscheint eine Liste deiner Inventar-Artikel mit Status <strong>LISTED</strong>, <strong>IN_STOCK</strong> oder <strong>LISTING_PENDING</strong> (mit EAN).</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Optional: Trage die <strong>eBay-Item-ID</strong> ein — zu finden in der URL deines Listings: <code style="background:var(--surface2);padding:1px 5px;border-radius:4px;font-size:12px">ebay.de/itm/<strong>123456789</strong></code></div>
+          </div>
+          <div class="step">
+            <div class="step-num">4</div>
+            <div class="step-body">Klicke <strong>„Hinzufügen"</strong>.</div>
+          </div>
+        </div>
+
+        <div class="callout info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-body"><strong>eBay-Item-ID ist optional beim Hinzufügen</strong> — aber ohne sie kann der Repricer den Preis nicht automatisch setzen. Entweder manuell eintragen oder über „Listings sync" automatisch abgleichen lassen.</div>
+        </div>
+      </div>
+
+      <!-- 3 ── Status -->
+      <div class="guide-section" id="status">
+        <h2><span class="num">3</span> Status verstehen</h2>
+        <p>Nach jedem Run bekommt jeder Artikel einen Status, der anzeigt was passiert ist:</p>
+
+        <table class="status-table">
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Bedeutung</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge-status badge-updated">↓ UPDATED</span></td>
+              <td>Preis wurde <strong>gesenkt</strong> — du bist jetzt auf deinem Ziel-Rang. Die Preisdifferenz wird als grüner Wert angezeigt.</td>
+            </tr>
+            <tr>
+              <td><span class="badge-status badge-raised">↑ RAISED</span></td>
+              <td>Preis wurde <strong>angehoben</strong> — du warst bereits der günstigste, der Preis wurde auf den 2. Platz gesetzt (falls „Anheben" aktiviert).</td>
+            </tr>
+            <tr>
+              <td><span class="badge-status badge-floor">🔒 AT_FLOOR</span></td>
+              <td>Konkurrent ist billiger, aber der Preis kann <strong>nicht weiter sinken</strong> — der Floor-Schutz greift. Du verkaufst zum Mindestpreis.</td>
+            </tr>
+            <tr>
+              <td><span class="badge-status badge-hold">= HOLD</span></td>
+              <td>Kein Handlungsbedarf — dein Preis liegt bereits richtig, keine Änderung notwendig.</td>
+            </tr>
+            <tr>
+              <td><span class="badge-status badge-failed">✗ EBAY_FAILED</span></td>
+              <td>eBay hat die Preisänderung <strong>abgelehnt</strong>. Öffne die Detailansicht für den genauen Fehlertext.</td>
+            </tr>
+            <tr>
+              <td><span class="badge-status badge-noid">⚠ NO_EBAY_ID</span></td>
+              <td><strong>Keine eBay-Item-ID</strong> hinterlegt — der Repricer kann den Preis nicht ändern. „Listings sync" ausführen oder ID manuell eintragen.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 4 ── Floor -->
+      <div class="guide-section" id="floor">
+        <h2><span class="num">4</span> Der Floor-Preis — deine Untergrenze</h2>
+        <p>Der Floor ist der <strong>niedrigste Preis, zu dem du je verkaufst</strong>. Er schützt dich davor, mit Verlust oder zu knapper Marge zu verkaufen — egal wie billig die Konkurrenz wird.</p>
+
+        <p>Der Floor wird automatisch aus deinem Inventar-EK berechnet:</p>
+
+        <div class="formula-box">
+          Floor = (EK × (1 + Mindest-Marge%) + Versand) ÷ (1 − eBay-Gebühr%)
+          <div class="comment">// Beispiel: EK 20€, Marge 15%, Versand 4€, Gebühr 13%</div>
+          <div class="comment">// Floor = (20 × 1,15 + 4) ÷ (1 − 0,13) = 27 ÷ 0,87 = <strong>31,03€</strong></div>
+        </div>
+
+        <p>Du siehst den berechneten Floor in Echtzeit in der Artikel-Detailansicht — sobald du die Marge oder Kategorie änderst, aktualisiert er sich live.</p>
+
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">Der Floor wird automatisch aus dem EK im Inventar übernommen. Wenn kein EK hinterlegt ist, kannst du ihn auch manuell pro Artikel setzen.</div>
+        </div>
+      </div>
+
+      <!-- 5 ── Strategien -->
+      <div class="guide-section" id="strategien">
+        <h2><span class="num">5</span> Repricing-Strategien</h2>
+        <p>Du wählst pro Artikel (oder global für alle), welchen Rang du auf eBay anstrebst:</p>
+
+        <div class="strategy-grid">
+          <div class="strategy-row">
+            <div class="strategy-name">Günstigster (Rang 1)</div>
+            <div class="strategy-desc">Zielt auf den niedrigsten Preis im Markt. Maximale Sichtbarkeit, aber höchster Preisdruck. Kombiniere mit „Preis anheben" um den Markt nicht kaputtzumachen.</div>
+          </div>
+          <div class="strategy-row recommended">
+            <div class="strategy-name">2. Günstigster ★</div>
+            <div class="strategy-desc">Unterbietet knapp den zweiten Platz. Gute Balance aus Sichtbarkeit und Marge — empfohlen für die meisten Reseller.</div>
+          </div>
+          <div class="strategy-row">
+            <div class="strategy-name">3. Günstigster</div>
+            <div class="strategy-desc">Konservativer Ansatz — weniger Preisdruck, aber auch weniger direkte Sichtbarkeit bei Suchergebnissen.</div>
+          </div>
+          <div class="strategy-row">
+            <div class="strategy-name">Ø Durchschnitt Top 3</div>
+            <div class="strategy-desc">Setzt deinen Preis auf den Durchschnitt der 3 günstigsten Angebote. Gut wenn du stabile Preise bevorzugst.</div>
+          </div>
+          <div class="strategy-row">
+            <div class="strategy-name">Ø Durchschnitt Top 5</div>
+            <div class="strategy-desc">Breiter Durchschnitt der 5 günstigsten — etwas höhere Preise als Top-3-Schnitt.</div>
+          </div>
+          <div class="strategy-row">
+            <div class="strategy-name">Ø 30-Tage (verkauft)</div>
+            <div class="strategy-desc">Richtet sich am Durchschnitt <em>tatsächlich verkaufter</em> Artikel der letzten 30 Tage aus — spiegelt reale Markpreise wider.</div>
+          </div>
+          <div class="strategy-row">
+            <div class="strategy-name">Median 30 Tage</div>
+            <div class="strategy-desc">Wie 30-Tage-Durchschnitt, aber Ausreißer (sehr billige oder teure Verkäufe) werden durch den Median geglättet.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 6 ── Raise -->
+      <div class="guide-section" id="raise">
+        <h2><span class="num">6</span> „Wenn günstigster" — Preis anheben</h2>
+        <p>Diese Option ist nur bei Strategie <strong>„Günstigster (Rang 1)"</strong> verfügbar und löst ein häufiges Problem:</p>
+
+        <p>Wenn du bereits der günstigste bist, senkt der Repricer deinen Preis nicht weiter — aber du lässt Marge liegen, wenn du deutlich unter dem zweiten Platz liegst. Mit dieser Option aktiviert hebt der Repricer deinen Preis auf den <strong>2. günstigsten Preis an</strong> — du bleibst auf Rang 1, aber zum bestmöglichen Preis.</p>
+
+        <div class="callout tip">
+          <div class="callout-icon">🎯</div>
+          <div class="callout-body">Aktiviere diese Option immer wenn du Rang 1 spielst. Sie verhindert außerdem, dass du den Marktpreis nach unten ziehst und andere Verkäufer dazu zwingt, mit dir in einen Preiskampf zu gehen.</div>
+        </div>
+      </div>
+
+      <!-- 7 ── Gewerblich -->
+      <div class="guide-section" id="gewerblich">
+        <h2><span class="num">7</span> Nur Gewerbliche filtern</h2>
+        <p>Du kannst private Verkäufer aus dem Konkurrenzvergleich ausblenden — das macht vor allem Sinn, weil Privatpersonen oft unrealistisch niedrige Preise setzen (Einmalverkauf, keine Marge nötig).</p>
+
+        <p><strong>Private ignorieren</strong> — aktiviere die Checkbox, damit nur gewerbliche Anbieter als Konkurrenten gezählt werden.</p>
+        <p><strong>Min. Feedback</strong> — gewerbliche Verkäufer müssen mindestens diese Anzahl Bewertungen haben, um gezählt zu werden. Verhindert, dass neue Fake-Accounts den Vergleich verfälschen.</p>
+      </div>
+
+      <!-- 8 ── Regeln -->
+      <div class="guide-section" id="regeln">
+        <h2><span class="num">8</span> Globale Einstellungen vs. Artikel-Regel</h2>
+        <p>Du kannst Einstellungen auf zwei Ebenen setzen:</p>
+
+        <p><strong>Global</strong> — gilt als Standard für alle Artikel, die keine eigene Regel haben. Zu finden im Einstellungs-Dialog (Zahnrad-Button oben rechts).</p>
+        <p><strong>Artikel-spezifisch</strong> — überschreibt die globalen Einstellungen für genau diesen Artikel. Klicke einen Artikel an → Abschnitt „Regel (Artikel-spezifisch)" → Änderungen vornehmen → <strong>„Speichern"</strong>.</p>
+
+        <p>In der Detailansicht steht rechts neben dem Regel-Titel entweder <em>„Eigene Regel"</em> (individuelle Einstellung aktiv) oder <em>„Global-Einstellungen"</em> (erbt die globalen Werte).</p>
+
+        <div class="callout info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-body">Tipp: Setze sinnvolle Globalwerte (z.B. 15% Mindestmarge, Strategie „2. Günstigster") und passe nur Artikel mit besonderen Anforderungen individuell an.</div>
+        </div>
+      </div>
+
+      <!-- 9 ── Intervall -->
+      <div class="guide-section" id="intervall">
+        <h2><span class="num">9</span> Ausführungs-Intervall & manueller Run</h2>
+        <p>In den <strong>Einstellungen</strong> (Zahnrad-Button) legst du fest, wie oft der Repricer automatisch läuft:</p>
+
+        <p>Minimum <strong>10 Minuten</strong> · Standard <strong>30 Minuten</strong> · Maximum <strong>1.440 Minuten</strong> (einmal täglich)</p>
+
+        <p>Du kannst den Repricer auch jederzeit sofort anstoßen mit dem Button <strong>„Jetzt ausführen"</strong> oben rechts — zum Beispiel nach dem Hinzufügen neuer Artikel oder wenn du eine Strategieänderung sofort testen willst.</p>
+      </div>
+
+      <!-- 10 ── Verlauf -->
+      <div class="guide-section" id="verlauf">
+        <h2><span class="num">10</span> Preisverlauf eines Artikels</h2>
+        <p>Klicke auf einen Artikel → scrolle nach unten zum Abschnitt <strong>„Verlauf"</strong>. Du siehst die letzten 15 Preisänderungen mit:</p>
+
+        <div class="steps">
+          <div class="step"><div class="step-num">→</div><div class="step-body"><strong>Zeitstempel</strong> — wann der Run lief</div></div>
+          <div class="step"><div class="step-num">→</div><div class="step-body"><strong>Alter Preis → Neuer Preis</strong> mit Delta (+/− €)</div></div>
+          <div class="step"><div class="step-num">→</div><div class="step-body"><strong>Verwendete Strategie</strong> — welche Regel zum Einsatz kam</div></div>
+          <div class="step"><div class="step-num">→</div><div class="step-body"><strong>Status</strong> — was der Repricer entschieden hat</div></div>
+        </div>
+
+        <p>Das hilft dir nachzuvollziehen, warum sich ein Preis wie verändert hat — und ob deine Strategie das gewünschte Ergebnis liefert.</p>
+      </div>
+
+      <!-- 11 ── Pause -->
+      <div class="guide-section" id="pause">
+        <h2><span class="num">11</span> Artikel pausieren & entfernen</h2>
+        <p><strong>Pausieren:</strong> Toggle-Schalter oben rechts in der Artikel-Detailansicht. Der Artikel bleibt im Repricer, wird aber beim nächsten Run übersprungen. Praxis: nutze das wenn du einen Artikel vorübergehend manuell preiset oder ein Listing ruht.</p>
+
+        <p><strong>Entfernen:</strong> Button „Entfernen" (rot, unten im Regel-Editor). Der Artikel wird aus dem Repricer gelöscht — der Inventar-Eintrag bleibt vollständig erhalten.</p>
+      </div>
+
+      <!-- 12 ── Probleme -->
+      <div class="guide-section" id="probleme">
+        <h2><span class="num">12</span> Häufige Probleme</h2>
+
+        <table class="trouble-table">
+          <thead>
+            <tr><th>Problem</th><th>Lösung</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Status bleibt „⚠ Keine ID"</td>
+              <td>„Listings sync" ausführen — oder die eBay-Item-ID manuell in der Detailansicht eintragen (zu finden in <code style="font-size:12px;background:var(--surface2);padding:1px 4px;border-radius:3px">ebay.de/itm/XXXXXXXXX</code>).</td>
+            </tr>
+            <tr>
+              <td>Status „✗ eBay Fehler"</td>
+              <td>Artikel anklicken → Fehlermeldung im roten Banner lesen. Häufige Ursachen: Listing abgelaufen, Preis außerhalb der eBay-Mindest-/Maximalwerte, oder eBay-Token abgelaufen (Verbindung trennen & neu verbinden).</td>
+            </tr>
+            <tr>
+              <td>Floor erscheint zu hoch</td>
+              <td>EK im Inventar prüfen; eine Kategorie mit niedrigerer Gebühr wählen (z.B. Handy-Zubehör 11% statt Standard 13%); oder die Mindest-Marge etwas reduzieren.</td>
+            </tr>
+            <tr>
+              <td>Preis ändert sich nicht obwohl Konkurrent billiger ist</td>
+              <td>Prüfe ob der Artikel aktiviert ist (Toggle); prüfe ob eine eBay-ID hinterlegt ist; stoße den Run manuell mit „Jetzt ausführen" an.</td>
+            </tr>
+            <tr>
+              <td>„Nicht verbunden" nach Neustart</td>
+              <td>Der eBay-Token ist abgelaufen. Badge anklicken → neu autorisieren.</td>
+            </tr>
+            <tr>
+              <td>Keine Artikel im „Hinzufügen"-Dialog</td>
+              <td>Nur Inventar-Artikel mit Status LISTED / IN_STOCK / LISTING_PENDING <em>und</em> einer EAN erscheinen. EAN im Inventar ergänzen oder direkt „Listings sync" nutzen.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="guide-footer-nav">
+        <a href="/guides">← Zurück zur Guide-Übersicht</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Fragen? Discord →</a>
+      </div>
+
+    </main>
+  </div>
+
+  <footer style="border-top:1px solid var(--border);padding:32px 24px;text-align:center">
+    <p style="font-size:13px;color:var(--dim)">
+      © 2025 Flipcheck ·
+      <a href="/privacy" style="color:var(--dim);margin:0 8px">Datenschutz</a>·
+      <a href="/terms"   style="color:var(--dim);margin:0 8px">AGB</a>·
+      <a href="/imprint" style="color:var(--dim);margin:0 8px">Impressum</a>
+    </p>
+  </footer>
+
+  <script>
+    // Active ToC highlighting
+    const sections = document.querySelectorAll('.guide-section');
+    const links    = document.querySelectorAll('.guide-toc a');
+    const obs = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          links.forEach(l => l.classList.remove('active'));
+          const a = document.querySelector(`.guide-toc a[href="#${e.target.id}"]`);
+          if (a) a.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -60% 0px' });
+    sections.forEach(s => obs.observe(s));
+  </script>
+
+</body>
+</html>
