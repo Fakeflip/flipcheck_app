@@ -482,12 +482,28 @@ function wireEvents() {
     e.preventDefault();
     const btn = $('authLink');
     if (btn) { btn.textContent = '⟳ Anmelden…'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
+
+    // Listen for token being saved to storage — reloads popup regardless of
+    // whether the sendMessage reply arrives (popup may close/reopen during OAuth).
+    const storageListener = (changes, area) => {
+      if (area === 'local' && changes.fc_token?.newValue) {
+        chrome.storage.onChanged.removeListener(storageListener);
+        window.location.reload();
+      }
+    };
+    chrome.storage.onChanged.addListener(storageListener);
+
     chrome.runtime.sendMessage({ type: 'LOGIN' }, res => {
       if (res?.ok) {
-        window.location.reload(); // re-check token + hide banner
-      } else {
+        // Reply arrived (popup stayed open) — storage listener will also fire, reload once is fine
+        chrome.storage.onChanged.removeListener(storageListener);
+        window.location.reload();
+      } else if (res !== undefined) {
+        // Explicit failure reply (not just a dead channel)
+        chrome.storage.onChanged.removeListener(storageListener);
         if (btn) { btn.textContent = '→ Anmelden'; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
       }
+      // res === undefined means the popup closed/SW died — storage listener is still watching
     });
   });
 
