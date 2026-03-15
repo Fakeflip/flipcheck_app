@@ -478,7 +478,18 @@ function wireEvents() {
     $('settingsBtn').style.opacity   = isOpen ? '' : '0.5';
   });
 
-  $('authLink').addEventListener('click', e => { e.preventDefault(); chrome.runtime.openOptionsPage(); });
+  $('authLink').addEventListener('click', e => {
+    e.preventDefault();
+    const btn = $('authLink');
+    if (btn) { btn.textContent = '⟳ Anmelden…'; btn.style.opacity = '0.6'; btn.style.pointerEvents = 'none'; }
+    chrome.runtime.sendMessage({ type: 'LOGIN' }, res => {
+      if (res?.ok) {
+        window.location.reload(); // re-check token + hide banner
+      } else {
+        if (btn) { btn.textContent = '→ Anmelden'; btn.style.opacity = ''; btn.style.pointerEvents = ''; }
+      }
+    });
+  });
 
   $('cookieSaveBtn').addEventListener('click', async () => {
     const cookie = $('cookieTa').value.trim();

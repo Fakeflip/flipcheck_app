@@ -380,6 +380,24 @@ async def discord_callback_get(code: str, state: Optional[str] = None):
     return RedirectResponse(url=deep_link, status_code=302)
 
 
+@app.get("/auth/extension/login")
+def extension_login(ext_redirect: str = ""):
+    """Start Discord OAuth for the Chrome extension.
+    ext_redirect = chrome.identity.getRedirectURL() — passed as OAuth state.
+    After auth, /auth/extension/callback redirects there with ?token=XXX
+    so chrome.identity.launchWebAuthFlow() can intercept it.
+    """
+    params = {
+        "client_id":     DISCORD_CLIENT_ID,
+        "redirect_uri":  "https://api.joinflipcheck.app/auth/extension/callback",
+        "response_type": "code",
+        "scope":         "identify",
+        "state":         ext_redirect,
+    }
+    url = "https://discord.com/oauth2/authorize?" + urlencode(params)
+    return RedirectResponse(url=url, status_code=302)
+
+
 @app.get("/auth/extension/callback")
 async def auth_extension_callback(code: str, state: Optional[str] = None):
     """
@@ -438,9 +456,16 @@ async def auth_extension_callback(code: str, state: Optional[str] = None):
         algorithm=APP_JWT_ALGO,
     )
 
-    # Return a small HTML page that postMessages the token to the extension
-    # chrome.identity intercepts the redirect at https://[id].chromiumapp.org/
-    # but we also support a landing page approach
+    # If state is a chromiumapp.org URL, redirect there with token —
+    # chrome.identity.launchWebAuthFlow() intercepts this redirect automatically.
+    if state and "chromiumapp.org" in state:
+        sep = "&" if "?" in state else "?"
+        return RedirectResponse(
+            url=f"{state}{sep}token={quote(gate_token)}",
+            status_code=302,
+        )
+
+    # Fallback: plain JSON (e.g. direct API calls / testing)
     return JSONResponse(content={
         "ok":    True,
         "token": gate_token,

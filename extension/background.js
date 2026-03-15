@@ -688,12 +688,30 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           break;
 
         case 'LOGIN': {
-          // Chrome identity OAuth flow (no Electron required)
+          // chrome.identity.launchWebAuthFlow — works fully without the desktop app.
+          // Flow: extension/login → Discord OAuth → extension/callback → chromiumapp.org?token=X
           try {
-            const redirectBase = 'https://gate.joinflipcheck.app/auth/discord/login';
-            const authUrl = redirectBase;
-            _cr.tabs.create({ url: authUrl });
-            reply({ ok: true });
+            const extRedirect = chrome.identity.getRedirectURL();
+            const authUrl = `https://gate.joinflipcheck.app/auth/extension/login?ext_redirect=${encodeURIComponent(extRedirect)}`;
+            chrome.identity.launchWebAuthFlow({ url: authUrl, interactive: true }, async (callbackUrl) => {
+              if (chrome.runtime.lastError || !callbackUrl) {
+                reply({ ok: false, error: chrome.runtime.lastError?.message || 'auth_cancelled' });
+                return;
+              }
+              try {
+                const u     = new URL(callbackUrl);
+                const token = u.searchParams.get('token');
+                if (!token) { reply({ ok: false, error: 'no_token' }); return; }
+                _token = token;
+                await _cr.storage.local.set({
+                  fc_token:     token,
+                  fc_token_exp: Date.now() + 7 * 24 * 3600 * 1000,
+                });
+                reply({ ok: true, token });
+              } catch (e) {
+                reply({ ok: false, error: e.message });
+              }
+            });
           } catch (e) {
             reply({ ok: false, error: e.message });
           }
