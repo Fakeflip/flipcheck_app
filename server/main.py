@@ -389,7 +389,7 @@ def extension_login(ext_redirect: str = ""):
     """
     params = {
         "client_id":     DISCORD_CLIENT_ID,
-        "redirect_uri":  "https://api.joinflipcheck.app/auth/extension/callback",
+        "redirect_uri":  "https://gate.joinflipcheck.app/auth/extension/callback",
         "response_type": "code",
         "scope":         "identify",
         "state":         ext_redirect,
@@ -407,16 +407,12 @@ async def auth_extension_callback(code: str, state: Optional[str] = None):
     Same logic as /auth/discord/callback but redirects to extension callback URL.
     """
     token_url = "https://discord.com/api/oauth2/token"
-    ext_redirect = os.environ.get(
-        "EXTENSION_REDIRECT_URI",
-        "https://api.joinflipcheck.app/auth/extension/callback"
-    )
     data = {
         "client_id":     DISCORD_CLIENT_ID,
         "client_secret": DISCORD_CLIENT_SECRET,
         "grant_type":    "authorization_code",
         "code":          code,
-        "redirect_uri":  ext_redirect,
+        "redirect_uri":  "https://gate.joinflipcheck.app/auth/extension/callback",
     }
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
