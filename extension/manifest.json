@@ -34,7 +34,8 @@
     "alarms",
     "contextMenus",
     "notifications",
-    "tabs"
+    "tabs",
+    "identity"
   ],
   "commands": {
     "toggle-panel": {
