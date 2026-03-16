@@ -647,6 +647,9 @@ const FlipcheckView = (() => {
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
             🏷 Idealo ↗
           </a>
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            💰 Geizhals ↗
+          </a>
         </div>
       </div>
 
@@ -799,16 +802,23 @@ const FlipcheckView = (() => {
         </details>
 
         <!-- ── Actions ── -->
-        <div class="fc-actions mt-16">
-          <button class="btn btn-sm btn-primary" id="btnAddToInv" style="gap:6px">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <div class="row mt-16" style="gap:8px;flex-wrap:wrap">
+          <button class="btn btn-secondary btn-sm" id="btnAddToInv">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 5V4a3 3 0 0 1 6 0v1M6 10h4M8 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             ${I18N.t('fc.btn.add_inventory')}
           </button>
-          ${productUrl ? `<a class="btn btn-sm btn-ghost" href="${productUrl}" target="_blank" style="gap:4px;text-decoration:none">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1v-3M10 2h4v4M7 9l7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Kaufland öffnen
+          ${productUrl ? `<a class="btn btn-ghost btn-sm" href="${productUrl}" target="_blank" rel="noopener" style="text-decoration:none">
+            Kaufland öffnen ↗
           </a>` : ""}
-          <button class="btn btn-sm btn-ghost" id="btnReset">${I18N.t('fc.btn.reset')}</button>
+          <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.btn.reset')}</button>
+        </div>
+        <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            🏷 Idealo ↗
+          </a>
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            💰 Geizhals ↗
+          </a>
         </div>
       </div>
     `;
@@ -973,6 +983,9 @@ const FlipcheckView = (() => {
           </a>
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
             🏷 Idealo ↗
+          </a>
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+            💰 Geizhals ↗
           </a>
         </div>
       </div>
