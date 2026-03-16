@@ -19,16 +19,16 @@ HEADERS = {
 # Proxy-Liste (rotierend) - BLEIBT IM SCRIPT
 # -----------------------------
 PROXIES_LIST = [
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-qoh955ra-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-u1q5l3h5-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-dto9kg6l-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-0pec2hud-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-tek0xyk3-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-qzukc3qr-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-gnih351l-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-969edao8-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-uqq2x5g3-sesstime-60@boilingbraineu.boilingproxies.com:7002",
-    "http://ue2NF6VM:QYCwB72b-cc-de-sessid-96qmethk-sesstime-60@boilingbraineu.boilingproxies.com:7002",
+    "http://user_c19093666cc1:wy0tCBJt@82.25.197.175:61234",
+    "http://user_01b8187438ef:bmAD6Cae@82.25.202.144:61234",
+    "http://user_9397c11aa7c9:Ni3W6nEo@82.25.202.246:61234",
+    "http://user_9e85beaac451:RNCF6VAa@88.135.99.9:61234",
+    "http://user_2f8623fdea99:GxHT6JFy@88.135.99.33:61234",
+    "http://user_14b9aa1a93e9:0WXnfNeZ@88.135.99.106:61234",
+    "http://user_3c1866aeb60f:qVfP0R3r@88.135.99.113:61234",
+    "http://user_95e3199150b0:rwPc5LeF@88.135.99.147:61234",
+    "http://user_ace3fa75d6a4:CXPwsJrm@88.135.99.209:61234",
+    "http://user_6163e08b6c75:PdlSG1tJ@88.135.99.243:61234",
 ]
 
 BLOCK_STATUSES = {403, 429, 503}
