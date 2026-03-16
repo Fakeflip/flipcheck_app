@@ -592,6 +592,9 @@ async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
                 shipping_cost = 0.0
                 payout_amount = 0.0
                 fee_breakdown = {}
+                refund_total = 0.0
+                refund_date = None
+                refund_fee_credit = 0.0
 
                 for txn in transactions:
                     txn_type = txn.get("transactionType", "")
@@ -618,11 +621,24 @@ async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
                         ship_amt = txn.get("amount", {})
                         shipping_cost += abs(float(ship_amt.get("value", 0)))
 
+                    # REFUND transactions — buyer got money back
+                    elif txn_type == "REFUND":
+                        refund_amt = txn.get("amount", {})
+                        refund_total += abs(float(refund_amt.get("value", 0)))
+                        refund_date = txn.get("transactionDate", refund_date)
+                        # Fee credits: eBay may refund its fee on full refunds
+                        for oli in txn.get("orderLineItems", []):
+                            for fee in oli.get("marketplaceFees", []):
+                                refund_fee_credit += abs(float(fee.get("amount", {}).get("value", 0)))
+
                 results[oid] = {
-                    "total_fee":      round(total_fee, 2),
-                    "shipping_cost":  round(shipping_cost, 2),
-                    "payout_amount":  round(payout_amount, 2),
-                    "fee_breakdown":  fee_breakdown,
+                    "total_fee":         round(total_fee, 2),
+                    "shipping_cost":     round(shipping_cost, 2),
+                    "payout_amount":     round(payout_amount, 2),
+                    "fee_breakdown":     fee_breakdown,
+                    "refund_amount":     round(refund_total, 2),
+                    "refund_date":       refund_date,
+                    "refund_fee_credit": round(refund_fee_credit, 2),
                 }
             except Exception as e:
                 logger.debug(f"[Finances] Error fetching {oid}: {e}")
@@ -660,14 +676,20 @@ async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int
         oid = item.get("order_id")
         if oid and oid in financials:
             fin = financials[oid]
-            item["ebay_fee"]       = fin["total_fee"]
-            item["shipping_cost"]  = fin["shipping_cost"]
-            item["payout_amount"]  = fin["payout_amount"]
-            item["fee_breakdown"]  = fin["fee_breakdown"]
+            item["ebay_fee"]           = fin["total_fee"]
+            item["shipping_cost"]      = fin["shipping_cost"]
+            item["payout_amount"]      = fin["payout_amount"]
+            item["fee_breakdown"]      = fin["fee_breakdown"]
+            item["refund_amount"]      = fin.get("refund_amount", 0)
+            item["refund_date"]        = fin.get("refund_date", None)
+            item["refund_fee_credit"]  = fin.get("refund_fee_credit", 0)
         else:
-            item["ebay_fee"]       = None
-            item["shipping_cost"]  = None
-            item["payout_amount"]  = None
+            item["ebay_fee"]           = None
+            item["shipping_cost"]      = None
+            item["payout_amount"]      = None
+            item["refund_amount"]      = 0
+            item["refund_date"]        = None
+            item["refund_fee_credit"]  = 0
 
     sold_result["has_financials"] = len(financials) > 0
     return sold_result

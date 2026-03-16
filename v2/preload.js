@@ -354,4 +354,8 @@ contextBridge.exposeInMainWorld("fc", {
   ebaySyncSetEnabled:  (on) => ipcRenderer.invoke("ebaySync:setEnabled", on),
   /** Get sync history log. @returns {Promise<Array>} */
   ebaySyncGetLog:      () => ipcRenderer.invoke("ebaySync:getLog"),
+  /** Listen for sync completion (auto or manual). @param {(stats: object) => void} cb */
+  onEbaySyncCompleted: (cb) => ipcRenderer.on("ebaySync:completed", (_e, stats) => cb(stats)),
+  /** Listen for sync errors. @param {(info: {error: string}) => void} cb */
+  onEbaySyncError:     (cb) => ipcRenderer.on("ebaySync:error", (_e, info) => cb(info)),
 });

@@ -130,20 +130,22 @@ describe("calcRealProfit() — eBay market (deducts fee)", () => {
   });
 });
 
-describe("calcRealProfit() — non-eBay markets (no fee)", () => {
-  test("amz market: no fee deducted", () => {
+describe("calcRealProfit() — non-eBay markets (with market fee)", () => {
+  test("amz market: 15% fee deducted", () => {
     const item = makeItem({ market: "amz", sell_price: 30, ek: 10, ship_out: 0 });
-    // 30 − 10 − 0 = 20
-    expect(ctx.calcRealProfit(item)).toBeCloseTo(20.0, 5);
+    // 30 − 10 − 4.50 (15%) = 15.50
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(15.5, 5);
   });
 
-  test("kaufland market: no fee deducted", () => {
+  test("kaufland market: 10.5% fee deducted", () => {
     const item = makeItem({ market: "kaufland", sell_price: 30, ek: 10, ship_out: 0 });
-    expect(ctx.calcRealProfit(item)).toBeCloseTo(20.0, 5);
+    // 30 − 10 − 3.15 (10.5%) = 16.85
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(16.85, 5);
   });
 
   test("other market: no fee deducted", () => {
     const item = makeItem({ market: "other", sell_price: 30, ek: 10, ship_out: 0 });
+    // 30 − 10 − 0 = 20
     expect(ctx.calcRealProfit(item)).toBeCloseTo(20.0, 5);
   });
 });
@@ -164,5 +166,62 @@ describe("calcRealProfit() — complete calculation scenarios", () => {
     });
     // 10 − 20 − 5 − 1.30 (fee) = −16.30
     expect(ctx.calcRealProfit(item)).toBeLessThan(0);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// calcRealProfit — MwSt / VAT handling
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe("calcRealProfit() — MwSt ust_19 mode (all values netto)", () => {
+  beforeAll(() => {
+    ctx.App.settings = { tax: { vat_mode: "ust_19", ek_mode: "gross" } };
+  });
+  afterAll(() => {
+    ctx.App.settings = {};
+  });
+
+  test("eBay: VK 119 − EK 59.50 − fee netto → profit is netto", () => {
+    const item = makeItem({ market: "ebay", sell_price: 119, ek: 59.50, ship_out: 0, cat_id: "sonstiges" });
+    // vkNet = 119/1.19 = 100, ekNet = 59.50/1.19 = 50, feeGross = 119*0.13 = 15.47, feeNet = 15.47/1.19 = 13.00
+    // profit = 100 - 50 - 13.00 = 37.00
+    const vkNet  = 119 / 1.19;
+    const ekNet  = 59.50 / 1.19;
+    const feeNet = (119 * 0.13) / 1.19;
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(vkNet - ekNet - feeNet, 2);
+  });
+
+  test("ship_out also divided by 1.19", () => {
+    const item = makeItem({ market: "ebay", sell_price: 119, ek: 59.50, ship_out: 5.95, cat_id: "sonstiges" });
+    const vkNet   = 119 / 1.19;
+    const ekNet   = 59.50 / 1.19;
+    const feeNet  = (119 * 0.13) / 1.19;
+    const shipNet = 5.95 / 1.19;
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(vkNet - ekNet - feeNet - shipNet, 2);
+  });
+
+  test("ek_mode netto: EK is already netto, not divided", () => {
+    ctx.App.settings = { tax: { vat_mode: "ust_19", ek_mode: "netto" } };
+    const item = makeItem({ market: "ebay", sell_price: 119, ek: 50, ship_out: 0, cat_id: "sonstiges" });
+    // vkNet = 100, ekNet = 50 (already netto), feeNet = 15.47/1.19 = 13.00
+    const vkNet  = 119 / 1.19;
+    const feeNet = (119 * 0.13) / 1.19;
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(vkNet - 50 - feeNet, 2);
+    ctx.App.settings = { tax: { vat_mode: "ust_19", ek_mode: "gross" } };
+  });
+});
+
+describe("calcRealProfit() — no_vat mode unchanged", () => {
+  beforeAll(() => {
+    ctx.App.settings = { tax: { vat_mode: "no_vat" } };
+  });
+  afterAll(() => {
+    ctx.App.settings = {};
+  });
+
+  test("no_vat: same as brutto calc", () => {
+    const item = makeItem({ market: "ebay", sell_price: 30, ek: 10, ship_out: 0, cat_id: "sonstiges" });
+    // 30 − 10 − 3.90 = 16.10 (brutto, no VAT adjustment)
+    expect(ctx.calcRealProfit(item)).toBeCloseTo(16.1, 5);
   });
 });

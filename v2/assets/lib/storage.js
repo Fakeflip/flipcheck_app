@@ -171,6 +171,8 @@ const Storage = (() => {
     _settings = { ...current, ...patch };
     try { await window.fc.setSettings(_settings); }
     catch {}
+    // Keep App.settings in sync so calcRealProfit() picks up VAT changes immediately
+    if (typeof App !== "undefined") App.settings = _settings;
     return _settings;
   }
 
@@ -189,7 +191,7 @@ const Storage = (() => {
     if (_analyticsCache && _analyticsCache.key === key) return _analyticsCache.result;
     // ─────────────────────────────────────────────────────────────────────────
 
-    const sold   = items.filter(i => i.status === "SOLD" && i.sell_price && i.ek);
+    const sold   = items.filter(i => (i.status === "SOLD" || i.status === "RETURN") && i.sell_price && i.ek);
     const active = items.filter(i => FC.ACTIVE_STATUSES.includes(i.status));
 
     // Real profit = sell_price - ek - ship_out - ebay_fee (uses global calcRealProfit from app.js)

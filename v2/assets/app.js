@@ -210,6 +210,11 @@ function calcMarketFee(vk, market, catId) {
  * Falls back to estimated fees (category-based) when real data is unavailable.
  * Returns null if sell_price or ek are missing.
  *
+ * MwSt-Logik (wenn User umsatzsteuerpflichtig — vat_mode: "ust_19"):
+ * - VK, Fee, Shipping: netto = brutto / 1.19
+ * - EK: netto = brutto / 1.19 (wenn ek_mode: "gross"), sonst schon netto
+ * - Profit = vkNet - ekNet - shipInNet - shipOutNet - feeNet
+ *
  * @param {FC_InventoryItem} item
  * @returns {number|null} Per-unit profit in EUR, or null if data is incomplete.
  */
@@ -221,12 +226,33 @@ function calcRealProfit(item) {
   const market  = item.market || "ebay";
 
   // Prefer real eBay fee from Finances API, fall back to estimated
-  const fee     = item.ebay_fee != null ? Number(item.ebay_fee) : calcMarketFee(vk, market, item.cat_id);
+  const feeRaw  = item.ebay_fee != null ? Number(item.ebay_fee) : calcMarketFee(vk, market, item.cat_id);
 
   // Prefer real shipping label cost from eBay, fall back to manual ship_out
   const shipOut = item.ebay_ship_cost != null ? Number(item.ebay_ship_cost) : (Number(item.ship_out) || 0);
 
-  return vk - ek - shipIn - shipOut - fee;
+  // Refund adjustment: reduce revenue by refund amount, reduce fee by fee credit
+  const refund    = Number(item.refund_amount) || 0;
+  const feeCredit = Number(item.refund_fee_credit) || 0;
+  const fee       = Math.max(0, feeRaw - feeCredit);
+  const effectiveVk = vk - refund;
+
+  // MwSt: if user is USt-pflichtig, compute everything netto
+  const tax     = App.settings?.tax || {};
+  const vatMode = tax.vat_mode || "no_vat";
+  const ekMode  = tax.ek_mode  || "gross";
+
+  if (vatMode === "ust_19") {
+    const vat       = 1.19;
+    const vkNet     = effectiveVk / vat;
+    const feeNet    = fee    / vat;
+    const shipInNet = shipIn / vat;
+    const shipOutNet= shipOut/ vat;
+    const ekNet     = ekMode === "gross" ? ek / vat : ek;
+    return vkNet - ekNet - shipInNet - shipOutNet - feeNet;
+  }
+
+  return effectiveVk - ek - shipIn - shipOut - fee;
 }
 
 /**
@@ -872,6 +898,26 @@ async function initApp() {
     window.fc.onCheckLink((p) => {
       App._navPayload = p; // { ean, ek, market, cat, autoRun: true }
       navigateTo("flipcheck");
+    });
+  }
+
+  // ── eBay Sync completion toast — fires on auto-sync and manual sync ──────────
+  if (window.fc?.onEbaySyncCompleted) {
+    window.fc.onEbaySyncCompleted((stats) => {
+      if (typeof Toast === "undefined") return;
+      const parts = [];
+      if (stats.new_items)         parts.push(`${stats.new_items} neu`);
+      if (stats.updated)           parts.push(`${stats.updated} aktualisiert`);
+      if (stats.sold_marked)       parts.push(`${stats.sold_marked} verkauft`);
+      if (stats.returns_detected)  parts.push(`${stats.returns_detected} Retoure${stats.returns_detected > 1 ? "n" : ""}`);
+      if (stats.archived)          parts.push(`${stats.archived} archiviert`);
+      const msg = parts.length > 0 ? parts.join(" · ") : "Keine Änderungen";
+      Toast.success("eBay Sync", msg);
+    });
+  }
+  if (window.fc?.onEbaySyncError) {
+    window.fc.onEbaySyncError((info) => {
+      if (typeof Toast !== "undefined") Toast.error("eBay Sync fehlgeschlagen", info?.error || "Unbekannter Fehler");
     });
   }
 

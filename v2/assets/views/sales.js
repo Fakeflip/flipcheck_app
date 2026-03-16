@@ -157,7 +157,7 @@ const SalesView = (() => {
 
     const { listInventory } = Storage;
     const items = await listInventory();
-    _allSold = items.filter(i => i.status === "SOLD" && i.sell_price != null && i.ek != null);
+    _allSold = items.filter(i => (i.status === "SOLD" || i.status === "RETURN") && i.sell_price != null && i.ek != null);
     render();
   }
 
@@ -184,6 +184,9 @@ const SalesView = (() => {
     const allProfit = _allSold.reduce((s,i) => s + netProfit(i), 0);
     const allRoi    = allCount > 0 ? _allSold.reduce((s,i) => s + (itemRoi(i) ?? 0), 0) / allCount : 0;
     const isFiltered = _filterMonth || _filterPlatform;
+    const returnItems   = _allSold.filter(i => i.status === "RETURN");
+    const returnCount   = returnItems.length;
+    const totalRefunded = returnItems.reduce((s, i) => s + (Number(i.refund_amount) || 0), 0);
 
     // Platform split (from filtered)
     const pSplit = {};
@@ -208,6 +211,7 @@ const SalesView = (() => {
           <span class="sales-stat-pill ${allRoi >= 15 ? "sales-stat-pill-yellow" : ""}">
             <b>Ø ${fmtPct(allRoi)}</b> ${I18N.t('sal.stats.roi')}
           </span>
+          ${returnCount > 0 ? `<span class="sales-stat-pill sales-stat-pill-red"><b>${returnCount}</b> Rücksendung${returnCount !== 1 ? "en" : ""} · ${fmtEur(totalRefunded)} erstattet</span>` : ""}
           ${isFiltered ? `<span class="sales-stat-pill sales-stat-pill-accent"><b>${totalCount}</b> ${I18N.t('sal.stats.filtered')}</span>` : ""}
         </div>
       </div>
@@ -339,9 +343,14 @@ const SalesView = (() => {
               : _vk * (FLAT_FEES[i.market || "other"] ?? 0);
           const fee     = _vk > 0 ? _feeAmt / _vk : 0;
           const plat    = PLATFORM_LABELS[i.market] || i.market || "—";
-          return `<tr>
+          const isReturn  = i.status === "RETURN";
+          const isPartial = isReturn && i.refund_amount > 0 && i.refund_amount < (i.sell_price || 0);
+          const returnBadge = isReturn
+            ? `<span style="display:inline-block;font-size:9px;padding:1px 5px;border-radius:4px;background:var(--red,#ef4444);color:#fff;margin-left:6px;vertical-align:middle">${isPartial ? "Teilerstattung" : "Rücksendung"}</span>`
+            : "";
+          return `<tr${isReturn ? ' style="opacity:0.75"' : ""}>
             <td style="max-width:200px">
-              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(i.title||i.ean)}">${esc((i.title||i.ean||"—").slice(0,32))}</div>
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(i.title||i.ean)}">${esc((i.title||i.ean||"—").slice(0,32))}${returnBadge}</div>
             </td>
             <td class="text-mono text-muted" style="font-size:11px">${esc(i.ean||"—")}</td>
             <td class="col-right col-num text-muted">${fmtEur(i.ek)}</td>
@@ -425,7 +434,7 @@ const SalesView = (() => {
 
       try {
         const { upsertItem } = Storage;
-        await upsertItem({ ...item, status: "IN_STOCK", sell_price: null, sold_at: null });
+        await upsertItem({ ...item, status: "IN_STOCK", sell_price: null, sold_at: null, refund_amount: 0, refund_date: null, refund_fee_credit: 0, ebay_order_id: null });
         _allSold = _allSold.filter(i => i.id !== id);
         if (typeof Toast !== "undefined") Toast.success(I18N.t('sal.toast.undo'), I18N.t('sal.toast.undo_sub'));
         render();

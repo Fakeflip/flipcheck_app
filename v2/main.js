@@ -499,7 +499,11 @@ function startBackend(port) {
 
   backendProc = spawn(python, ["-m", "uvicorn", module, "--host", HOST, "--port", String(port), "--log-level", "warning"], {
     cwd: dir,
-    env: { ...process.env, PORT: String(port) },
+    env: {
+      ...process.env,
+      PORT: String(port),
+      EBAY_SELLER_TOKEN_FILE: path.join(app.getPath("userData"), "ebay_seller_token.json"),
+    },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
   });
@@ -1767,7 +1771,11 @@ async function runEbaySyncCycle() {
 
     // 1. Check connection
     const statusRes = await mainApiCall(`${base}/seller/auth/status`, token);
-    if (!statusRes.data?.connected) { console.log("[EbaySync] Not connected."); return { ok: false, reason: "not_connected" }; }
+    if (!statusRes.data) {
+      console.log("[EbaySync] Backend unreachable.");
+      return { ok: false, reason: "backend_unavailable" };
+    }
+    if (!statusRes.data.connected) { console.log("[EbaySync] Not connected."); return { ok: false, reason: "not_connected" }; }
 
     // 2. Fetch ALL active listings (paginated)
     const allActive = [];
@@ -1937,6 +1945,35 @@ async function runEbaySyncCycle() {
       }
     }
 
+    // 6.5. Refund detection — check sold data for REFUND transactions
+    stats.returns_detected = 0;
+    if (hasFinancials) {
+      const refundMap = new Map();
+      for (const sold of allSold) {
+        if (sold.order_id && sold.refund_amount > 0) {
+          refundMap.set(sold.order_id, {
+            refund_amount:     sold.refund_amount,
+            refund_date:       sold.refund_date || now,
+            refund_fee_credit: sold.refund_fee_credit || 0,
+          });
+        }
+      }
+      if (refundMap.size > 0) {
+        for (const item of items) {
+          if (item.status !== "SOLD" || !item.ebay_order_id) continue;
+          const refund = refundMap.get(item.ebay_order_id);
+          if (!refund) continue;
+          item.status            = "RETURN";
+          item.refund_amount     = refund.refund_amount;
+          item.refund_date       = refund.refund_date;
+          item.refund_fee_credit = refund.refund_fee_credit;
+          item.updated_at        = now;
+          stats.returns_detected++;
+        }
+        if (stats.returns_detected > 0) console.log(`[EbaySync] ${stats.returns_detected} return(s) detected via Finances API`);
+      }
+    }
+
     // 7. Stale detection — items LISTED with ebay_offer_id but not in active listings
     for (const it of items) {
       if (it.status === "LISTED" && it.ebay_offer_id && it.source === "ebay_sync") {
@@ -1966,10 +2003,14 @@ async function runEbaySyncCycle() {
       mainWindow.webContents.send("ebaySync:completed", stats);
     }
 
-    console.log(`[EbaySync] Done — ${stats.new_items} new, ${stats.updated} updated, ${stats.sold_marked} sold, ${stats.archived} archived`);
+    console.log(`[EbaySync] Done — ${stats.new_items} new, ${stats.updated} updated, ${stats.sold_marked} sold, ${stats.returns_detected || 0} returns, ${stats.archived} archived`);
     return { ok: true, stats };
   } catch (e) {
     console.error("[EbaySync] Cycle error:", e.message);
+    // Notify renderer about sync failure
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("ebaySync:error", { error: e.message });
+    }
     return { ok: false, error: e.message };
   } finally {
     _ebaySyncRunning = false;

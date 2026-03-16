@@ -99,6 +99,11 @@ function normalizeItem(input) {
   it.ebay_fee       = it.ebay_fee       !== undefined ? (Number(it.ebay_fee) || null) : null;
   it.ebay_ship_cost = it.ebay_ship_cost !== undefined ? (Number(it.ebay_ship_cost) || null) : null;
 
+  // Refund data from eBay Finances API (0 = no refund)
+  it.refund_amount     = it.refund_amount     !== undefined ? (Number(it.refund_amount) || 0) : 0;
+  it.refund_date       = it.refund_date       || null;
+  it.refund_fee_credit = it.refund_fee_credit !== undefined ? (Number(it.refund_fee_credit) || 0) : 0;
+
   return /** @type {import('./assets/lib/types.js').FC_InventoryItem} */ (it);
 }
 

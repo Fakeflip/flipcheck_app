@@ -81,7 +81,7 @@ const AnalyticsView = (() => {
     try { items = await Storage.listInventory(); } catch {}
 
     const stats     = Storage.calcInventoryAnalytics(items);
-    const soldItems = items.filter(i => i.status === "SOLD" && i.sell_price && i.ek);
+    const soldItems = items.filter(i => (i.status === "SOLD" || i.status === "RETURN") && i.sell_price && i.ek);
     const extra     = calcExtra(soldItems, stats);
 
     container.innerHTML = renderView(stats, extra, items.length);
@@ -137,7 +137,11 @@ const AnalyticsView = (() => {
       marketProfit[mkt] = (marketProfit[mkt] || 0) + _rp(item);
     }
 
-    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit };
+    // Return rate
+    const returnCount = soldItems.filter(i => i.status === "RETURN").length;
+    const returnRate  = soldItems.length > 0 ? Math.round(returnCount / soldItems.length * 100) : 0;
+
+    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit, returnCount, returnRate };
   }
 
   // ── Period data builders ──────────────────────────────────────────────────
@@ -370,6 +374,21 @@ const AnalyticsView = (() => {
           <div class="kpi-value">${s.avgDaysToCash > 0 ? fmtDays(s.avgDaysToCash) : "—"}</div>
           <div class="kpi-meta"><span>${I18N.t('an.kpi.purchase_sale')}</span></div>
         </div>
+
+        <!-- Return Rate -->
+        ${extra.returnCount > 0 ? `
+        <div class="kpi-card an-kpi-card">
+          <div class="an-kpi-top">
+            <div class="kpi-label">Retourenquote</div>
+            <div class="an-kpi-ico">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M2 8a6 6 0 1 1 1.5 4M2 3v5h5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value ${extra.returnRate > 10 ? 'text-red' : extra.returnRate > 5 ? 'text-yellow' : 'text-green'}">${extra.returnRate}%</div>
+          <div class="kpi-meta"><span>${extra.returnCount} Rücksendung${extra.returnCount !== 1 ? 'en' : ''}</span></div>
+        </div>` : ""}
 
       </div>
 
