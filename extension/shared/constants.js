@@ -1,6 +1,6 @@
 /* Flipcheck Extension — Shared Constants */
 
-const REMOTE_BASE  = 'https://gate.joinflipcheck.app';
+const REMOTE_BASE  = 'https://api.joinflipcheck.app';
 const BRIDGE_BASE  = 'http://127.0.0.1:8766';
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min
 
@@ -73,3 +73,36 @@ const FBA_TIERS = [
   [15.0,  74, 8.10 + DE_FBA_SURCHARGE, 'Groß 4'],
   [null, null, 9.80 + DE_FBA_SURCHARGE, 'Schwer/Sperrig'],
 ];
+
+// Closing fee (Amazon DE) — applies to media categories (Bücher, DVDs, Musik, Software, Games)
+const AMAZON_CLOSING_FEE = 1.01;
+const AMAZON_CLOSING_CATS = ['buecher', 'medien', 'musik', 'software', 'dvd', 'games'];
+
+// ── Amazon Breadcrumb → Category Mapping ────────────────────────────────────
+// Maps Amazon.de breadcrumb text (lowercase) to internal category IDs
+const AMAZON_CATEGORY_MAP = [
+  // Electronics / Computers
+  { keywords: ['computer', 'laptop', 'notebook', 'tablet', 'pc '], cat: 'computer_tablets' },
+  { keywords: ['handy', 'smartphone', 'mobiltelefon'], cat: 'handys' },
+  { keywords: ['konsole', 'playstation', 'xbox', 'nintendo', 'gaming', 'videospiel'], cat: 'konsolen' },
+  { keywords: ['kamera', 'foto', 'camcorder', 'objektiv'], cat: 'foto_camcorder' },
+  { keywords: ['fernseher', 'tv', 'audio', 'kopfhörer', 'lautsprecher', 'headset'], cat: 'tv_video_audio' },
+  { keywords: ['haushaltsgerät', 'kühlschrank', 'waschmaschine', 'staubsauger', 'mikrowelle'], cat: 'haushaltsgeraete' },
+  { keywords: ['drucker', 'scanner', 'toner', 'patrone'], cat: 'drucker' },
+  // Accessories
+  { keywords: ['handyhülle', 'handyzubehör', 'schutzhülle', 'displayschutz'], cat: 'handy_zubehoer' },
+  { keywords: ['notebookzubehör', 'laptopzubehör', 'tastatur', 'maus'], cat: 'notebook_zubehoer' },
+  { keywords: ['kabel', 'adapter', 'stecker', 'usb', 'hdmi'], cat: 'kabel' },
+  // General
+  { keywords: ['bekleidung', 'mode', 'kleidung', 'schuhe', 'schmuck'], cat: 'mode' },
+  { keywords: ['sport', 'fitness', 'outdoor', 'fahrrad'], cat: 'sport_freizeit' },
+  { keywords: ['spielzeug', 'lego', 'puppe', 'puzzle', 'brettspiel'], cat: 'spielzeug' },
+  { keywords: ['buch', 'bücher', 'taschenbuch', 'roman', 'dvd', 'blu-ray', 'musik', 'cd'], cat: 'buecher' },
+];
+
+// FBA storage rates (Amazon DE, monthly per unit)
+const FBA_STORAGE_RATES = {
+  klein:      { normal: 0.43, q4: 0.94 },
+  standard:   { normal: 0.51, q4: 1.21 },
+  uebergross: { normal: 0.53, q4: 1.42 },
+};

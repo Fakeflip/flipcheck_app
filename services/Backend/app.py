@@ -678,6 +678,66 @@ async def flipcheck(request: Request):
     if ek is None:
         return _err("EK fehlt/ungültig.", "Missing EK")
 
+    # Market selection (default: ebay)
+    _src = body if is_json else form
+    market = (_src.get("market") or "ebay").strip().lower()
+
+    # ── Kaufland branch ──────────────────────────────────────────────────────
+    if market == "kaufland":
+        try:
+            from kaufland import check_ean as kl_check
+            import asyncio
+            kl = await asyncio.get_event_loop().run_in_executor(None, kl_check, ean)
+        except Exception as e:
+            return JSONResponse({"ok": False, "verdict": "SKIP", "error": f"Kaufland-Check fehlgeschlagen: {e}"})
+
+        sell = kl.get("min_total_new")
+        if not sell:
+            return JSONResponse({"ok": False, "verdict": "SKIP", "error": "Kein Kaufland-Preis gefunden"})
+
+        kl_fee_pcts = {
+            "kl_elektronik": 0.085, "kl_handys": 0.085, "kl_gaming": 0.085,
+            "kl_foto": 0.085, "kl_haushalt_el": 0.085, "kl_buecher": 0.085,
+            "kl_sport": 0.105, "kl_spielzeug": 0.105, "kl_haushalt": 0.105,
+            "kl_garten": 0.105, "kl_mode": 0.175, "kl_sonstiges": 0.105,
+        }
+        fee_pct = kl_fee_pcts.get(category, 0.105)
+        fee = round(sell * fee_pct, 2)
+
+        ek_adj = ek / vat_factor if is_vat and ek_mode == "gross" else ek
+        sell_adj = sell / vat_factor if is_vat else sell
+        fee_adj = fee / vat_factor if is_vat else fee
+        ship_in_adj = shipping_in / vat_factor if is_vat else shipping_in
+        ship_out_adj = shipping_out / vat_factor if is_vat else shipping_out
+
+        profit = round(sell_adj - ek_adj - fee_adj - ship_in_adj - ship_out_adj, 2)
+        margin = round((profit / sell_adj * 100), 1) if sell_adj > 0 else 0
+
+        verdict = "BUY" if margin >= 15 and profit >= 3 else ("HOLD" if margin >= 8 else "SKIP")
+
+        return JSONResponse({
+            "ok": True,
+            "ean": ean,
+            "market": "kaufland",
+            "verdict": verdict,
+            "sell_price_avg": sell,
+            "sell_price_median": sell,
+            "profit_median": profit,
+            "profit_avg": profit,
+            "margin_pct": margin,
+            "fees_median": fee,
+            "fee_rate": fee_pct,
+            "offers_count": kl.get("offers_count_new", 0),
+            "bestseller": kl.get("bestseller", False),
+            "score": kl.get("score"),
+            "label": kl.get("label"),
+            "days_to_cash": None,
+            "sales_30d": None,
+            "price_series": [],
+            "qty_series": [],
+            "trending": None,
+        })
+
     # Custom thresholds
     custom_th: Optional[Thresholds] = None
     if mode == "custom":
@@ -1500,8 +1560,9 @@ try:
     from ebay_seller import (
         seller_auth_url, seller_token_exchange, bulk_revise_prices,
         is_connected, is_legacy_mode, get_my_active_listings, get_my_sold_list,
-        save_legacy_token, remove_legacy_token,
+        add_legacy_token, remove_legacy_token,
         get_sold_with_financials, get_order_financials,
+        parse_seller_token, encode_seller_token,
     )
     _SELLER_AVAILABLE = True
 except ImportError:
@@ -1509,15 +1570,23 @@ except ImportError:
 
     def seller_auth_url(): return ""  # type: ignore[misc]
     async def seller_token_exchange(code): return {"ok": False, "error": "ebay_seller module not available"}  # type: ignore[misc]
-    async def bulk_revise_prices(updates): return {"success": [], "failed": []}  # type: ignore[misc]
-    def is_connected(): return False  # type: ignore[misc]
-    def is_legacy_mode(): return False  # type: ignore[misc]
+    async def bulk_revise_prices(updates, token_data=None): return {"success": [], "failed": []}  # type: ignore[misc]
+    def is_connected(td=None): return False  # type: ignore[misc]
+    def is_legacy_mode(td=None): return False  # type: ignore[misc]
     async def get_my_active_listings(**_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def get_my_sold_list(**_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def get_sold_with_financials(**_): return {"ok": False, "items": []}  # type: ignore[misc]
-    async def get_order_financials(order_ids): return {}  # type: ignore[misc]
-    def save_legacy_token(token): pass  # type: ignore[misc]
-    def remove_legacy_token(): pass  # type: ignore[misc]
+    async def get_order_financials(order_ids, token_data=None): return {}  # type: ignore[misc]
+    def add_legacy_token(td, token): return {}  # type: ignore[misc]
+    def remove_legacy_token(td=None): return None  # type: ignore[misc]
+    def parse_seller_token(raw): return None  # type: ignore[misc]
+    def encode_seller_token(data): return ""  # type: ignore[misc]
+
+
+def _get_seller_token_from_request(request) -> dict | None:
+    """Extract seller token from X-eBay-Seller-Token header."""
+    raw = request.headers.get("x-ebay-seller-token", "")
+    return parse_seller_token(raw) if raw else None
 
 
 @app.get("/seller/auth/url")
@@ -1530,25 +1599,29 @@ async def seller_auth_url_endpoint():
 
 @app.get("/seller/auth/callback")
 async def seller_auth_callback(code: str):
-    """Exchange authorization code for access token (called after eBay OAuth redirect)."""
+    """Exchange authorization code for access token. Redirects to Electron deep link with token."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
     try:
         result = await seller_token_exchange(code)
-        return result
+        seller_token = result.get("seller_token", "")
+        # Redirect to Electron app via deep link — client stores the token locally
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(f"flipcheck://seller-token?t={seller_token}")
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
 @app.get("/seller/auth/status")
-async def seller_auth_status():
-    """Check whether a seller token exists."""
+async def seller_auth_status(request: Request):
+    """Check whether a seller token exists (from client-provided header)."""
     if not _SELLER_AVAILABLE:
         return {"ok": True, "connected": False, "is_legacy": False}
+    td = _get_seller_token_from_request(request)
     return {
         "ok":        True,
-        "connected": is_connected(),
-        "is_legacy": is_legacy_mode(),
+        "connected": is_connected(td),
+        "is_legacy": is_legacy_mode(td),
     }
 
 
@@ -1557,43 +1630,40 @@ class LegacyTokenBody(BaseModel):
 
 
 @app.post("/seller/auth/legacy")
-async def seller_auth_legacy_set(body: LegacyTokenBody):
-    """Store a legacy eBay Auth'n'Auth token (for team/sub-account access)."""
+async def seller_auth_legacy_set(body: LegacyTokenBody, request: Request):
+    """Add a legacy eBay Auth'n'Auth token. Returns updated seller_token for client storage."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
     if not body.token.strip():
         return JSONResponse({"ok": False, "error": "Token darf nicht leer sein"}, status_code=400)
     try:
-        save_legacy_token(body.token)
-        return {"ok": True, "is_legacy": True}
+        td = _get_seller_token_from_request(request)
+        updated = add_legacy_token(td, body.token)
+        return {"ok": True, "is_legacy": True, "seller_token": encode_seller_token(updated)}
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.delete("/seller/auth/legacy")
-async def seller_auth_legacy_remove():
-    """Remove the legacy token (falls back to OAuth if still authorized)."""
+async def seller_auth_legacy_remove(request: Request):
+    """Remove the legacy token. Returns updated seller_token for client storage."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller module not configured"}, status_code=503)
     try:
-        remove_legacy_token()
-        return {"ok": True, "is_legacy": False}
+        td = _get_seller_token_from_request(request)
+        updated = remove_legacy_token(td)
+        return {
+            "ok": True,
+            "is_legacy": False,
+            "seller_token": encode_seller_token(updated) if updated else None,
+        }
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
 
 
 @app.delete("/seller/auth/disconnect")
 async def seller_auth_disconnect():
-    """Delete the stored seller token (logout from eBay seller account)."""
-    from ebay_seller import TOKEN_FILE  # type: ignore[import]
-    try:
-        if TOKEN_FILE.exists():
-            TOKEN_FILE.unlink()
-        # Also clear in-memory cache
-        import ebay_seller as _es  # type: ignore[import]
-        _es._token_cache = None
-    except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+    """Client should delete its local seller token. Server has nothing to delete."""
     return {"ok": True}
 
 
@@ -1692,7 +1762,7 @@ def _apply_price_strategy(
 
 
 @app.post("/repricer/update")
-async def repricer_update(items: list[RepricerItem]):
+async def repricer_update(items: list[RepricerItem], request: Request):
     """
     For each item:
       1. Fetch up to 15 competitor listings via Browse API (sorted cheapest first).
@@ -1833,7 +1903,8 @@ async def repricer_update(items: list[RepricerItem]):
     ebay_result: Dict = {"success": [], "failed": []}
     if ebay_updates and _SELLER_AVAILABLE:
         try:
-            ebay_result = await bulk_revise_prices(ebay_updates)
+            td = _get_seller_token_from_request(request)
+            ebay_result = await bulk_revise_prices(ebay_updates, token_data=td)
         except Exception as e:
             for u in ebay_updates:
                 ebay_result.setdefault("failed", []).append({"item_id": u["item_id"], "error": str(e)})
@@ -1854,25 +1925,31 @@ async def repricer_update(items: list[RepricerItem]):
 
 
 @app.get("/seller/listings/active")
-async def seller_active_listings(page: int = 1, per_page: int = 100):
+async def seller_active_listings(request: Request, page: int = 1, per_page: int = 100):
     """Fetch seller's own active eBay listings (for repricer auto-match)."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
+    td = _get_seller_token_from_request(request)
+    if not td:
+        return JSONResponse({"ok": False, "error": "No seller token provided"}, status_code=401)
     try:
-        return await get_my_active_listings(page=page, per_page=min(int(per_page), 200))
+        return await get_my_active_listings(page=page, per_page=min(int(per_page), 200), token_data=td)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
 @app.get("/seller/listings/sold")
-async def seller_sold_listings(page: int = 1, per_page: int = 100, days: int = 60, financials: bool = True):
+async def seller_sold_listings(request: Request, page: int = 1, per_page: int = 100, days: int = 60, financials: bool = True):
     """Fetch seller's recently sold items, enriched with real eBay fees if available."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
+    td = _get_seller_token_from_request(request)
+    if not td:
+        return JSONResponse({"ok": False, "error": "No seller token provided"}, status_code=401)
     try:
         if financials:
-            return await get_sold_with_financials(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60))
-        return await get_my_sold_list(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60))
+            return await get_sold_with_financials(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60), token_data=td)
+        return await get_my_sold_list(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60), token_data=td)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 

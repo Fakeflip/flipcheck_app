@@ -68,12 +68,165 @@ async function initDiscordRPC() {
   }
 }
 
-// ─── Keytar ──────────────────────────────────────────────────────────────────
+// ─── Auth Token (Keytar + file fallback for macOS) ──────────────────────────
 const SVC = "flipcheck";
 const ACC = "gate_token";
-const getToken = () => keytar.getPassword(SVC, ACC).catch(() => null);
-const saveToken = (t) => keytar.setPassword(SVC, ACC, t).catch(() => {});
-const deleteToken = () => keytar.deletePassword(SVC, ACC).catch(() => {});
+const AUTH_TOKEN_PATH = path.join(app.getPath("userData"), "auth_token.json");
+
+async function getToken() {
+  // Try Keytar first (OS credential store)
+  let t = await keytar.getPassword(SVC, ACC).catch(e => {
+    console.warn("[Auth] Keytar read failed:", e.message);
+    return null;
+  });
+  if (t) return t;
+  // Fallback: file-based (for macOS when Keychain denies access)
+  try {
+    const raw = fs.readFileSync(AUTH_TOKEN_PATH, "utf8");
+    return JSON.parse(raw).token || null;
+  } catch { return null; }
+}
+
+async function saveToken(t) {
+  keytar.setPassword(SVC, ACC, t).catch(e => console.warn("[Auth] Keytar save failed:", e.message));
+  try { fs.writeFileSync(AUTH_TOKEN_PATH, JSON.stringify({ token: t }), "utf8"); } catch {}
+}
+
+async function deleteToken() {
+  keytar.deletePassword(SVC, ACC).catch(() => {});
+  try { fs.unlinkSync(AUTH_TOKEN_PATH); } catch {}
+}
+
+// ─── eBay Seller Token (client-side only, never sent to shared server for storage) ──
+const SELLER_TOKEN_PATH = path.join(app.getPath("userData"), "ebay_seller_token.json");
+
+function loadSellerToken() {
+  try {
+    return JSON.parse(fs.readFileSync(SELLER_TOKEN_PATH, "utf8"));
+  } catch { return null; }
+}
+
+function saveSellerToken(data) {
+  try {
+    fs.writeFileSync(SELLER_TOKEN_PATH, JSON.stringify(data, null, 2), "utf8");
+    console.log("[SellerToken] Saved locally");
+  } catch (e) { console.error("[SellerToken] Save failed:", e.message); }
+}
+
+function deleteSellerToken() {
+  try { fs.unlinkSync(SELLER_TOKEN_PATH); } catch {}
+  console.log("[SellerToken] Deleted");
+}
+
+/** Base64-encode seller token for X-eBay-Seller-Token header */
+function encodeSellerToken(data) {
+  if (!data) return "";
+  return Buffer.from(JSON.stringify(data)).toString("base64");
+}
+
+/**
+ * Make a GET request with both auth + seller token headers.
+ * If response contains updated_token, auto-save it.
+ */
+function sellerApiCall(urlStr, authToken) {
+  const sellerData = loadSellerToken();
+  return new Promise((resolve, reject) => {
+    const url  = new URL(urlStr);
+    const mod  = url.protocol === "https:" ? https : http;
+    const headers = { "Content-Type": "application/json" };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (sellerData) headers["X-eBay-Seller-Token"] = encodeSellerToken(sellerData);
+    const opts = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "GET",
+      headers,
+    };
+    const req = mod.request(opts, res => {
+      let body = "";
+      res.on("data", c => body += c);
+      res.on("end", () => {
+        try {
+          const data = JSON.parse(body);
+          // Auto-save updated token if server refreshed it
+          if (data && data.updated_token) {
+            saveSellerToken(data.updated_token);
+          }
+          resolve({ status: res.statusCode, data });
+        } catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
+
+function sellerApiPost(urlStr, body, authToken) {
+  const sellerData = loadSellerToken();
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const url     = new URL(urlStr);
+    const mod     = url.protocol === "https:" ? https : http;
+    const headers = {
+      "Content-Type":   "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+    };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (sellerData) headers["X-eBay-Seller-Token"] = encodeSellerToken(sellerData);
+    const opts = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "POST",
+      headers,
+    };
+    const req = mod.request(opts, res => {
+      let data = "";
+      res.on("data", c => data += c);
+      res.on("end", () => {
+        try {
+          const parsed = JSON.parse(data);
+          if (parsed && parsed.updated_token) saveSellerToken(parsed.updated_token);
+          resolve({ status: res.statusCode, data: parsed });
+        } catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+function sellerApiDelete(urlStr, authToken) {
+  const sellerData = loadSellerToken();
+  return new Promise((resolve, reject) => {
+    const url  = new URL(urlStr);
+    const mod  = url.protocol === "https:" ? https : http;
+    const headers = { "Content-Type": "application/json" };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (sellerData) headers["X-eBay-Seller-Token"] = encodeSellerToken(sellerData);
+    const req = mod.request({
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "DELETE",
+      headers,
+    }, res => {
+      let body = "";
+      res.on("data", c => body += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", () => resolve({ status: 0, data: null }));
+    req.setTimeout(5000, () => { req.destroy(); resolve({ status: 0, data: null }); });
+    req.end();
+  });
+}
 
 // ─── Inventory Store ─────────────────────────────────────────────────────────
 // SCHEMA_VERSION, VALID_MARKETS, VALID_STATUSES, uid, nowIso, normalizeItem,
@@ -502,7 +655,6 @@ function startBackend(port) {
     env: {
       ...process.env,
       PORT: String(port),
-      EBAY_SELLER_TOKEN_FILE: path.join(app.getPath("userData"), "ebay_seller_token.json"),
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,
@@ -589,6 +741,17 @@ function parseToken(url) {
   } catch { return null; }
 }
 
+// Parse flipcheck://seller-token?t=BASE64 deep link (eBay OAuth callback)
+function parseSellerTokenLink(url) {
+  try {
+    const u = new URL(url);
+    if (u.protocol !== "flipcheck:" || u.hostname !== "seller-token") return null;
+    const t = u.searchParams.get("t");
+    if (!t) return null;
+    return JSON.parse(Buffer.from(t, "base64").toString("utf8"));
+  } catch { return null; }
+}
+
 // Parse flipcheck://check?ean=...&ek=...&market=...&cat=... deep links
 function parseCheckLink(url) {
   try {
@@ -625,6 +788,13 @@ if (!gotLock) {
     if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
     const token = parseToken(deep);
     if (token) { await saveToken(token); if (mainWindow) mainWindow.webContents.send("auth:token", token); return; }
+    // Handle seller token deep link: flipcheck://seller-token?t=BASE64
+    const sellerToken = parseSellerTokenLink(deep);
+    if (sellerToken) {
+      saveSellerToken(sellerToken);
+      if (mainWindow) mainWindow.webContents.send("ebaySellerToken:received", { ok: true });
+      return;
+    }
     const check = parseCheckLink(deep);
     if (check && mainWindow) mainWindow.webContents.send("flipcheck:check", check);
   });
@@ -636,6 +806,12 @@ app.on("open-url", async (e, url) => {
   if (token) {
     await saveToken(token);
     if (mainWindow) { mainWindow.webContents.send("auth:token", token); mainWindow.show(); mainWindow.focus(); }
+    return;
+  }
+  const sellerToken = parseSellerTokenLink(url);
+  if (sellerToken) {
+    saveSellerToken(sellerToken);
+    if (mainWindow) { mainWindow.webContents.send("ebaySellerToken:received", { ok: true }); mainWindow.show(); mainWindow.focus(); }
     return;
   }
   const check = parseCheckLink(url);
@@ -1408,7 +1584,7 @@ ipcMain.handle("repricer:setInterval", (_e, min) => {
 ipcMain.handle("repricer:authUrl", async () => {
   try {
     const base = apiBaseBackend();
-    const res  = await mainApiCall(`${base}/seller/auth/url`, await getToken().catch(() => null));
+    const res  = await sellerApiCall(`${base}/seller/auth/url`, await getToken().catch(() => null));
     return res.data?.url || null;
   } catch { return null; }
 });
@@ -1416,8 +1592,7 @@ ipcMain.handle("repricer:authUrl", async () => {
 ipcMain.handle("repricer:isConnected", async () => {
   try {
     const base = apiBaseBackend();
-    const res  = await mainApiCall(`${base}/seller/auth/status`, await getToken().catch(() => null));
-    // Return full status object so frontend can read is_legacy too
+    const res  = await sellerApiCall(`${base}/seller/auth/status`, await getToken().catch(() => null));
     return res.data || false;
   } catch { return false; }
 });
@@ -1428,54 +1603,34 @@ ipcMain.handle("repricer:runNow", async () => {
 });
 
 ipcMain.handle("repricer:disconnect", async () => {
-  try {
-    const base  = apiBaseBackend();
-    const token = await getToken().catch(() => null);
-    const url   = new URL(`${base}/seller/auth/disconnect`);
-    const mod   = url.protocol === "https:" ? https : http;
-    await new Promise((resolve) => {
-      const req = mod.request({
-        hostname: url.hostname,
-        port:     url.port || (url.protocol === "https:" ? 443 : 80),
-        path:     url.pathname,
-        method:   "DELETE",
-        headers:  { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
-      }, res => { res.resume(); res.on("end", resolve); });
-      req.on("error", resolve); // best-effort
-      req.setTimeout(5000, () => { req.destroy(); resolve(); });
-      req.end();
-    });
-  } catch { /* backend may not be running; best-effort */ }
+  // Token is only stored locally — just delete it
+  deleteSellerToken();
   return { ok: true };
 });
 
 ipcMain.handle("repricer:setLegacyToken", async (_e, token) => {
   try {
-    const base  = apiBaseBackend();
-    const auth  = await getToken().catch(() => null);
-    const res   = await mainApiPost(`${base}/seller/auth/legacy`, { token }, auth);
+    const base = apiBaseBackend();
+    const auth = await getToken().catch(() => null);
+    const res  = await sellerApiPost(`${base}/seller/auth/legacy`, { token }, auth);
+    // Server returns updated seller_token — save locally
+    if (res.data?.seller_token) {
+      saveSellerToken(JSON.parse(Buffer.from(res.data.seller_token, "base64").toString("utf8")));
+    }
     return res.data || { ok: false };
   } catch (e) { return { ok: false, error: String(e) }; }
 });
 
 ipcMain.handle("repricer:removeLegacyToken", async () => {
   try {
-    const base  = apiBaseBackend();
-    const token = await getToken().catch(() => null);
-    const url   = new URL(`${base}/seller/auth/legacy`);
-    const mod   = url.protocol === "https:" ? https : http;
-    await new Promise((resolve) => {
-      const req = mod.request({
-        hostname: url.hostname,
-        port:     url.port || (url.protocol === "https:" ? 443 : 80),
-        path:     url.pathname,
-        method:   "DELETE",
-        headers:  { "Content-Type": "application/json", ...(token ? { "Authorization": `Bearer ${token}` } : {}) },
-      }, res => { res.resume(); res.on("end", resolve); });
-      req.on("error", resolve);
-      req.setTimeout(5000, () => { req.destroy(); resolve(); });
-      req.end();
-    });
+    const base = apiBaseBackend();
+    const auth = await getToken().catch(() => null);
+    const res  = await sellerApiDelete(`${base}/seller/auth/legacy`, auth);
+    if (res.data?.seller_token) {
+      saveSellerToken(JSON.parse(Buffer.from(res.data.seller_token, "base64").toString("utf8")));
+    } else if (res.data?.seller_token === null) {
+      deleteSellerToken();
+    }
   } catch { /* best-effort */ }
   return { ok: true };
 });
@@ -1497,7 +1652,7 @@ ipcMain.handle("repricer:syncListings", async () => {
     let allListings = [];
     let page = 1;
     while (true) {
-      const res = await mainApiCall(`${base}/seller/listings/active?page=${page}&per_page=100`, token);
+      const res = await sellerApiCall(`${base}/seller/listings/active?page=${page}&per_page=100`, token);
       if (res.status !== 200 || !res.data?.ok) break;
       const listings = res.data.items || [];
       allListings = allListings.concat(listings);
@@ -1615,7 +1770,7 @@ async function runRepricerMonitor() {
     if (!body.length) { console.log("[Repricer] No items with EK+VK set."); return; }
 
     // POST /repricer/update
-    const res = await mainApiPost(`${base}/repricer/update`, body, token);
+    const res = await sellerApiPost(`${base}/repricer/update`, body, token);
     if (res.status !== 200 || !res.data?.ok) {
       console.error("[Repricer] API error:", res.status, JSON.stringify(res.data)?.slice(0, 200));
       return;
@@ -1769,8 +1924,8 @@ async function runEbaySyncCycle() {
     const token = await getToken().catch(() => null);
     const base  = apiBaseBackend();
 
-    // 1. Check connection
-    const statusRes = await mainApiCall(`${base}/seller/auth/status`, token);
+    // 1. Check connection (uses seller token from local file)
+    const statusRes = await sellerApiCall(`${base}/seller/auth/status`, token);
     if (!statusRes.data) {
       console.log("[EbaySync] Backend unreachable.");
       return { ok: false, reason: "backend_unavailable" };
@@ -1781,7 +1936,7 @@ async function runEbaySyncCycle() {
     const allActive = [];
     let page = 1;
     while (true) {
-      const res = await mainApiCall(`${base}/seller/listings/active?page=${page}&per_page=200`, token);
+      const res = await sellerApiCall(`${base}/seller/listings/active?page=${page}&per_page=200`, token);
       if (!res.data?.ok) break;
       allActive.push(...(res.data.items || []));
       if (page >= (res.data.total_pages || 1)) break;
@@ -1796,7 +1951,7 @@ async function runEbaySyncCycle() {
     const allSold = [];
     page = 1;
     while (true) {
-      const res = await mainApiCall(`${base}/seller/listings/sold?page=${page}&per_page=200&days=${daysSince}`, token);
+      const res = await sellerApiCall(`${base}/seller/listings/sold?page=${page}&per_page=200&days=${daysSince}`, token);
       if (!res.data?.ok) break;
       allSold.push(...(res.data.items || []));
       if (page >= (res.data.total_pages || 1)) break;
@@ -2039,7 +2194,7 @@ ipcMain.handle("ebaySync:status", async () => {
   const token    = await getToken().catch(() => null);
   let connected  = false;
   try {
-    const res = await mainApiCall(`${base}/seller/auth/status`, token);
+    const res = await sellerApiCall(`${base}/seller/auth/status`, token);
     connected = !!res.data?.connected;
   } catch {}
   return {

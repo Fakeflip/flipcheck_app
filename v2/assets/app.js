@@ -874,6 +874,28 @@ async function initApp() {
   updateBackendStatus();
   App._statusInterval = /** @type {number} */ (/** @type {unknown} */ (setInterval(updateBackendStatus, 15000)));
 
+  // Populate topbar user pill with username
+  try {
+    const meRes = await API.call("/auth/me");
+    const name = meRes.ok && meRes.data ? (meRes.data.username || meRes.data.discord_username || "") : "";
+    if (name) {
+      const pill = document.getElementById("userPill");
+      const text = document.getElementById("userPillText");
+      if (pill && text) { text.textContent = name; pill.style.display = ""; }
+    }
+  } catch {
+    // JWT fallback
+    try {
+      const claims = JSON.parse(atob((App.token || "").split(".")[1]));
+      const name = claims.discord_username || claims.sub || "";
+      if (name) {
+        const pill = document.getElementById("userPill");
+        const text = document.getElementById("userPillText");
+        if (pill && text) { text.textContent = name; pill.style.display = ""; }
+      }
+    } catch {}
+  }
+
   // Start price alert background timer (every 15 minutes) — store ID for cleanup
   if (typeof runAlertChecks === "function") {
     // Initial check after 30s (give backend time to start)

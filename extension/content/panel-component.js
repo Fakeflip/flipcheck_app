@@ -838,6 +838,7 @@
                   <div class="fc-det-cell"><span class="fc-det-v" id="daBoxAvg30">—</span><span class="fc-det-l">Ø Buy Box 30T</span></div>
                   <div class="fc-det-cell"><span class="fc-det-v" id="daRefFee">—</span><span class="fc-det-l">Referral Fee</span></div>
                   <div class="fc-det-cell"><span class="fc-det-v" id="daFbaFee">—</span><span class="fc-det-l">FBA Fee</span></div>
+                  <div class="fc-det-cell"><span class="fc-det-v" id="daClosingFee">—</span><span class="fc-det-l">Closing Fee</span></div>
                   <div class="fc-det-cell"><span class="fc-det-v" id="daPrepFee">—</span><span class="fc-det-l">PREP Gebühr</span></div>
                   <div class="fc-det-cell"><span class="fc-det-v" id="daOffers">—</span><span class="fc-det-l">Angebote (neu)</span></div>
                   <div class="fc-det-cell"><span class="fc-det-v" id="daRank">—</span><span class="fc-det-l">Sales Rank</span></div>
@@ -1097,6 +1098,11 @@
           this._fetchResult();
         }
       }
+    }
+
+    setAmzCategory(catId) {
+      if (!catId) return;
+      this._defaults.amzCategory = catId;
     }
 
     autofillEk(price) {
@@ -1653,7 +1659,21 @@
         s.getElementById('daBoxAvg30').textContent  = fmt(d.buy_box_avg30);
         const refPct = d.referral_pct != null ? `${Number(d.referral_pct).toFixed(0)}%` : '';
         s.getElementById('daRefFee').textContent    = refPct ? `${refPct} (${fmt(d.referral_fee)})` : fmt(d.referral_fee);
-        s.getElementById('daFbaFee').textContent    = fmt(d.fba_fee);
+        // FBA fee — show tier label if weight data available
+        const wKg = d.signals?.weight_kg;
+        if (wKg && typeof fcGetFbaTier === 'function') {
+          const tier = fcGetFbaTier(wKg, 20);
+          s.getElementById('daFbaFee').textContent = `${fmt(d.fba_fee)} (${tier.label})`;
+        } else {
+          s.getElementById('daFbaFee').textContent = fmt(d.fba_fee);
+        }
+        // Closing fee (media categories)
+        const closingCats = typeof AMAZON_CLOSING_CATS !== 'undefined' ? AMAZON_CLOSING_CATS : ['buecher'];
+        const closingEl = s.getElementById('daClosingFee');
+        if (closingEl) {
+          const cat = this._defaults?.amzCategory || 'sonstiges';
+          closingEl.textContent = closingCats.includes(cat) ? fmt(typeof AMAZON_CLOSING_FEE !== 'undefined' ? AMAZON_CLOSING_FEE : 1.01) : '—';
+        }
         const prepFeeEl = s.getElementById('daPrepFee');
         if (prepFeeEl) prepFeeEl.textContent = d.prep_fee > 0 ? fmt(d.prep_fee) : '—';
         s.getElementById('daOffers').textContent    = d.fba_count != null
@@ -1757,17 +1777,63 @@
 
     _recalcAmazon() {
       if (!this._result || this._market !== 'amazon') return;
-      const s        = this._shadow;
-      const shipIn   = parseFloat(s.getElementById('daShipIn').value) || 0;
-      const d        = this._result;
-      const vk       = Number(d.buy_box || d.sell_price_median) || 0;
-      const ref      = Number(d.referral_fee) || 0;
-      const fba      = this._amazonMethod === 'fba' ? (Number(d.fba_fee) || 0) : shipIn;
-      const lager    = this._calcStorageFee();
-      const profit   = vk - ref - fba - lager - this._lastEk;
-      const margin   = vk > 0 ? (profit / vk) * 100 : 0;
-      s.getElementById('fcVerdictProfit').textContent = `€${profit.toFixed(2)}`;
-      s.getElementById('fcMbarPct').textContent = `${margin.toFixed(1)}%`;
+      const s   = this._shadow;
+      const d   = this._result;
+      const vk  = Number(d.buy_box || d.sell_price_median) || 0;
+
+      // Read user-adjustable inputs
+      const shipIn     = parseFloat(s.getElementById('daShipIn').value) || 0;
+      const storageMon = parseFloat(s.getElementById('daLagermonate')?.value) || 0;
+      const sizeCat    = s.getElementById('daSizeCategory')?.value || 'standard';
+      const method     = this._amazonMethod || 'fba';
+
+      // Weight & category from API signals
+      const weightKg   = d.signals?.weight_kg || 0.5;
+      const longestCm  = 20; // Keepa doesn't always provide dimensions
+      const category   = this._defaults?.amzCategory || 'sonstiges';
+      const prepFee    = Number(d.prep_fee) || 0;
+
+      // Use the full Revenue Calculator style profit calc
+      if (typeof fcCalcAmazonProfit === 'function') {
+        const calc = fcCalcAmazonProfit({
+          sellPrice:  vk,
+          ek:         this._lastEk,
+          category,
+          method,
+          shipIn,
+          fbaFee:     method === 'fba' ? (Number(d.fba_fee) || null) : null,
+          weightKg,
+          longestCm,
+          prepFee,
+          storageMon,
+          sizeCat,
+          vatMode:  'no_vat',  // extension doesn't track VAT yet
+          ekMode:   'gross',
+        });
+
+        s.getElementById('fcVerdictProfit').textContent = `€${calc.profit.toFixed(2)}`;
+        s.getElementById('fcMbarPct').textContent = `${calc.marginPct.toFixed(1)}%`;
+
+        // Update detail cells with recalculated values
+        const fmt = v => v != null && isFinite(v) ? `€${Number(v).toFixed(2)}` : '—';
+        const refEl = s.getElementById('daRefFee');
+        if (refEl) refEl.textContent = `${calc.referralPct}% (${fmt(calc.referralFeeGross)})`;
+        const fbaEl = s.getElementById('daFbaFee');
+        if (fbaEl) fbaEl.textContent = calc.fbaTierLabel ? `${fmt(calc.fbaFeeGross)} (${calc.fbaTierLabel})` : fmt(calc.fbaFeeGross);
+        const closingEl = s.getElementById('daClosingFee');
+        if (closingEl) closingEl.textContent = calc.closingFee > 0 ? fmt(calc.closingFee) : '—';
+        const lagerEl = s.getElementById('daLagerFeeDisplay');
+        if (lagerEl) lagerEl.textContent = calc.storageFee > 0 ? `-${fmt(calc.storageFee)}` : '—';
+      } else {
+        // Fallback: simple calculation
+        const ref    = Number(d.referral_fee) || 0;
+        const fba    = method === 'fba' ? (Number(d.fba_fee) || 0) : shipIn;
+        const lager  = this._calcStorageFee();
+        const profit = vk - ref - fba - lager - this._lastEk;
+        const margin = vk > 0 ? (profit / vk) * 100 : 0;
+        s.getElementById('fcVerdictProfit').textContent = `€${profit.toFixed(2)}`;
+        s.getElementById('fcMbarPct').textContent = `${margin.toFixed(1)}%`;
+      }
     }
 
     // ── Chart ────────────────────────────────────────────────────────────────
@@ -1885,10 +1951,12 @@
 
       const dpr  = window.devicePixelRatio || 1;
       const wrap = canvas.parentElement;
-      const W    = (wrap?.clientWidth  || 0) || 296;
-      const H    = (wrap?.clientHeight || 0) || 158;
+      const W    = Math.max(wrap?.clientWidth  || 0, 240) || 296;
+      const H    = Math.max(wrap?.clientHeight || 0, 100) || 158;
       canvas.width  = W * dpr;
       canvas.height = H * dpr;
+      canvas.style.width  = W + 'px';
+      canvas.style.height = H + 'px';
       const ctx = canvas.getContext('2d');
       ctx.scale(dpr, dpr);
       ctx.clearRect(0, 0, W, H);
@@ -1907,15 +1975,12 @@
       const priceH = ch - (VOL_H > 0 ? VOL_H + 4 : 0);  // price chart height
 
       const prices = pts.map(p => p.price);
-      const minP   = Math.min(...prices);
       const maxP   = Math.max(...prices);
-      const range  = maxP - minP || 1;
 
-      // Add 5% padding to price range so line doesn't touch edges
-      const pricePad = range * 0.05;
-      const dispMin  = minP - pricePad;
-      const dispMax  = maxP + pricePad;
-      const dispRange = dispMax - dispMin || 1;
+      // Y-axis always starts at 0 for clean, non-compressed look
+      const dispMin  = 0;
+      const dispMax  = maxP * 1.08;  // 8% headroom above max price
+      const dispRange = dispMax || 1;
 
       // X-axis anchored to the selected time window (not data range)
       // → 30d/90d/365d are visually distinct even with sparse data
@@ -1988,6 +2053,7 @@
       ctx.restore();
 
       // ── Min / Max dots ───────────────────────────────────────────────────
+      const minP   = Math.min(...prices);
       const minIdx = prices.indexOf(minP);
       const maxIdx = prices.indexOf(maxP);
       [[minIdx, minP, '#EF4444'], [maxIdx, maxP, '#22C55E']].forEach(([idx, p, col]) => {

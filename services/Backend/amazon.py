@@ -913,6 +913,9 @@ async def amazon_check(
         # Product signals
         "signals":           signals,
 
+        # Category info (for auto-detect on frontend)
+        "category_name":     " > ".join((n.get("name") or "") for n in (product.get("categoryTree") or []) if n.get("name")),
+
         # Setup echo
         "method":            method,
         "ship_in":           ship_in,

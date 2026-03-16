@@ -6,7 +6,8 @@ Trading API used for ReviseFixedPriceItem (works for ALL listings, not just
 Inventory API listings). GetMyeBaySelling fetches all active listings for
 auto-matching inventory items by EAN.
 
-Token stored in ebay_seller_token.json in userData dir.
+Token is NEVER stored on the server — it is stored client-side (Electron userData)
+and passed per-request via X-eBay-Seller-Token header.
 """
 from __future__ import annotations
 
@@ -52,8 +53,26 @@ SELL_SCOPES = " ".join([
 
 EBAY_FINANCES_BASE = "https://apiz.ebay.com/sell/finances/v1"
 
-TOKEN_FILE   = Path(os.getenv("EBAY_SELLER_TOKEN_FILE", BASE_DIR / "ebay_seller_token.json"))
-_token_cache: Optional[Dict] = None
+# ── Token parsing (from client-provided header) ──────────────────────────────
+
+def parse_seller_token(raw: str) -> Optional[Dict]:
+    """Decode a base64-encoded JSON seller token from the X-eBay-Seller-Token header."""
+    if not raw:
+        return None
+    try:
+        decoded = base64.b64decode(raw).decode("utf-8")
+        return json.loads(decoded)
+    except Exception:
+        # Maybe it's raw JSON (not base64)?
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
+
+
+def encode_seller_token(data: Dict) -> str:
+    """Encode a seller token dict to base64 for the client to store."""
+    return base64.b64encode(json.dumps(data).encode("utf-8")).decode("ascii")
 
 
 # ── OAuth Helpers ─────────────────────────────────────────────────────────────
@@ -75,6 +94,7 @@ def _basic_auth() -> str:
 
 
 async def seller_token_exchange(code: str) -> Dict:
+    """Exchange authorization code for access token. Returns token data for client to store."""
     async with httpx.AsyncClient() as client:
         resp = await client.post(
             EBAY_TOKEN_URL,
@@ -93,34 +113,16 @@ async def seller_token_exchange(code: str) -> Dict:
         raise RuntimeError(f"eBay token exchange failed: {resp.status_code} {resp.text}")
     data = resp.json()
     data["obtained_at"] = int(time.time())
-    _save_token(data)
-    return {"ok": True, "expires_in": data.get("expires_in", 7200)}
+    # Return token to client — server does NOT store it
+    return {
+        "ok": True,
+        "expires_in": data.get("expires_in", 7200),
+        "seller_token": encode_seller_token(data),
+    }
 
 
-def _save_token(data: Dict) -> None:
-    global _token_cache
-    _token_cache = data
-    try:
-        TOKEN_FILE.parent.mkdir(parents=True, exist_ok=True)
-        TOKEN_FILE.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    except Exception as e:
-        logger.warning(f"Could not save seller token: {e}")
-
-
-def _load_token() -> Optional[Dict]:
-    global _token_cache
-    if _token_cache:
-        return _token_cache
-    try:
-        if TOKEN_FILE.exists():
-            _token_cache = json.loads(TOKEN_FILE.read_text(encoding="utf-8"))
-            return _token_cache
-    except Exception:
-        pass
-    return None
-
-
-async def _refresh_access_token(token_data: Dict) -> str:
+async def _refresh_access_token(token_data: Dict) -> tuple:
+    """Refresh an expired access token. Returns (access_token, updated_token_data)."""
     refresh_token = token_data.get("refresh_token")
     if not refresh_token:
         raise RuntimeError("No refresh_token — user must re-authorize")
@@ -143,73 +145,68 @@ async def _refresh_access_token(token_data: Dict) -> str:
     data = resp.json()
     data["refresh_token"] = refresh_token
     data["obtained_at"]   = int(time.time())
-    _save_token(data)
-    return data["access_token"]
+    # Preserve legacy token if present
+    if token_data.get("legacy_token"):
+        data["legacy_token"] = token_data["legacy_token"]
+    return data["access_token"], data
 
 
-async def get_seller_token() -> str:
-    """Return a valid access_token, refreshing automatically if needed."""
-    data = _load_token()
-    if not data:
-        raise RuntimeError("No eBay seller token — authorize via /seller/auth/url")
-    obtained   = data.get("obtained_at", 0)
-    expires_in = data.get("expires_in",  7200)
-    if (time.time() - obtained) >= (expires_in - 300):
-        return await _refresh_access_token(data)
-    return data["access_token"]
-
-
-def is_connected() -> bool:
-    data = _load_token()
-    if not data:
-        return False
-    return bool(data.get("legacy_token")) or bool(data.get("access_token"))
-
-
-def is_legacy_mode() -> bool:
-    """True if a legacy Auth'n'Auth token is configured (team access)."""
-    data = _load_token()
-    return bool(data and data.get("legacy_token"))
-
-
-def save_legacy_token(token: str) -> None:
-    """Store a legacy eBay Auth'n'Auth token (for team/sub-account access)."""
-    global _token_cache
-    data = _load_token() or {}
-    data["legacy_token"] = token.strip()
-    _save_token(data)
-
-
-def remove_legacy_token() -> None:
-    """Remove the legacy token. Falls back to OAuth if an access_token still exists."""
-    global _token_cache
-    data = _load_token()
-    if not data:
-        return
-    data.pop("legacy_token", None)
-    _token_cache = data
-    if data.get("access_token"):
-        _save_token(data)
-    else:
-        try:
-            TOKEN_FILE.unlink(missing_ok=True)
-        except Exception:
-            pass
-        _token_cache = None
-
-
-async def get_token_for_trading() -> tuple:
+async def get_seller_token(token_data: Dict) -> tuple:
     """
-    Returns (token: str, is_legacy: bool).
+    Return (access_token, updated_token_data_or_None).
+    If token was refreshed, updated_token_data is the new dict the client should store.
+    """
+    if not token_data:
+        raise RuntimeError("No eBay seller token — authorize via /seller/auth/url")
+    obtained   = token_data.get("obtained_at", 0)
+    expires_in = token_data.get("expires_in",  7200)
+    if (time.time() - obtained) >= (expires_in - 300):
+        access_token, new_data = await _refresh_access_token(token_data)
+        return access_token, new_data
+    return token_data["access_token"], None
+
+
+def is_connected(token_data: Optional[Dict]) -> bool:
+    if not token_data:
+        return False
+    return bool(token_data.get("legacy_token")) or bool(token_data.get("access_token"))
+
+
+def is_legacy_mode(token_data: Optional[Dict]) -> bool:
+    """True if a legacy Auth'n'Auth token is configured (team access)."""
+    return bool(token_data and token_data.get("legacy_token"))
+
+
+def add_legacy_token(token_data: Optional[Dict], legacy_token: str) -> Dict:
+    """Return updated token_data with legacy token added."""
+    data = dict(token_data or {})
+    data["legacy_token"] = legacy_token.strip()
+    return data
+
+
+def remove_legacy_token(token_data: Optional[Dict]) -> Optional[Dict]:
+    """Return updated token_data with legacy token removed. Returns None if no data remains."""
+    if not token_data:
+        return None
+    data = dict(token_data)
+    data.pop("legacy_token", None)
+    if data.get("access_token"):
+        return data
+    return None
+
+
+async def get_token_for_trading(token_data: Dict) -> tuple:
+    """
+    Returns (token: str, is_legacy: bool, updated_token_data_or_None).
     Prefers legacy Auth'n'Auth token (team access) over OAuth.
     """
-    data = _load_token()
-    if not data:
+    if not token_data:
         raise RuntimeError("No eBay seller token — authorize via /seller/auth/url")
-    legacy = data.get("legacy_token")
+    legacy = token_data.get("legacy_token")
     if legacy:
-        return legacy, True
-    return await get_seller_token(), False
+        return legacy, True, None
+    access_token, new_data = await get_seller_token(token_data)
+    return access_token, False, new_data
 
 
 # ── Trading API helpers ───────────────────────────────────────────────────────
@@ -285,13 +282,13 @@ async def revise_fixed_price_item(item_id: str, new_price: float, token: str, le
     return {"ok": False, "item_id": item_id, "error": error_msg}
 
 
-async def bulk_revise_prices(updates: List[Dict]) -> Dict:
+async def bulk_revise_prices(updates: List[Dict], token_data: Dict = None) -> Dict:
     """
     Batch price updates via ReviseFixedPriceItem (no limit per call — sequential).
     updates: [{"item_id": "...", "new_price": 19.99}, ...]
-    Returns: {"success": [...item_ids], "failed": [{item_id, error}]}
+    Returns: {"success": [...item_ids], "failed": [{item_id, error}], "updated_token": ...}
     """
-    token, is_legacy = await get_token_for_trading()
+    token, is_legacy, updated = await get_token_for_trading(token_data)
     success: List[str]  = []
     failed:  List[Dict] = []
 
@@ -325,13 +322,13 @@ def _extract_ean_from_text(text: str) -> Optional[str]:
     return None
 
 
-async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60) -> Dict:
+async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60, token_data: Dict = None) -> Dict:
     """
     Fetch seller's recently sold items via Trading API GetMyeBaySelling → SoldList.
     Returns list of {item_id, title, ean_guess, quantity_sold, total_price, transaction_date, buyer}.
     No additional OAuth scopes needed — works with sell.inventory + sell.account.
     """
-    token, is_legacy = await get_token_for_trading()
+    token, is_legacy, _updated = await get_token_for_trading(token_data)
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <SoldList>
@@ -439,12 +436,12 @@ async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60) -
     }
 
 
-async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
+async def get_my_active_listings(page: int = 1, per_page: int = 100, token_data: Dict = None) -> Dict:
     """
     Fetch seller's active fixed-price listings via Trading API GetMyeBaySelling.
     Returns list of {item_id, title, price, ean_guess, url}.
     """
-    token, is_legacy = await get_token_for_trading()
+    token, is_legacy, _updated = await get_token_for_trading(token_data)
     xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
 <GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
   <ActiveList>
@@ -544,7 +541,7 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
 
 # ── Finances API — real fees & shipping costs per order ──────────────────────
 
-async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
+async def get_order_financials(order_ids: List[str], token_data: Dict = None) -> Dict[str, Dict]:
     """
     Fetch real eBay fees + shipping costs for a list of order IDs using the
     Finances API (sell.finances scope required).
@@ -566,13 +563,12 @@ async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
         return {}
 
     # We need an OAuth2 token (not legacy) for RESTful Finances API
-    data = _load_token()
-    if not data or data.get("legacy_token") and not data.get("access_token"):
+    if not token_data or (token_data.get("legacy_token") and not token_data.get("access_token")):
         logger.warning("[Finances] No OAuth2 token available (legacy-only) — skipping")
         return {}
 
     try:
-        token = await get_seller_token()
+        token, _updated = await get_seller_token(token_data)
     except Exception as e:
         logger.warning(f"[Finances] Token error: {e}")
         return {}
@@ -671,12 +667,12 @@ async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
     return results
 
 
-async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int = 60) -> Dict:
+async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int = 60, token_data: Dict = None) -> Dict:
     """
     Convenience: fetch sold list + enrich with real fee data from Finances API.
     Falls back gracefully if Finances API is unavailable (missing scope).
     """
-    sold_result = await get_my_sold_list(page=page, per_page=per_page, days=days)
+    sold_result = await get_my_sold_list(page=page, per_page=per_page, days=days, token_data=token_data)
     if not sold_result.get("ok") or not sold_result.get("items"):
         return sold_result
 
@@ -690,7 +686,7 @@ async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int
         return sold_result
 
     try:
-        financials = await get_order_financials(order_ids)
+        financials = await get_order_financials(order_ids, token_data=token_data)
     except Exception as e:
         logger.warning(f"[Finances] Bulk lookup failed: {e}")
         financials = {}

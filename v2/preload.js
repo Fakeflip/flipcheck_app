@@ -358,4 +358,6 @@ contextBridge.exposeInMainWorld("fc", {
   onEbaySyncCompleted: (cb) => ipcRenderer.on("ebaySync:completed", (_e, stats) => cb(stats)),
   /** Listen for sync errors. @param {(info: {error: string}) => void} cb */
   onEbaySyncError:     (cb) => ipcRenderer.on("ebaySync:error", (_e, info) => cb(info)),
+  /** Listen for eBay seller token received (after OAuth deep link). @param {(info: object) => void} cb */
+  onEbaySellerTokenReceived: (cb) => ipcRenderer.on("ebaySellerToken:received", (_e, info) => cb(info)),
 });

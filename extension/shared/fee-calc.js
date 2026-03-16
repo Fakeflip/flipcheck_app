@@ -88,7 +88,7 @@ function fcBuildCatOptions(selectedId) {
   ).join('');
 }
 
-// ── Amazon Fee Calculator ─────────────────────────────────────────────────────
+// ── Amazon Fee Calculator (Revenue Calculator Style) ──────────────────────────
 
 /**
  * Get FBA fee for given weight/dimensions.
@@ -105,24 +105,109 @@ function fcGetFbaTier(weightKg = 0.5, longestCm = 20) {
 }
 
 /**
- * Calculate Amazon profit.
+ * Full Amazon profit calculator — mirrors Amazon Revenue Calculator.
+ *
+ * Fee components:
+ * 1. Referral Fee  — % of sell price (category-dependent), min €0.30
+ * 2. FBA Fee       — weight/size-based fulfillment fee (or from API)
+ * 3. Closing Fee   — €1.01 for media categories (Bücher, DVD, Musik, Software, Games)
+ * 4. Storage Fee   — monthly per-unit rate × months (optional)
+ * 5. Prep Fee      — optional prep/labeling cost per unit
+ *
+ * Profit = sellPrice - referralFee - fbaFee - closingFee - storageFee - prepFee - shipIn - ek
+ *
+ * When vatMode is "ust_19", all values are converted to net (÷1.19).
+ *
  * @param {object} p
- * @param {number} p.sellPrice    - Amazon sell price (Buy Box or similar)
- * @param {number} p.ek           - Purchase price (EK)
- * @param {string} p.category     - Category ID for referral fee lookup
- * @param {string} p.method       - "fba" or "fbm"
- * @param {number} p.shipIn       - Inbound shipping cost
- * @param {number} p.fbaFee       - FBA fulfillment fee (from API or tier)
- * @returns {{ referralFee, fbaFee, totalFees, profit, marginPct }}
+ * @param {number} p.sellPrice       - Amazon sell price (Buy Box, gross)
+ * @param {number} p.ek              - Purchase price
+ * @param {string} [p.category]      - Category ID for referral fee lookup
+ * @param {string} [p.method]        - "fba" or "fbm"
+ * @param {number} [p.shipIn]        - Inbound shipping / FBM outbound cost
+ * @param {number} [p.fbaFee]        - FBA fulfillment fee (from API or null to auto-calc)
+ * @param {number} [p.weightKg]      - Product weight in kg (for tier calc)
+ * @param {number} [p.longestCm]     - Longest side in cm (for tier calc)
+ * @param {number} [p.prepFee]       - Prep/labeling fee per unit
+ * @param {number} [p.storageMon]    - Months of FBA storage
+ * @param {string} [p.sizeCat]       - Size category for storage ("klein"|"standard"|"uebergross")
+ * @param {string} [p.vatMode]       - "no_vat" | "ust_19"
+ * @param {string} [p.ekMode]        - "gross" | "net"
+ * @returns {object} Full fee breakdown
  */
-function fcCalcAmazonProfit({ sellPrice, ek, category = 'sonstiges', method = 'fba', shipIn = 4.99, fbaFee = 3.40 }) {
-  const refPct     = (typeof AMAZON_REFERRAL_PCTS !== 'undefined' ? AMAZON_REFERRAL_PCTS[category] : null) || 0.15;
-  // Amazon minimum referral fee: €0.30 per unit
-  const referralFee = +Math.max(0.30, sellPrice * refPct).toFixed(2);
-  const fulfillment = method === 'fba' ? fbaFee : 0;
-  const shipOut     = method === 'fbm' ? shipIn : 0;
-  const totalFees   = +(referralFee + fulfillment + shipOut).toFixed(2);
-  const profit      = +(sellPrice - totalFees - ek - shipIn).toFixed(2);
-  const marginPct   = sellPrice > 0 ? +((profit / sellPrice) * 100).toFixed(1) : 0;
-  return { referralFee, fbaFee: fulfillment, totalFees, profit, marginPct, referralPct: +(refPct * 100).toFixed(1) };
+function fcCalcAmazonProfit({
+  sellPrice, ek,
+  category = 'sonstiges', method = 'fba',
+  shipIn = 0, fbaFee = null,
+  weightKg = 0.5, longestCm = 20,
+  prepFee = 0, storageMon = 0, sizeCat = 'standard',
+  vatMode = 'no_vat', ekMode = 'gross',
+}) {
+  const vat = vatMode === 'ust_19' ? 1.19 : 1.0;
+
+  // 1. Referral Fee (% of gross sell price, min €0.30)
+  const refPct = (typeof AMAZON_REFERRAL_PCTS !== 'undefined' ? AMAZON_REFERRAL_PCTS[category] : null) || 0.15;
+  const referralFeeGross = +Math.max(0.30, sellPrice * refPct).toFixed(2);
+
+  // 2. FBA Fee — use API value if provided, otherwise calculate from weight/size
+  let fbaFeeGross = 0;
+  let fbaTierLabel = '';
+  if (method === 'fba') {
+    if (fbaFee != null && fbaFee > 0) {
+      fbaFeeGross = fbaFee;
+      // Reverse-lookup tier label
+      const t = fcGetFbaTier(weightKg, longestCm);
+      fbaTierLabel = t.label;
+    } else {
+      const t = fcGetFbaTier(weightKg, longestCm);
+      fbaFeeGross = t.fee;
+      fbaTierLabel = t.label;
+    }
+  }
+
+  // 3. Closing Fee — media categories only
+  const closingCats = typeof AMAZON_CLOSING_CATS !== 'undefined' ? AMAZON_CLOSING_CATS : ['buecher'];
+  const closingFeeAmt = typeof AMAZON_CLOSING_FEE !== 'undefined' ? AMAZON_CLOSING_FEE : 1.01;
+  const closingFee = closingCats.includes(category) ? closingFeeAmt : 0;
+
+  // 4. Storage Fee
+  let storageFee = 0;
+  if (storageMon > 0 && method === 'fba') {
+    const rates = typeof FBA_STORAGE_RATES !== 'undefined' ? FBA_STORAGE_RATES : { standard: { normal: 0.51, q4: 1.21 } };
+    const isQ4 = new Date().getMonth() >= 9;
+    const catRates = rates[sizeCat] || rates.standard;
+    storageFee = +(catRates[isQ4 ? 'q4' : 'normal'] * storageMon).toFixed(2);
+  }
+
+  // 5. FBM: no FBA fee, but ship_in is outbound shipping
+  const shipOut = method === 'fbm' ? shipIn : 0;
+  const shipInCost = method === 'fba' ? shipIn : 0;
+
+  // Netto conversion
+  const sellNet      = +(sellPrice / vat).toFixed(2);
+  const referralNet  = +(referralFeeGross / vat).toFixed(2);
+  const fbaNet       = +(fbaFeeGross / vat).toFixed(2);
+  const closingNet   = +(closingFee / vat).toFixed(2);
+  const storageNet   = +(storageFee / vat).toFixed(2);
+  const prepNet      = +(prepFee / vat).toFixed(2);
+  const shipInNet    = +(shipInCost / vat).toFixed(2);
+  const shipOutNet   = +(shipOut / vat).toFixed(2);
+  const ekNet        = (vatMode === 'ust_19' && ekMode === 'gross') ? +(ek / vat).toFixed(2) : ek;
+
+  const totalFees    = +(referralNet + fbaNet + closingNet + storageNet + prepNet + shipInNet + shipOutNet).toFixed(2);
+  const profit       = +(sellNet - totalFees - ekNet).toFixed(2);
+  const marginPct    = sellPrice > 0 ? +((profit / sellNet) * 100).toFixed(1) : 0;
+  const roiPct       = ekNet > 0 ? +((profit / ekNet) * 100).toFixed(1) : 0;
+
+  return {
+    // Gross values (for display)
+    referralFeeGross, fbaFeeGross, closingFee, storageFee, prepFee: prepFee,
+    // Net values (for calculation)
+    sellNet, referralFee: referralNet, fbaFee: fbaNet, closingFeeNet: closingNet,
+    storageFeeNet: storageNet, prepFeeNet: prepNet, shipInNet, shipOutNet, ekNet,
+    totalFees, profit, marginPct, roiPct,
+    // Meta
+    referralPct: +(refPct * 100).toFixed(1),
+    fbaTierLabel,
+    method,
+  };
 }

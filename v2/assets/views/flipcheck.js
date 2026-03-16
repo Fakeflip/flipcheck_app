@@ -96,26 +96,58 @@ const FlipcheckView = (() => {
     return cats.map(([v, l]) => `<option value="${v}"${v === sel ? " selected" : ""}>${esc(l)}</option>`).join("");
   }
 
-  // ─── FBA tier table (DE, 2024) ────────────────────────────────────────────
+  // ─── FBA tier table (DE, 2025 + DE-Aufschlag €0.26) ──────────────────────
+  const DE_FBA_SURCHARGE = 0.26;
   const FBA_TIERS = [
-    { label: "Klein Standard",   maxW: 0.20, maxSide: 20, fee: 2.70 },
-    { label: "Klein Standard+",  maxW: 0.40, maxSide: 30, fee: 3.00 },
-    { label: "Standard 1",       maxW: 0.90, maxSide: 33, fee: 3.40 },
-    { label: "Standard 2",       maxW: 1.50, maxSide: 33, fee: 3.80 },
-    { label: "Groß 1",           maxW: 3.00, maxSide: 45, fee: 4.70 },
-    { label: "Groß 2",           maxW: 5.00, maxSide: 61, fee: 5.40 },
-    { label: "Groß 3",           maxW: 9.00, maxSide: 61, fee: 6.50 },
-    { label: "Groß 4",           maxW:15.00, maxSide: 74, fee: 8.10 },
-    { label: "Schwer/Sperrig",   maxW: null, maxSide: null,fee:9.80 },
+    { label: "Klein Standard",   maxW: 0.20, maxSide: 20, fee: 2.70 + DE_FBA_SURCHARGE },
+    { label: "Klein Standard+",  maxW: 0.40, maxSide: 30, fee: 3.00 + DE_FBA_SURCHARGE },
+    { label: "Standard 1",       maxW: 0.90, maxSide: 33, fee: 3.40 + DE_FBA_SURCHARGE },
+    { label: "Standard 2",       maxW: 1.50, maxSide: 33, fee: 3.80 + DE_FBA_SURCHARGE },
+    { label: "Groß 1",           maxW: 3.00, maxSide: 45, fee: 4.70 + DE_FBA_SURCHARGE },
+    { label: "Groß 2",           maxW: 5.00, maxSide: 61, fee: 5.40 + DE_FBA_SURCHARGE },
+    { label: "Groß 3",           maxW: 9.00, maxSide: 61, fee: 6.50 + DE_FBA_SURCHARGE },
+    { label: "Groß 4",           maxW:15.00, maxSide: 74, fee: 8.10 + DE_FBA_SURCHARGE },
+    { label: "Schwer/Sperrig",   maxW: null, maxSide: null,fee:9.80 + DE_FBA_SURCHARGE },
   ];
 
   const AMZ_REFERRAL_FEES = {
-    computer_tablets: 0.07, handys: 0.07, konsolen: 0.08,
-    foto_camcorder: 0.07,   tv_video_audio: 0.07, haushaltsgeraete: 0.07,
-    drucker: 0.07, handy_zubehoer: 0.15, notebook_zubehoer: 0.15,
+    computer_tablets: 0.06, handys: 0.08, konsolen: 0.08,
+    foto_camcorder: 0.08,   tv_video_audio: 0.08, haushaltsgeraete: 0.08,
+    drucker: 0.08, handy_zubehoer: 0.15, notebook_zubehoer: 0.15,
     kabel: 0.15, mode: 0.15, sport_freizeit: 0.15,
     spielzeug: 0.15, buecher: 0.15, sonstiges: 0.15,
   };
+
+  // Closing fee — media categories (Bücher, DVDs, Musik, Software, Games)
+  const AMZ_CLOSING_FEE = 1.01;
+  const AMZ_CLOSING_CATS = ['buecher'];
+
+  // ─── Amazon Breadcrumb → Category Auto-Detect ─────────────────────────────
+  const AMZ_CAT_MAP = [
+    { keywords: ['computer', 'laptop', 'notebook', 'tablet', 'pc '], cat: 'computer_tablets' },
+    { keywords: ['handy', 'smartphone', 'mobiltelefon'], cat: 'handys' },
+    { keywords: ['konsole', 'playstation', 'xbox', 'nintendo', 'gaming', 'videospiel'], cat: 'konsolen' },
+    { keywords: ['kamera', 'foto', 'camcorder', 'objektiv'], cat: 'foto_camcorder' },
+    { keywords: ['fernseher', 'tv', 'audio', 'kopfhörer', 'lautsprecher'], cat: 'tv_video_audio' },
+    { keywords: ['haushaltsgerät', 'kühlschrank', 'waschmaschine', 'staubsauger'], cat: 'haushaltsgeraete' },
+    { keywords: ['drucker', 'scanner', 'toner', 'patrone'], cat: 'drucker' },
+    { keywords: ['handyhülle', 'handyzubehör', 'schutzhülle'], cat: 'handy_zubehoer' },
+    { keywords: ['notebookzubehör', 'laptopzubehör', 'tastatur', 'maus'], cat: 'notebook_zubehoer' },
+    { keywords: ['kabel', 'adapter', 'stecker', 'usb', 'hdmi'], cat: 'kabel' },
+    { keywords: ['bekleidung', 'mode', 'kleidung', 'schuhe'], cat: 'mode' },
+    { keywords: ['sport', 'fitness', 'outdoor', 'fahrrad'], cat: 'sport_freizeit' },
+    { keywords: ['spielzeug', 'lego', 'puppe', 'puzzle', 'brettspiel'], cat: 'spielzeug' },
+    { keywords: ['buch', 'bücher', 'taschenbuch', 'dvd', 'blu-ray', 'musik', 'cd'], cat: 'buecher' },
+  ];
+
+  function _detectAmzCategory(categoryName) {
+    if (!categoryName) return null;
+    const lower = categoryName.toLowerCase();
+    for (const entry of AMZ_CAT_MAP) {
+      if (entry.keywords.some(kw => lower.includes(kw))) return entry.cat;
+    }
+    return null;
+  }
 
   // ─── State ────────────────────────────────────────────────────────────────
   let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland"
@@ -620,6 +652,98 @@ const FlipcheckView = (() => {
 
       <!-- Inline price history chart -->
       <div id="fcPriceChart" data-market="ebay" class="mt-12"></div>
+    `;
+  }
+
+  // ─── Kaufland Result Card ─────────────────────────────────────────────────
+  function renderResultKaufland(data, ean, ek) {
+    const v  = data.verdict || "SKIP";
+    const vc = v.toLowerCase();
+
+    const sell   = data.sell_price_avg ?? null;
+    const profit = data.profit_median ?? data.profit_avg ?? null;
+    const margin = data.margin_pct ?? null;
+    const fee    = data.fees_median ?? null;
+    const feeRate = data.fee_rate ? `${(data.fee_rate * 100).toFixed(1)} %` : "—";
+    const offers = data.offers_count ?? null;
+    const bestseller = data.bestseller;
+    const score  = data.score;
+    const label  = data.label;
+
+    const profitColor = profit > 0 ? "text-green" : profit < 0 ? "text-red" : "";
+    const marginColor = (margin ?? 0) >= 20 ? "text-green" : (margin ?? 0) >= 10 ? "text-yellow" : "text-red";
+
+    const vIcon = v === "BUY"
+      ? `<path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`
+      : v === "HOLD"
+      ? `<path d="M8 2v7M5 12h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`
+      : `<path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`;
+
+    return `
+      <div class="result-card ${vc}">
+
+        <!-- ── Hero: Verdict ── -->
+        <div class="fc-hero mb-16">
+          <div class="fc-hero-left">
+            <div class="verdict-badge ${vc}">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none">${vIcon}</svg>
+              ${v}
+            </div>
+            <div style="margin-top:6px">
+              <div class="fc-product-title">${esc(data.title || ean)}</div>
+              <div class="fc-product-ean">${esc(ean)}</div>
+            </div>
+          </div>
+          ${bestseller ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--yellow-bg, #fef3c7);color:var(--yellow, #b45309);border-radius:var(--r-sm);padding:3px 10px;font-size:11px;font-weight:600">⭐ Bestseller</div>` : ""}
+        </div>
+
+        <!-- ── 3-KPI Strip ── -->
+        <div class="fc-kpi-row mb-16">
+          <div class="fc-kpi-card ${profit > 0 ? "green" : profit < 0 ? "red" : ""}">
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.profit')}</div>
+            <div class="fc-kpi-value ${profitColor}">${profit != null ? fmtEur(profit) : "—"}</div>
+          </div>
+          <div class="fc-kpi-card ${marginColor}">
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.margin')}</div>
+            <div class="fc-kpi-value ${marginColor}">${margin != null ? fmtPct(margin) : "—"}</div>
+          </div>
+          <div class="fc-kpi-card">
+            <div class="fc-kpi-label">${I18N.t('fc.chip.offers')}</div>
+            <div class="fc-kpi-value">${offers != null ? offers : "—"}</div>
+          </div>
+        </div>
+
+        <!-- ── Market Signals ── -->
+        <div class="fc-market-row mb-16">
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">Verkaufspreis</span>
+            <span class="fc-market-chip-v">${sell != null ? fmtEur(sell) : "—"}</span>
+          </div>
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">Kaufland Gebühr (${feeRate})</span>
+            <span class="fc-market-chip-v text-red">${fee != null ? "−" + fmtEur(fee) : "—"}</span>
+          </div>
+          ${label ? `
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">Label</span>
+            <span class="fc-market-chip-v">${esc(label)}</span>
+          </div>` : ""}
+          ${score != null ? `
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">Score</span>
+            <span class="fc-market-chip-v">${score}</span>
+          </div>` : ""}
+        </div>
+
+        <!-- ── Actions ── -->
+        <div class="fc-actions mt-16">
+          <button class="btn btn-sm btn-primary" id="btnAddToInv" style="gap:6px">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+            ${I18N.t('fc.btn.add_inventory')}
+          </button>
+          <button class="btn btn-sm btn-ghost" id="btnReset">${I18N.t('fc.btn.reset')}</button>
+        </div>
+      </div>
     `;
   }
 
@@ -1444,6 +1568,15 @@ const FlipcheckView = (() => {
         lastResult = data; lastEan = identifier; lastEk = ek;
         resultEl.innerHTML = renderResultAmazon(data, identifier, ek, shipIn);
 
+        // Auto-detect category from Keepa response and pre-select dropdown for next check
+        if (data.category_name) {
+          const detectedCat = _detectAmzCategory(data.category_name);
+          if (detectedCat) {
+            const catSel = container.querySelector("#fcAmzCategory");
+            if (catSel && catSel.value === "sonstiges") catSel.value = detectedCat;
+          }
+        }
+
         // Update EAN↔ASIN converter box with resolved values
         const box = container.querySelector("#fcConverterBox");
         if (box && (data.ean || data.asin)) {
@@ -1477,6 +1610,34 @@ const FlipcheckView = (() => {
         if (data.rank_series?.length >= 2) {
           loadBsrChart(resultEl, data.rank_series);
         }
+        return;
+      }
+
+      // ── Kaufland branch ──────────────────────────────────────────────────
+      if (selectedMarket === "kaufland") {
+        const klCat  = container.querySelector("#fcCategory")?.value || "kl_sonstiges";
+        const shipIn  = parseFloat(container.querySelector("#fcShipIn")?.value)  || 0;
+        const shipOut = parseFloat(container.querySelector("#fcShipOut")?.value) || 0;
+
+        const { ok, data } = await API.flipcheck(identifier, ek, mode, {
+          market:       "kaufland",
+          category:     klCat,
+          shipping_in:  shipIn,
+          shipping_out: shipOut,
+          vat_mode:     _vatMode,
+          ek_mode:      _ekMode,
+        });
+
+        if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
+        if (!ok || !data) throw new Error(data?.detail || data?.error || "Backend nicht erreichbar");
+
+        lastResult = data; lastEan = identifier; lastEk = ek;
+        resultEl.innerHTML = renderResultKaufland(data, identifier, ek);
+
+        resultEl.querySelector("#btnAddToInv")?.addEventListener("click", () => addToInventory(identifier, ek, data, "kaufland"));
+        resultEl.querySelector("#btnReset")?.addEventListener("click",    () => { resultEl.innerHTML = renderResultPlaceholder(); });
+
+        if (btn) btn.disabled = false;
         return;
       }
 

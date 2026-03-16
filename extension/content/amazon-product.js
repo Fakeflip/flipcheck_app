@@ -80,6 +80,27 @@
     }
   });
 
+  // ── Auto-detect Amazon category from breadcrumbs ───────────────────────────
+  function detectAmazonCategory() {
+    // Primary: breadcrumb navigation
+    const bcEl = document.querySelector('#wayfinding-breadcrumbs_feature_div');
+    const bcText = (bcEl?.textContent || '').toLowerCase().replace(/\s+/g, ' ').trim();
+    // Secondary: product category from detail table
+    const detailRows = document.querySelectorAll('#detailBullets_feature_div li, #productDetails_detailBullets_sections1 tr');
+    let catText = bcText;
+    detailRows.forEach(row => {
+      const t = (row.textContent || '').toLowerCase();
+      if (t.includes('kategorie') || t.includes('abteilung')) catText += ' ' + t;
+    });
+    if (!catText) return null;
+    if (typeof AMAZON_CATEGORY_MAP !== 'undefined') {
+      for (const entry of AMAZON_CATEGORY_MAP) {
+        if (entry.keywords.some(kw => catText.includes(kw))) return entry.cat;
+      }
+    }
+    return null;
+  }
+
   // ── Load settings, then extract identifier with retry ──────────────────────
   chrome.runtime.sendMessage({ type: 'SETTINGS_GET' }, res => {
     const s         = res?.data || {};
@@ -108,6 +129,12 @@
         panel.probe(identifier, 'amazon');
       } else {
         panel.setIdentifier(identifier, 'amazon');
+      }
+
+      // Auto-detect category from page breadcrumbs
+      const detectedCat = detectAmazonCategory();
+      if (detectedCat && typeof panel.setAmzCategory === 'function') {
+        panel.setAmzCategory(detectedCat);
       }
 
       if (asin) {
@@ -212,6 +239,9 @@
       // Re-probe if identifier changed (new product page)
       if (newId && newId !== panel.currentEan) {
         panel.probe(newId, 'amazon');
+        // Auto-detect category for new product
+        const newCat = detectAmazonCategory();
+        if (newCat && typeof panel.setAmzCategory === 'function') panel.setAmzCategory(newCat);
         // Pre-populate EAN crossId for the new product
         if (newAsin) {
           if (newEan) {
