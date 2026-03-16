@@ -715,6 +715,27 @@ async def flipcheck(request: Request):
 
         verdict = "BUY" if margin >= 15 and profit >= 3 else ("HOLD" if margin >= 8 else "SKIP")
 
+        # Best offer details
+        best_new = kl.get("best_offer_new") or {}
+
+        # ── Cross-market volume hints (non-blocking, best-effort) ──
+        vol_ebay, vol_amazon = None, None
+        try:
+            from ebay_live import fetch_research_stats
+            ebay_res = await asyncio.get_event_loop().run_in_executor(None, fetch_research_stats, ean)
+            if ebay_res and ebay_res.get("monthly_sales"):
+                vol_ebay = ebay_res["monthly_sales"]
+        except Exception:
+            pass
+        try:
+            from amazon import amazon_check
+            amz = await amazon_check(ean, ean, 0)
+            if amz and amz.get("sales_30d"):
+                vol_amazon = amz["sales_30d"]
+        except Exception:
+            pass
+
+        pid = kl.get("product_id")
         return JSONResponse({
             "ok": True,
             "ean": ean,
@@ -729,8 +750,20 @@ async def flipcheck(request: Request):
             "fee_rate": fee_pct,
             "offers_count": kl.get("offers_count_new", 0),
             "bestseller": kl.get("bestseller", False),
+            "rating": kl.get("rating"),
+            "review_count": kl.get("review_count"),
             "score": kl.get("score"),
             "label": kl.get("label"),
+            # Best offer breakdown
+            "best_seller_name": best_new.get("seller_name"),
+            "min_price_new": kl.get("min_price_new"),
+            "min_shipping_new": kl.get("min_shipping_new"),
+            "min_total_used": kl.get("min_total_used"),
+            "product_url": f"https://www.kaufland.de/product/{pid}/" if pid else None,
+            # Cross-market volume hints
+            "volume_hint_ebay": vol_ebay,
+            "volume_hint_amazon": vol_amazon,
+            # Compat fields
             "days_to_cash": None,
             "sales_30d": None,
             "price_series": [],

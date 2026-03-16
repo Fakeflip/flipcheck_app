@@ -641,6 +641,7 @@
           <div class="fc-market-row">
             <button class="fc-mkt-btn active" data-market="ebay">eBay</button>
             <button class="fc-mkt-btn" data-market="amazon">Amazon</button>
+            <button class="fc-mkt-btn" data-market="kaufland">Kaufland</button>
           </div>
           <div class="fc-hdr-btns">
             <button class="fc-btn-icon" id="fcSettingsBtn" title="Einstellungen">⚙</button>
@@ -1286,10 +1287,13 @@
       }
 
       s.querySelectorAll('.fc-mkt-btn').forEach(b => b.classList.toggle('active', b.dataset.market === market));
-      s.getElementById('kvVkLabel').textContent    = market === 'amazon' ? 'Ø Buy Box 30T' : 'Median VK';
-      s.getElementById('kvFeeLabel').textContent   = market === 'amazon' ? 'Ref + FBA'    : 'eBay Gebühr';
-      s.getElementById('kvSalesLabel').textContent = market === 'amazon' ? 'Est. Verk./30d · BSR↓' : 'Verk./30d';
-      s.getElementById('legendPrimary').textContent = market === 'amazon' ? 'Ø Buy Box 30T' : 'Median VK';
+      const vkLabels    = { amazon: 'Ø Buy Box 30T', kaufland: 'Günstigster Neu', ebay: 'Median VK' };
+      const feeLabels   = { amazon: 'Ref + FBA', kaufland: 'KL Gebühr', ebay: 'eBay Gebühr' };
+      const salesLabels = { amazon: 'Est. Verk./Mo', kaufland: 'Vol. (Cross-Mkt)', ebay: 'Verk./30d' };
+      s.getElementById('kvVkLabel').textContent     = vkLabels[market]    || vkLabels.ebay;
+      s.getElementById('kvFeeLabel').textContent    = feeLabels[market]   || feeLabels.ebay;
+      s.getElementById('kvSalesLabel').textContent  = salesLabels[market] || salesLabels.ebay;
+      s.getElementById('legendPrimary').textContent = vkLabels[market]    || vkLabels.ebay;
 
       const prepRow = s.getElementById('fcPrepRow');
       if (prepRow) prepRow.classList.toggle('open', market === 'amazon');
@@ -1297,8 +1301,8 @@
       if (this._result) {
         const accE = s.getElementById('accEbay');
         const accA = s.getElementById('accAmazon');
-        if (accE) accE.style.display = market === 'ebay'   ? '' : 'none';
-        if (accA) accA.style.display = market === 'amazon' ? '' : 'none';
+        if (accE) accE.style.display = market === 'ebay'     ? '' : 'none';
+        if (accA) accA.style.display = market === 'amazon'   ? '' : 'none';
       }
 
       if (refetch && this._identifier) {
@@ -1313,7 +1317,7 @@
           return;
         }
         const isAsin = id => /^[A-Z0-9]{10}$/.test(String(id||'')) && /[A-Z]/.test(String(id||''));
-        if (market === 'ebay' && isAsin(this._identifier)) {
+        if ((market === 'ebay' || market === 'kaufland') && isAsin(this._identifier)) {
           this._setState('loading');
           chrome.runtime.sendMessage({ type: 'ASIN_TO_EAN', asin: this._identifier }, res => {
             if (chrome.runtime.lastError) { this._setState('error'); return; }
@@ -1401,6 +1405,14 @@
           type:'AMAZON_CHECK', asin:this._identifier, ean:this._identifier,
           ek:this._lastEk, mode:this._mode, method:this._amazonMethod,
           shipIn:parseFloat(s.getElementById('daShipIn')?.value)||0, prepFee:prepVal,
+        }, res => {
+          if (chrome.runtime.lastError) { this._setState('error'); return; }
+          this._handleApiResponse(res);
+        });
+      } else if (this._market === 'kaufland') {
+        chrome.runtime.sendMessage({
+          type:'FLIPCHECK', ean:this._identifier, ek:this._lastEk, mode:this._mode,
+          market:'kaufland',
         }, res => {
           if (chrome.runtime.lastError) { this._setState('error'); return; }
           this._handleApiResponse(res);
@@ -1531,11 +1543,25 @@
         s.getElementById('kvVk').textContent = fmt(vk30);
         const totalFee = (d.referral_fee ?? 0) + (d.fba_fee ?? 0);
         s.getElementById('kvFee').textContent = totalFee > 0 ? `-€${totalFee.toFixed(2)}` : '—';
-        const salesStr = d.sales_30d != null ? `~${d.sales_30d}` : '—';
-        const bsrStr   = d.bsr_drops_30d != null ? ` · ${d.bsr_drops_30d}↓` : '';
-        s.getElementById('kvSales').textContent    = salesStr + bsrStr;
-        s.getElementById('kvSalesLabel').textContent = 'Est. Verk./30d · BSR↓';
+        // Sales display: badge value if available, else estimate with drops annotation
+        const src = d.sales_30d_source;
+        const salesStr = d.sales_30d != null
+          ? (src === 'badge' ? `${d.sales_30d}+` : `~${d.sales_30d}`)
+          : '—';
+        const dropsNote = (d.bsr_drops_30d > 0 && src !== 'badge') ? ` (${d.bsr_drops_30d}↓)` : '';
+        s.getElementById('kvSales').textContent    = salesStr + dropsNote;
+        s.getElementById('kvSalesLabel').textContent = src === 'badge' ? 'Verk./Mo 🏷' : 'Est. Verk./Mo';
         this._renderVelocityBar(d.sales_30d);
+      } else if (this._market === 'kaufland') {
+        s.getElementById('kvVk').textContent = fmt(d.sell_price_avg);
+        s.getElementById('kvFee').textContent = d.fees_median != null ? `-€${Number(d.fees_median).toFixed(2)}` : '—';
+        // Kaufland has no native sales data — show cross-market volume hints
+        const volParts = [];
+        if (d.volume_hint_ebay) volParts.push(`~${d.volume_hint_ebay} eBay`);
+        if (d.volume_hint_amazon) volParts.push(`~${d.volume_hint_amazon} Amz`);
+        s.getElementById('kvSales').textContent     = volParts.length ? volParts.join(' · ') : '—';
+        s.getElementById('kvSalesLabel').textContent = volParts.length ? 'Vol. (Cross-Mkt)' : 'Volumen';
+        this._renderVelocityBar(d.volume_hint_ebay || d.volume_hint_amazon || null);
       } else {
         s.getElementById('kvVk').textContent = fmt(d.sell_price_median);
         let feeAmt = d.fee ?? d.ebay_fee ?? null;

@@ -660,18 +660,28 @@ const FlipcheckView = (() => {
     const v  = data.verdict || "SKIP";
     const vc = v.toLowerCase();
 
-    const sell   = data.sell_price_avg ?? null;
-    const profit = data.profit_median ?? data.profit_avg ?? null;
-    const margin = data.margin_pct ?? null;
-    const fee    = data.fees_median ?? null;
-    const feeRate = data.fee_rate ? `${(data.fee_rate * 100).toFixed(1)} %` : "—";
-    const offers = data.offers_count ?? null;
+    const sell       = data.sell_price_avg ?? null;
+    const profit     = data.profit_median ?? data.profit_avg ?? null;
+    const margin     = data.margin_pct ?? null;
+    const fee        = data.fees_median ?? null;
+    const feeRate    = data.fee_rate ? `${(data.fee_rate * 100).toFixed(1)}%` : "—";
+    const offers     = data.offers_count ?? null;
     const bestseller = data.bestseller;
-    const score  = data.score;
-    const label  = data.label;
+    const score      = data.score ?? null;
+    const label      = data.label;
+    const rating     = data.rating ?? null;
+    const reviews    = data.review_count ?? null;
+    const usedPrice  = data.min_total_used ?? null;
+    const sellerName = data.best_seller_name ?? null;
+    const productUrl = data.product_url ?? null;
+    const volEbay    = data.volume_hint_ebay ?? null;
+    const volAmazon  = data.volume_hint_amazon ?? null;
+    const isVAT      = _vatMode === "ust_19";
 
     const profitColor = profit > 0 ? "text-green" : profit < 0 ? "text-red" : "";
     const marginColor = (margin ?? 0) >= 20 ? "text-green" : (margin ?? 0) >= 10 ? "text-yellow" : "text-red";
+    const scoreColor  = score >= 70 ? "var(--green)" : score >= 50 ? "var(--yellow)" : "var(--red)";
+    const labelColor  = label === "HOT" ? "badge-green" : label === "OK" ? "badge-yellow" : "badge-red";
 
     const vIcon = v === "BUY"
       ? `<path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`
@@ -679,10 +689,15 @@ const FlipcheckView = (() => {
       ? `<path d="M8 2v7M5 12h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`
       : `<path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`;
 
+    // Recalculate with Kaufland fee
+    const ekNum  = parseFloat(ek) || 0;
+    const shipIn  = parseFloat(_container?.querySelector("#fcShipIn")?.value) || 0;
+    const shipOut = parseFloat(_container?.querySelector("#fcShipOut")?.value) || 0;
+
     return `
       <div class="result-card ${vc}">
 
-        <!-- ── Hero: Verdict ── -->
+        <!-- ── Hero: Verdict + Score ── -->
         <div class="fc-hero mb-16">
           <div class="fc-hero-left">
             <div class="verdict-badge ${vc}">
@@ -694,13 +709,27 @@ const FlipcheckView = (() => {
               <div class="fc-product-ean">${esc(ean)}</div>
             </div>
           </div>
-          ${bestseller ? `<div style="display:inline-flex;align-items:center;gap:4px;background:var(--yellow-bg, #fef3c7);color:var(--yellow, #b45309);border-radius:var(--r-sm);padding:3px 10px;font-size:11px;font-weight:600">⭐ Bestseller</div>` : ""}
+          ${score != null ? `
+          <div class="fc-score-block">
+            <div class="fc-score-label">Score <strong style="color:${scoreColor}">${score}</strong><span style="color:var(--text-muted)">/100</span></div>
+            <div class="fc-score-bar">
+              <div class="fc-score-fill" style="width:${score}%;background:${scoreColor}"></div>
+            </div>
+            <div class="fc-score-sub">${label === "HOT" ? "Hohe Nachfrage" : label === "OK" ? "Moderate Nachfrage" : "Geringes Interesse"}</div>
+          </div>` : ""}
         </div>
 
-        <!-- ── 3-KPI Strip ── -->
+        <!-- ── Badges ── -->
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${bestseller ? `<span style="display:inline-flex;align-items:center;gap:4px;background:var(--yellow-bg, #fef3c7);color:var(--yellow, #b45309);border-radius:var(--r-sm);padding:3px 10px;font-size:11px;font-weight:600">⭐ Bestseller</span>` : ""}
+          ${rating != null ? `<span style="display:inline-flex;align-items:center;gap:3px;background:var(--bg-secondary);border-radius:var(--r-sm);padding:3px 10px;font-size:11px;font-weight:500">⭐ ${rating.toFixed(1)}${reviews ? ` (${reviews})` : ""}</span>` : ""}
+          ${label ? `<span class="${labelColor}" style="display:inline-flex;align-items:center;border-radius:var(--r-sm);padding:3px 10px;font-size:11px;font-weight:600">${esc(label)}</span>` : ""}
+        </div>
+
+        <!-- ── 4-KPI Strip ── -->
         <div class="fc-kpi-row mb-16">
           <div class="fc-kpi-card ${profit > 0 ? "green" : profit < 0 ? "red" : ""}">
-            <div class="fc-kpi-label">${I18N.t('fc.kpi.profit')}</div>
+            <div class="fc-kpi-label">${I18N.t('fc.kpi.profit')}${isVAT ? " "+I18N.t('fc.kpi.net_suffix') : ""}</div>
             <div class="fc-kpi-value ${profitColor}">${profit != null ? fmtEur(profit) : "—"}</div>
           </div>
           <div class="fc-kpi-card ${marginColor}">
@@ -711,29 +740,63 @@ const FlipcheckView = (() => {
             <div class="fc-kpi-label">${I18N.t('fc.chip.offers')}</div>
             <div class="fc-kpi-value">${offers != null ? offers : "—"}</div>
           </div>
+          <div class="fc-kpi-card">
+            <div class="fc-kpi-label">Nachfrage</div>
+            <div class="fc-kpi-value" style="color:${scoreColor}">${score != null ? score : "—"}</div>
+          </div>
         </div>
 
         <!-- ── Market Signals ── -->
         <div class="fc-market-row mb-16">
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Verkaufspreis</span>
+            <span class="fc-market-chip-l">VK (günstigster Neu)</span>
             <span class="fc-market-chip-v">${sell != null ? fmtEur(sell) : "—"}</span>
           </div>
           <div class="fc-market-chip">
             <span class="fc-market-chip-l">Kaufland Gebühr (${feeRate})</span>
             <span class="fc-market-chip-v text-red">${fee != null ? "−" + fmtEur(fee) : "—"}</span>
           </div>
-          ${label ? `
+          ${usedPrice != null ? `
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Label</span>
-            <span class="fc-market-chip-v">${esc(label)}</span>
+            <span class="fc-market-chip-l">Gebraucht ab</span>
+            <span class="fc-market-chip-v">${fmtEur(usedPrice)}</span>
           </div>` : ""}
-          ${score != null ? `
+          ${sellerName ? `
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Score</span>
-            <span class="fc-market-chip-v">${score}</span>
+            <span class="fc-market-chip-l">Günstigster Seller</span>
+            <span class="fc-market-chip-v">${esc(sellerName)}</span>
           </div>` : ""}
         </div>
+
+        <!-- ── Cross-Market Volume Hints ── -->
+        ${(volEbay || volAmazon) ? `
+        <div class="fc-market-row mb-16" style="opacity:.85">
+          ${volEbay ? `
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">eBay Verk./Mo</span>
+            <span class="fc-market-chip-v">~${volEbay}</span>
+          </div>` : ""}
+          ${volAmazon ? `
+          <div class="fc-market-chip">
+            <span class="fc-market-chip-l">Amazon Verk./Mo</span>
+            <span class="fc-market-chip-v">~${volAmazon}</span>
+          </div>` : ""}
+        </div>` : ""}
+
+        <!-- ── Cost Breakdown ── -->
+        <details class="fc-accordion mb-16" style="border:1px solid var(--border);border-radius:var(--r-sm);padding:0">
+          <summary style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-secondary)">Kostenaufstellung</summary>
+          <div style="padding:8px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12px">
+            <span>Verkaufspreis (brutto)</span><span style="text-align:right">${sell != null ? fmtEur(sell) : "—"}</span>
+            <span>Kaufland Gebühr (${feeRate})</span><span style="text-align:right;color:var(--red)">−${fee != null ? fmtEur(fee) : "—"}</span>
+            ${shipIn > 0 ? `<span>Versand Inbound</span><span style="text-align:right;color:var(--red)">−${fmtEur(shipIn)}</span>` : ""}
+            ${shipOut > 0 ? `<span>Versand Outbound</span><span style="text-align:right;color:var(--red)">−${fmtEur(shipOut)}</span>` : ""}
+            <span>EK</span><span style="text-align:right;color:var(--red)">−${fmtEur(ekNum)}</span>
+            <div style="grid-column:1/-1;border-top:1px solid var(--border);margin:4px 0"></div>
+            <span style="font-weight:700">Profit${isVAT ? " (netto)" : ""}</span>
+            <span style="text-align:right;font-weight:700" class="${profitColor}">${profit != null ? fmtEur(profit) : "—"}</span>
+          </div>
+        </details>
 
         <!-- ── Actions ── -->
         <div class="fc-actions mt-16">
@@ -741,6 +804,10 @@ const FlipcheckView = (() => {
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M8 2v12M2 8h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
             ${I18N.t('fc.btn.add_inventory')}
           </button>
+          ${productUrl ? `<a class="btn btn-sm btn-ghost" href="${productUrl}" target="_blank" style="gap:4px;text-decoration:none">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 2H3a1 1 0 00-1 1v10a1 1 0 001 1h10a1 1 0 001-1v-3M10 2h4v4M7 9l7-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Kaufland öffnen
+          </a>` : ""}
           <button class="btn btn-sm btn-ghost" id="btnReset">${I18N.t('fc.btn.reset')}</button>
         </div>
       </div>
@@ -767,7 +834,7 @@ const FlipcheckView = (() => {
     const bsrMax      = data.bsr_max_30d;
     const breakEven   = data.break_even;
     const netPayout   = data.net_payout;
-    const salesSource = data.sales_30d_source; // "badge" | "bsr_estimate"
+    const salesSource = data.sales_30d_source; // "badge" | "bsr_estimate" | "bsr_drops"
     const refFee    = data.referral_fee ?? 0;
     const refPct    = data.referral_pct != null ? `${Number(data.referral_pct).toFixed(0)}%` : "—";
     const fbaFee    = data.fba_fee ?? 0;
@@ -835,10 +902,13 @@ const FlipcheckView = (() => {
           ${_amzMetric("FBA / Ges.", `${fbaCount} / ${offers}`)}
           ${_amzMetric(
             salesSource === "badge" ? "Verk./Mo 🏷" : "Verk./Mo",
-            sales30d != null ? (salesSource === "badge" ? `${sales30d}+` : `~${sales30d}`) : "—"
+            sales30d != null
+              ? (salesSource === "badge" ? `${sales30d}+` : `~${sales30d}`)
+                + (bsrDrops > 0 && salesSource !== "badge" ? ` (${bsrDrops}↓)` : "")
+              : "—",
+            sales30d >= 30 ? "text-green" : sales30d >= 10 ? "text-yellow" : ""
           )}
           ${_amzMetric("Days to Cash", dtc != null ? fmtDays(dtc) : "—")}
-          ${_amzMetric("BSR Drops", bsrDrops != null ? String(bsrDrops) : "—", bsrDropColor)}
         </div>
 
         <!-- ── Break-Even + Net Payout ── -->

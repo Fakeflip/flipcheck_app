@@ -181,11 +181,12 @@ async function getToken() {
 }
 
 // ── Flipcheck API Call (L1 → L2 → Network) ───────────────────────────────────
-async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', shipIn = 0, shipOut = 0 }) {
+async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', shipIn = 0, shipOut = 0, market = 'ebay' }) {
   const ekNum      = parseFloat(ek)      || 0;
   const shipInNum  = parseFloat(shipIn)  || 0;
   const shipOutNum = parseFloat(shipOut) || 0;
-  const key        = `${ean}:${ekNum}:${mode}:${shipInNum}:${shipOutNum}`;
+  const mkt        = (market || 'ebay').toLowerCase();
+  const key        = `${mkt}:${ean}:${ekNum}:${mode}:${shipInNum}:${shipOutNum}`;
 
   // L1 hit
   const l1 = _cache.get(key);
@@ -210,7 +211,7 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
     const res = await _fetchWithRetry('https://api.joinflipcheck.app/flipcheck', {
       method: 'POST',
       headers,
-      body: JSON.stringify({ ean, ek: ekNum, mode, category: catId, shipping_in: shipInNum, shipping_out: shipOutNum }),
+      body: JSON.stringify({ ean, ek: ekNum, mode, category: catId, shipping_in: shipInNum, shipping_out: shipOutNum, market: mkt }),
     }, 15000);
     if (!res.ok) {
       // Free plan daily limit: parse 429 body and return a sentinel (don't cache)
