@@ -1,0 +1,38 @@
+# Node
+node_modules/
+npm-debug.log*
+
+# Build output
+v2/dist/
+v2/out/
+v2/coverage/
+
+# Electron
+*.log
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Secrets / Keys
+*.p12
+*.key
+*.cer
+.env
+.env.*
+ebay_seller_token.json
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+.venv/
+venv/
+*.egg-info/
+
+# IDE
+.vscode/
+.idea/
+*.swp
