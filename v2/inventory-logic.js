@@ -80,6 +80,7 @@ function normalizeItem(input) {
   it.ek         = it.ek         !== undefined ? (Number(it.ek)         || null) : null;
   it.sell_price = it.sell_price !== undefined ? (Number(it.sell_price) || null) : null;
   it.ship_out   = it.ship_out   !== undefined ? (Number(it.ship_out)   || 0)    : 0;
+  it.ship_in    = it.ship_in    !== undefined ? (Number(it.ship_in)    || 0)    : 0;
 
   // Date fields
   it.ek_date = it.ek_date || null;   // purchase date — used in "days to cash" analytics

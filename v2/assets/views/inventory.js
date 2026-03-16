@@ -337,6 +337,8 @@ const InventoryView = (() => {
             <tr>
               <th style="width:36px"><input type="checkbox" id="invSelectAll" ${allChecked ? "checked" : ""} /></th>
               <th class="inv-sort-th${_state.sort.col==="title"  ?" inv-sort-active":""}" data-sort="title" >${I18N.t('inv.col.article')} ${_sortIcon("title")}</th>
+              <th class="inv-sort-th" data-sort="ean" style="width:120px">EAN ${_sortIcon("ean")}</th>
+              <th class="inv-sort-th col-right" data-sort="qty" style="width:50px">Menge ${_sortIcon("qty")}</th>
               <th class="inv-sort-th${_state.sort.col==="market" ?" inv-sort-active":""}" data-sort="market">${I18N.t('inv.col.market')} ${_sortIcon("market")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="ek"     ?" inv-sort-active":""}" data-sort="ek"    >EK ${_sortIcon("ek")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="vk"     ?" inv-sort-active":""}" data-sort="vk"    >VK ${_sortIcon("vk")}</th>
@@ -442,14 +444,14 @@ const InventoryView = (() => {
         <td>
           <div style="display:flex;align-items:center;gap:6px">
             <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="${esc(item.title||item.ean)}">${esc(item.title||item.ean||"—")}</div>
-            ${(item.qty || 1) > 1 ? `<span style="flex-shrink:0;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-subtle);padding:1px 5px;border-radius:4px">×${item.qty}</span>` : ""}
           </div>
-          <div style="font-size:11px;color:var(--dim);margin-top:1px;font-family:var(--font-mono)">${esc(item.ean||"")}</div>
           ${item.source === "ebay_sync" ? `<span class="badge" style="margin-top:3px;font-size:9px;background:rgba(99,102,241,.12);color:#818CF8;border:1px solid rgba(99,102,241,.25);padding:1px 5px" title="Automatisch von eBay importiert">⟳ eBay Sync</span>` : ""}
           ${item.label ? `<span class="badge badge-gray" style="margin-top:3px;font-size:10px">${esc(item.label)}</span>` : ""}
         </td>
+        <td style="font-size:11px;color:var(--dim);font-family:var(--font-mono)">${esc(item.ean||"—")}</td>
+        <td class="col-right" style="font-size:12px;font-weight:600">${item.qty || 1}</td>
         <td><span class="inv-mkt" style="${mktStyle}">${mktSvg} ${mktText}</span></td>
-        <td class="col-right col-num" style="font-size:12px">${item.ek != null ? fmtEur(item.ek) : `<button class="btn-ek-quick" data-id="${esc(item.id)}" title="EK eingeben" style="background:rgba(245,158,11,.12);color:#F59E0B;border:1px solid rgba(245,158,11,.3);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">+ EK</button>`}</td>
+        <td class="col-right col-num" style="font-size:12px">${item.ek != null ? `<span class="btn-ek-quick" data-id="${esc(item.id)}" title="EK bearbeiten" style="cursor:pointer;border-bottom:1px dashed var(--border)">${fmtEur(item.ek)}</span>` : `<button class="btn-ek-quick" data-id="${esc(item.id)}" title="EK eingeben" style="background:rgba(245,158,11,.12);color:#F59E0B;border:1px solid rgba(245,158,11,.3);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">+ EK</button>`}</td>
         <td class="col-right col-num" style="font-size:12px">${item.sell_price != null ? fmtEur(item.sell_price) : "—"}</td>
         <td class="col-right">${profitHtml}</td>
         <td><span class="badge status-${item.status||"IN_STOCK"}">${esc(STATUS_LABELS[item.status] || item.status || "—")}</span></td>
@@ -626,12 +628,12 @@ const InventoryView = (() => {
     const item = _state.items.find(i => i.id === itemId);
     if (!item) return;
 
-    let _ekVal = null;
-    let _ekDate = new Date().toISOString().slice(0, 10);
-    let _shipOut = null;
+    let _ekVal = item.ek != null ? item.ek : null;
+    let _ekDate = item.ek_date || new Date().toISOString().slice(0, 10);
+    let _shipOut = item.ship_out != null ? item.ship_out : null;
 
     const result = await Modal.open({
-      title: "Einkaufspreis eingeben",
+      title: item.ek != null ? "Einkaufspreis bearbeiten" : "Einkaufspreis eingeben",
       width: 400,
       body: `
         <div style="margin-bottom:12px">
@@ -643,7 +645,7 @@ const InventoryView = (() => {
           <div class="input-prefix-wrap" style="flex:1">
             <span class="prefix">€</span>
             <input id="quickEkInput" class="input" type="number" min="0" step="0.01" placeholder="EK"
-              style="text-align:right;padding-right:12px;padding-left:26px" />
+              value="${item.ek != null ? item.ek : ""}" style="text-align:right;padding-right:12px;padding-left:26px" />
           </div>
           <div class="input-prefix-wrap" style="flex:1">
             <span class="prefix">€</span>
@@ -669,13 +671,15 @@ const InventoryView = (() => {
       ],
     });
 
-    if (result !== "save" || !_ekVal || isNaN(_ekVal)) return;
+    if (result !== "save") return;
+    if (_ekVal == null || isNaN(_ekVal)) _ekVal = item.ek;  // keep old EK if input was cleared
 
     try {
-      const updates = { ...item, ek: _ekVal, ek_date: _ekDate };
+      const updates = { ...item, ek_date: _ekDate };
+      if (_ekVal != null) updates.ek = _ekVal;
       if (_shipOut != null && !isNaN(_shipOut)) updates.ship_out = _shipOut;
       await Storage.upsertItem(updates);
-      Toast.success("EK gespeichert", `${fmtEur(_ekVal)} für ${item.title || item.ean}`);
+      Toast.success("Gespeichert", `${_ekVal != null ? fmtEur(_ekVal) + " EK" : ""}${_shipOut != null ? " · " + fmtEur(_shipOut) + " Versand" : ""} — ${item.title || item.ean}`);
       await loadItems(container);
     } catch (e) {
       Toast.error("Fehler", e.message || "EK konnte nicht gespeichert werden.");

@@ -7,6 +7,7 @@ import re
 import random
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple
+from http.cookiejar import DefaultCookiePolicy
 from urllib.parse import urlencode
 import requests
 from dotenv import load_dotenv
@@ -37,7 +38,7 @@ TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
 BROWSE_BASE = "https://api.ebay.com/buy/browse/v1"
 RESEARCH_BASE = "https://www.ebay.de/sh/research/api/search"
 SESSION = requests.Session()
-SESSION.cookies.set_policy(requests.cookies.DefaultCookiePolicy(allowed_domains=[]))  # No cookie storage — prevent cross-user leaks
+SESSION.cookies.set_policy(DefaultCookiePolicy(allowed_domains=[]))  # No cookie storage — prevent cross-user leaks
 SESSION.headers.update(
     {
         "User-Agent": (

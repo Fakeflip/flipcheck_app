@@ -403,12 +403,24 @@ async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60) -
         except ValueError:
             price = 0.0
 
-        ean_guess = _extract_ean_from_text(title)
+        # Try to get real EAN from ItemSpecifics first, fall back to title guess
+        ean = None
+        specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics")
+        if specifics_el is not None:
+            for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
+                name = _xml_tag(nv, "Name") or ""
+                if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
+                    val = _xml_tag(nv, "Value") or ""
+                    if val and val.lower() not in ("nicht zutreffend", "does not apply", "n/a", "na"):
+                        ean = val.strip()
+                        break
+        if not ean:
+            ean = _extract_ean_from_text(title)
 
         sold_items.append({
             "item_id":          item_id,
             "title":            title,
-            "ean_guess":        ean_guess,
+            "ean_guess":        ean,
             "quantity_sold":    qty,
             "total_price":      round(price * qty, 2),
             "unit_price":       price,
@@ -484,7 +496,19 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
             price = float(price_s)
         except ValueError:
             price = 0.0
-        ean_guess = _extract_ean_from_text(title)
+        # Try to get real EAN from ItemSpecifics first, fall back to title guess
+        ean = None
+        specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics")
+        if specifics_el is not None:
+            for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
+                name = _xml_tag(nv, "Name") or ""
+                if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
+                    val = _xml_tag(nv, "Value") or ""
+                    if val and val.lower() not in ("nicht zutreffend", "does not apply", "n/a", "na"):
+                        ean = val.strip()
+                        break
+        if not ean:
+            ean = _extract_ean_from_text(title)
 
         # Category ID (e.g. "9355" for Handys) — maps to fee tiers in the frontend
         cat_id = _xml_tag(item_el, "PrimaryCategory", "CategoryID") or ""
@@ -502,7 +526,7 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
             "item_id":   item_id,
             "title":     title,
             "price":     price,
-            "ean_guess": ean_guess,
+            "ean_guess": ean,
             "category_id":   cat_id,
             "category_name": cat_name,
             "qty":       qty,

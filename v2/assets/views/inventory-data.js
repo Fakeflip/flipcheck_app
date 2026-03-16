@@ -132,6 +132,12 @@ const InventoryData = (() => {
             const bv = (b.market || "").toLowerCase();
             return av < bv ? -d : av > bv ? d : 0;
           }
+          case "ean": {
+            const av = (a.ean || "").toLowerCase();
+            const bv = (b.ean || "").toLowerCase();
+            return av < bv ? -d : av > bv ? d : 0;
+          }
+          case "qty":    return ((a.qty || 1) - (b.qty || 1)) * d;
           case "ek":     return ((a.ek || 0) - (b.ek || 0)) * d;
           case "vk":     return ((a.sell_price || 0) - (b.sell_price || 0)) * d;
           case "profit": {
