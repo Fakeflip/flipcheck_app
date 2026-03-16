@@ -210,6 +210,53 @@ const SettingsView = (() => {
           </div>
         </div>
 
+        <!-- ── eBay Seller Sync ─────────────────────────────────────────── -->
+        <div class="st-section" id="ebaySyncSection">
+          ${sectionHeader("eBay Seller Sync", icoSync(), "Automatischer Import von Listings & Verkäufen")}
+          <div class="panel st-panel" id="ebaySyncPanel">
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>eBay-Konto</h4>
+                <p id="ebaySyncConnStatus" style="margin-top:2px">Lade…</p>
+              </div>
+              <div id="ebaySyncConnBtn"></div>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Auto-Sync</h4>
+                <p>Inventar automatisch mit eBay synchronisieren</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sEbaySyncEnabled" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Sync-Intervall</h4>
+                <p>Wie oft neue Daten von eBay geholt werden</p>
+              </div>
+              <select id="sEbaySyncInterval" class="select" style="width:140px">
+                <option value="15">Alle 15 Min</option>
+                <option value="30" selected>Alle 30 Min</option>
+                <option value="60">Stündlich</option>
+                <option value="360">Alle 6 Std</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Neue Listings importieren</h4>
+                <p>eBay-Listings ohne Inventar-Eintrag automatisch anlegen</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sEbaySyncAutoCreate" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row" style="border:none">
+              <div class="settings-row-left">
+                <h4>Letzter Sync</h4>
+                <p id="ebaySyncLastInfo" style="margin-top:2px">—</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btnEbaySyncNow">Jetzt synchronisieren</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Shortcuts ──────────────────────────────────────────────────── -->
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.shortcuts'), icoKeyboard(), I18N.t('st.section.shortcuts.desc'))}
@@ -356,6 +403,12 @@ const SettingsView = (() => {
       <path d="M5 6h6M5 8.5h4M5 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
     </svg>`;
   }
+  function icoSync() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <path d="M2.5 8a5.5 5.5 0 019.5-3.5M13.5 8a5.5 5.5 0 01-9.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      <path d="M12 2v3h-3M4 11v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>`;
+  }
 
   // ─── Events ────────────────────────────────────────────────────────────────
   function attachEvents(container, settings) {
@@ -438,6 +491,84 @@ const SettingsView = (() => {
       if (!ok) return;
       try { await window.fc.logout(); } catch {}
       window.location.reload();
+    });
+
+    // ── eBay Sync section ──────────────────────────────────────────────────
+    (async () => {
+      try {
+        const syncStatus = await window.fc.ebaySyncStatus();
+        const connStatus = container.querySelector("#ebaySyncConnStatus");
+        const connBtn    = container.querySelector("#ebaySyncConnBtn");
+        const enabledCb  = container.querySelector("#sEbaySyncEnabled");
+        const intervalSel = container.querySelector("#sEbaySyncInterval");
+        const autoCreateCb = container.querySelector("#sEbaySyncAutoCreate");
+        const lastInfo   = container.querySelector("#ebaySyncLastInfo");
+
+        // Connection status
+        if (connStatus) {
+          connStatus.textContent = syncStatus.connected
+            ? "Verbunden mit eBay Seller Account"
+            : "Nicht verbunden";
+          connStatus.style.color = syncStatus.connected ? "var(--green)" : "var(--text-muted)";
+        }
+        if (connBtn) {
+          if (syncStatus.connected) {
+            connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>`;
+          } else {
+            connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnEbayConnect">Verbinden</button>`;
+            connBtn.querySelector("#btnEbayConnect")?.addEventListener("click", async () => {
+              try {
+                const url = await window.fc.repricerAuthUrl();
+                if (url) window.open(url, "_blank");
+              } catch { Toast.error("Fehler", "eBay-Auth URL konnte nicht geladen werden."); }
+            });
+          }
+        }
+
+        // Restore saved state
+        if (enabledCb)    enabledCb.checked = syncStatus.enabled !== false;
+        if (intervalSel)  intervalSel.value = String(syncStatus.interval_min || 30);
+        if (autoCreateCb) autoCreateCb.checked = syncStatus.auto_create !== false;
+
+        // Last sync info
+        if (lastInfo && syncStatus.last_sync_at) {
+          const d = new Date(syncStatus.last_sync_at);
+          lastInfo.textContent = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        }
+
+        // Event listeners
+        enabledCb?.addEventListener("change", () => window.fc.ebaySyncSetEnabled(enabledCb.checked));
+        intervalSel?.addEventListener("change", () => window.fc.ebaySyncSetInterval(parseInt(intervalSel.value)));
+        autoCreateCb?.addEventListener("change", async () => {
+          const s = await Storage.getSettings();
+          await Storage.saveSettings({ ebay_sync: { ...(s.ebay_sync || {}), auto_create: autoCreateCb.checked } });
+        });
+      } catch (e) {
+        console.error("[Settings] eBay sync init error:", e);
+      }
+    })();
+
+    // Sync Now button
+    container.querySelector("#btnEbaySyncNow")?.addEventListener("click", async () => {
+      const btn = container.querySelector("#btnEbaySyncNow");
+      if (btn) { btn.disabled = true; btn.textContent = "Synchronisiere…"; }
+      try {
+        const result = await window.fc.ebaySyncRun();
+        if (result?.ok && result.stats) {
+          const s = result.stats;
+          Toast.success("Sync abgeschlossen", `${s.active_fetched} aktiv, ${s.sold_marked} verkauft, ${s.new_items} neu importiert`);
+          const lastInfo = container.querySelector("#ebaySyncLastInfo");
+          if (lastInfo) lastInfo.textContent = new Date().toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        } else if (result?.reason === "not_connected") {
+          Toast.error("Nicht verbunden", "Bitte zuerst eBay-Konto verbinden.");
+        } else {
+          Toast.error("Sync-Fehler", result?.error || "Unbekannter Fehler");
+        }
+      } catch (e) {
+        Toast.error("Sync-Fehler", e.message || "Verbindung fehlgeschlagen");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
+      }
     });
 
     // Version

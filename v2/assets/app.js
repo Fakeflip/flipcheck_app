@@ -204,10 +204,10 @@ function calcMarketFee(vk, market, catId) {
 
 /**
  * Calculate the real per-unit profit for one inventory item.
- * - eBay: uses tiered calcEbayFee() (category-aware)
- * - Amazon: 15% flat referral fee
- * - Kaufland: 10.5% flat commission
- * - other: no fee
+ * Prefers real eBay fee data (from Finances API) over estimated fees.
+ * - ebay_fee: real fee from eBay Finances API (if available)
+ * - ebay_ship_cost: real shipping label cost from eBay (if available)
+ * Falls back to estimated fees (category-based) when real data is unavailable.
  * Returns null if sell_price or ek are missing.
  *
  * @param {FC_InventoryItem} item
@@ -218,10 +218,24 @@ function calcRealProfit(item) {
   const vk      = Number(item.sell_price) || 0;
   const ek      = Number(item.ek)         || 0;
   const shipIn  = Number(item.ship_in)    || 0;
-  const shipOut = Number(item.ship_out)   || 0;
   const market  = item.market || "ebay";
-  const fee     = calcMarketFee(vk, market, item.cat_id);
+
+  // Prefer real eBay fee from Finances API, fall back to estimated
+  const fee     = item.ebay_fee != null ? Number(item.ebay_fee) : calcMarketFee(vk, market, item.cat_id);
+
+  // Prefer real shipping label cost from eBay, fall back to manual ship_out
+  const shipOut = item.ebay_ship_cost != null ? Number(item.ebay_ship_cost) : (Number(item.ship_out) || 0);
+
   return vk - ek - shipIn - shipOut - fee;
+}
+
+/**
+ * Check if an item uses real fee data from eBay Finances API.
+ * @param {FC_InventoryItem} item
+ * @returns {boolean}
+ */
+function hasRealFees(item) {
+  return item && item.ebay_fee != null;
 }
 
 // ─── API Client ───────────────────────────────────────────────────────────────

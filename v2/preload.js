@@ -342,4 +342,16 @@ contextBridge.exposeInMainWorld("fc", {
   repricerSetLegacyToken:    (token) => ipcRenderer.invoke("repricer:setLegacyToken", token),
   /** Remove the legacy token. @returns {Promise<{ok:boolean}>} */
   repricerRemoveLegacyToken: () => ipcRenderer.invoke("repricer:removeLegacyToken"),
+
+  // ── eBay Seller Auto-Sync ──────────────────────────────────────────────────
+  /** Trigger a manual eBay inventory sync. @returns {Promise<{ok:boolean, stats?:object}>} */
+  ebaySyncRun:         () => ipcRenderer.invoke("ebaySync:run"),
+  /** Get current sync status. @returns {Promise<{connected, enabled, last_sync_at, syncing, interval_min}>} */
+  ebaySyncStatus:      () => ipcRenderer.invoke("ebaySync:status"),
+  /** Set sync interval in minutes (min 15). @returns {Promise<{ok:boolean, interval_min:number}>} */
+  ebaySyncSetInterval: (min) => ipcRenderer.invoke("ebaySync:setInterval", min),
+  /** Enable/disable auto-sync. @returns {Promise<{ok:boolean, enabled:boolean}>} */
+  ebaySyncSetEnabled:  (on) => ipcRenderer.invoke("ebaySync:setEnabled", on),
+  /** Get sync history log. @returns {Promise<Array>} */
+  ebaySyncGetLog:      () => ipcRenderer.invoke("ebaySync:getLog"),
 });

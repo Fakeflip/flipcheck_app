@@ -91,6 +91,14 @@ function normalizeItem(input) {
   // Condition — default to "new" for unknown/missing values
   it.condition = VALID_CONDITIONS.has(it.condition) ? it.condition : "new";
 
+  // eBay sync fields — linking inventory items to eBay listings/orders
+  it.ebay_offer_id = it.ebay_offer_id || null;   // eBay item ID (links to active listing)
+  it.ebay_order_id = it.ebay_order_id || null;   // eBay order line item ID (dedup for sold items)
+
+  // Real fee data from eBay Finances API (null = use estimated fee)
+  it.ebay_fee       = it.ebay_fee       !== undefined ? (Number(it.ebay_fee) || null) : null;
+  it.ebay_ship_cost = it.ebay_ship_cost !== undefined ? (Number(it.ebay_ship_cost) || null) : null;
+
   return /** @type {import('./assets/lib/types.js').FC_InventoryItem} */ (it);
 }
 

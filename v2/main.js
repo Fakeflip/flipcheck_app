@@ -700,6 +700,8 @@ app.whenReady().then(async () => {
   startCompetitionMonitor();
   // Background repricer monitor (auto-update eBay listing prices)
   startRepricerMonitor();
+  // Background eBay inventory sync (pull active + sold listings → inventory)
+  startEbaySyncMonitor();
 });
 
 app.on("window-all-closed", () => {
@@ -1733,6 +1735,300 @@ function startRepricerMonitor() {
   setTimeout(runRepricerMonitor, 60 * 1000);
   console.log(`[Repricer] Started — interval: ${intervalMin} min`);
 }
+
+// ─── eBay Seller Auto-Sync (Listings + Sold → Inventory) ─────────────────────
+const EBAY_SYNC_LOG_FILE = path.join(app.getPath("userData"), "ebay_sync_log.json");
+
+function readSyncLog() {
+  try {
+    if (!fs.existsSync(EBAY_SYNC_LOG_FILE)) return [];
+    return JSON.parse(fs.readFileSync(EBAY_SYNC_LOG_FILE, "utf8") || "[]") || [];
+  } catch { return []; }
+}
+function writeSyncLog(log) {
+  try { fs.writeFileSync(EBAY_SYNC_LOG_FILE, JSON.stringify(log.slice(0, 50), null, 2), "utf8"); } catch {}
+}
+
+let _ebaySyncTimer   = null;
+let _ebaySyncRunning = false;
+
+async function runEbaySyncCycle() {
+  if (_ebaySyncRunning) return { ok: false, reason: "already_running" };
+  _ebaySyncRunning = true;
+  console.log("[EbaySync] Cycle started");
+  const stats = { active_fetched: 0, sold_fetched: 0, new_items: 0, updated: 0, sold_marked: 0, archived: 0 };
+  try {
+    const settings  = loadSettings();
+    const syncConf  = settings.ebay_sync || {};
+    if (syncConf.enabled === false) { console.log("[EbaySync] Disabled."); return { ok: true, skipped: true }; }
+
+    const token = await getToken().catch(() => null);
+    const base  = apiBaseBackend();
+
+    // 1. Check connection
+    const statusRes = await mainApiCall(`${base}/seller/auth/status`, token);
+    if (!statusRes.data?.connected) { console.log("[EbaySync] Not connected."); return { ok: false, reason: "not_connected" }; }
+
+    // 2. Fetch ALL active listings (paginated)
+    const allActive = [];
+    let page = 1;
+    while (true) {
+      const res = await mainApiCall(`${base}/seller/listings/active?page=${page}&per_page=200`, token);
+      if (!res.data?.ok) break;
+      allActive.push(...(res.data.items || []));
+      if (page >= (res.data.total_pages || 1)) break;
+      page++;
+    }
+    stats.active_fetched = allActive.length;
+    console.log(`[EbaySync] Fetched ${allActive.length} active listings`);
+
+    // 3. Fetch sold items (since last sync, max 60 days)
+    const lastSync = syncConf.last_sync_at ? new Date(syncConf.last_sync_at) : null;
+    const daysSince = lastSync ? Math.min(60, Math.ceil((Date.now() - lastSync.getTime()) / 86400000) + 1) : 30;
+    const allSold = [];
+    page = 1;
+    while (true) {
+      const res = await mainApiCall(`${base}/seller/listings/sold?page=${page}&per_page=200&days=${daysSince}`, token);
+      if (!res.data?.ok) break;
+      allSold.push(...(res.data.items || []));
+      if (page >= (res.data.total_pages || 1)) break;
+      page++;
+    }
+    stats.sold_fetched = allSold.length;
+    // Check if Finances API data was available (first page response has the flag)
+    const hasFinancials = allSold.some(s => s.ebay_fee != null);
+    stats.has_financials = hasFinancials;
+    console.log(`[EbaySync] Fetched ${allSold.length} sold items (last ${daysSince} days)${hasFinancials ? " [with real fees]" : ""}`);
+
+    // 4. Read current inventory
+    const invData = readInv();
+    const items   = invData.items || [];
+    const now     = nowIso();
+
+    // Build index for fast matching
+    const byOfferId = new Map();
+    const byEan     = new Map();
+    for (const it of items) {
+      if (it.ebay_offer_id) byOfferId.set(it.ebay_offer_id, it);
+      if (it.ean)           byEan.set(it.ean, it);
+    }
+
+    // Track which ebay_offer_ids are still active (for stale detection)
+    const activeOfferIds = new Set();
+
+    // 5. Process active listings
+    for (const listing of allActive) {
+      const itemId = listing.item_id;
+      if (!itemId) continue;
+      activeOfferIds.add(itemId);
+
+      let match = byOfferId.get(itemId);
+      if (!match && listing.ean_guess) match = byEan.get(listing.ean_guess);
+
+      if (match) {
+        // Update existing item — NEVER overwrite ek
+        let changed = false;
+        if (!match.ebay_offer_id && itemId) { match.ebay_offer_id = itemId; changed = true; }
+        if (match.status !== "LISTED" && match.status !== "SOLD") { match.status = "LISTED"; changed = true; }
+        if (listing.price && !match.sell_price) { match.sell_price = listing.price; changed = true; }
+        if (listing.title && !match.title) { match.title = listing.title; changed = true; }
+        if (listing.category_id && (!match.cat_id || match.cat_id === "sonstiges")) { match.cat_id = listing.category_id; changed = true; }
+        if (listing.qty && listing.qty > 1 && match.qty === 1) { match.qty = listing.qty; changed = true; }
+        if (changed) {
+          match.updated_at = now;
+          stats.updated++;
+        }
+      } else if (syncConf.auto_create !== false) {
+        // Smart EK match: find existing item with same EAN that has an EK set
+        let autoEk = null;
+        let autoEkDate = null;
+        let autoCatId = null;
+        let autoShipOut = 0;
+        let autoCondition = null;
+        if (listing.ean_guess) {
+          const ekDonor = items.find(i => i.ean === listing.ean_guess && i.ek != null);
+          if (ekDonor) {
+            autoEk        = ekDonor.ek;
+            autoEkDate    = ekDonor.ek_date;
+            autoCatId     = ekDonor.cat_id;
+            autoShipOut   = ekDonor.ship_out || 0;
+            autoCondition = ekDonor.condition;
+          }
+        }
+        // Create new inventory item from eBay listing
+        const newItem = normalizeItem({
+          title:         listing.title || "",
+          ean:           listing.ean_guess || "",
+          sku:           listing.ean_guess || itemId,
+          source:        "ebay_sync",
+          market:        "ebay",
+          status:        "LISTED",
+          qty:           listing.qty || 1,
+          ek:            autoEk,
+          ek_date:       autoEkDate,
+          cat_id:        listing.category_id || autoCatId,
+          ship_out:      autoShipOut,
+          condition:     autoCondition,
+          sell_price:    listing.price || null,
+          ebay_offer_id: itemId,
+        });
+        items.push(newItem);
+        byOfferId.set(itemId, newItem);
+        if (newItem.ean) byEan.set(newItem.ean, newItem);
+        stats.new_items++;
+      }
+    }
+
+    // 6. Process sold items — dedup by order_id
+    const processedOrders = new Set();
+    for (const sold of allSold) {
+      if (!sold.item_id) continue;
+      if (sold.order_id && processedOrders.has(sold.order_id)) continue;
+      if (sold.order_id) processedOrders.add(sold.order_id);
+
+      // Check if this sale was already processed (find SOLD item with same ebay_order_id)
+      const alreadyProcessed = items.some(i =>
+        i.ebay_order_id === sold.order_id && i.status === "SOLD" && sold.order_id
+      );
+      if (alreadyProcessed) continue;
+
+      let match = byOfferId.get(sold.item_id);
+      if (!match && sold.ean_guess) match = byEan.get(sold.ean_guess);
+
+      if (match && match.status !== "SOLD") {
+        const qtySold = sold.quantity_sold || 1;
+
+        // Real fee data from Finances API (null if unavailable)
+        const realFee  = sold.ebay_fee != null ? sold.ebay_fee : null;
+        const realShip = sold.shipping_cost != null ? sold.shipping_cost : null;
+
+        if (match.qty > qtySold) {
+          // Split: reduce original, create SOLD clone
+          match.qty -= qtySold;
+          match.updated_at = now;
+
+          const clone = normalizeItem({
+            ...JSON.parse(JSON.stringify(match)),
+            id:              undefined, // uid() will generate new id
+            qty:             qtySold,
+            status:          "SOLD",
+            sell_price:      sold.unit_price || sold.total_price || match.sell_price,
+            sold_at:         sold.transaction_date || now,
+            ebay_order_id:   sold.order_id || null,
+            ebay_fee:        realFee,
+            ebay_ship_cost:  realShip,
+            source:          match.source || "ebay_sync",
+          });
+          // If real shipping cost available, also set ship_out for backward compat
+          if (realShip != null) clone.ship_out = realShip;
+          items.push(clone);
+        } else {
+          // Entire qty sold
+          match.status         = "SOLD";
+          match.sell_price     = sold.unit_price || sold.total_price || match.sell_price;
+          match.sold_at        = sold.transaction_date || now;
+          match.ebay_order_id  = sold.order_id || null;
+          match.ebay_fee       = realFee;
+          match.ebay_ship_cost = realShip;
+          if (realShip != null) match.ship_out = realShip;
+          match.updated_at     = now;
+        }
+        stats.sold_marked++;
+      }
+    }
+
+    // 7. Stale detection — items LISTED with ebay_offer_id but not in active listings
+    for (const it of items) {
+      if (it.status === "LISTED" && it.ebay_offer_id && it.source === "ebay_sync") {
+        if (!activeOfferIds.has(it.ebay_offer_id)) {
+          it.status     = "ARCHIVED";
+          it.updated_at = now;
+          stats.archived++;
+        }
+      }
+    }
+
+    // 8. Write back
+    invData.items = items;
+    writeInv(invData);
+
+    // 9. Update last_sync_at
+    saveSettings({ ebay_sync: { ...syncConf, last_sync_at: now } });
+
+    // 10. Log
+    const logEntry = { ts: Date.now(), ...stats };
+    const log = readSyncLog();
+    log.unshift(logEntry);
+    writeSyncLog(log);
+
+    // 11. Notify renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("ebaySync:completed", stats);
+    }
+
+    console.log(`[EbaySync] Done — ${stats.new_items} new, ${stats.updated} updated, ${stats.sold_marked} sold, ${stats.archived} archived`);
+    return { ok: true, stats };
+  } catch (e) {
+    console.error("[EbaySync] Cycle error:", e.message);
+    return { ok: false, error: e.message };
+  } finally {
+    _ebaySyncRunning = false;
+  }
+}
+
+function startEbaySyncMonitor() {
+  if (_ebaySyncTimer) { clearInterval(_ebaySyncTimer); _ebaySyncTimer = null; }
+  const settings    = loadSettings();
+  const syncConf    = settings.ebay_sync || {};
+  if (syncConf.enabled === false) { console.log("[EbaySync] Disabled, not starting monitor."); return; }
+  const intervalMin = Math.max(15, syncConf.interval_min || 30);
+  _ebaySyncTimer = setInterval(runEbaySyncCycle, intervalMin * 60 * 1000);
+  // First run after 90s (give backend + repricer time to start)
+  setTimeout(runEbaySyncCycle, 90 * 1000);
+  console.log(`[EbaySync] Monitor started — interval: ${intervalMin} min`);
+}
+
+// IPC handlers
+ipcMain.handle("ebaySync:run", async () => runEbaySyncCycle());
+
+ipcMain.handle("ebaySync:status", async () => {
+  const settings = loadSettings();
+  const syncConf = settings.ebay_sync || {};
+  const base     = apiBaseBackend();
+  const token    = await getToken().catch(() => null);
+  let connected  = false;
+  try {
+    const res = await mainApiCall(`${base}/seller/auth/status`, token);
+    connected = !!res.data?.connected;
+  } catch {}
+  return {
+    connected,
+    enabled:      syncConf.enabled !== false,
+    auto_create:  syncConf.auto_create !== false,
+    interval_min: syncConf.interval_min || 30,
+    last_sync_at: syncConf.last_sync_at || null,
+    syncing:      _ebaySyncRunning,
+  };
+});
+
+ipcMain.handle("ebaySync:setInterval", (_e, min) => {
+  const val = Math.max(15, Math.min(360, parseInt(min) || 30));
+  const settings = loadSettings();
+  saveSettings({ ebay_sync: { ...(settings.ebay_sync || {}), interval_min: val } });
+  startEbaySyncMonitor();
+  return { ok: true, interval_min: val };
+});
+
+ipcMain.handle("ebaySync:setEnabled", (_e, enabled) => {
+  const settings = loadSettings();
+  saveSettings({ ebay_sync: { ...(settings.ebay_sync || {}), enabled: !!enabled } });
+  if (enabled) startEbaySyncMonitor();
+  else if (_ebaySyncTimer) { clearInterval(_ebaySyncTimer); _ebaySyncTimer = null; }
+  return { ok: true, enabled: !!enabled };
+});
+
+ipcMain.handle("ebaySync:getLog", () => readSyncLog());
+
 
 // ─── IPC: Auto-Updater ────────────────────────────────────────────────────────
 ipcMain.handle("updater:check", async () => {

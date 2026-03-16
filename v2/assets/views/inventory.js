@@ -32,7 +32,7 @@ const InventoryView = (() => {
     container: null,
     items:     [],
     selected:  new Set(),
-    filter:    { q: "", status: "", market: "" },
+    filter:    { q: "", status: "", market: "", source: "" },
     sort:      { col: "age", dir: "asc" },
     vs:        { data: [], wrap: null, busy: false },
   };
@@ -105,7 +105,7 @@ const InventoryView = (() => {
     // Reset state fresh on every mount
     _state.container = container;
     _state.selected  = new Set();
-    _state.filter    = { q: "", status: "", market: "" };
+    _state.filter    = { q: "", status: "", market: "", source: "" };
     _state.sort      = { col: "age", dir: "asc" };
     _state.vs        = { data: [], wrap: null, busy: false };
 
@@ -176,6 +176,13 @@ const InventoryView = (() => {
         <select id="invMarketFilter" class="select">
           <option value="">${I18N.t('inv.filter.all_markets')}</option>
           ${MARKETS.map(m => `<option value="${m}">${m.toUpperCase()}</option>`).join("")}
+        </select>
+        <select id="invSourceFilter" class="select">
+          <option value="">Alle Quellen</option>
+          <option value="manual">Manuell</option>
+          <option value="ebay_sync">eBay Sync</option>
+          <option value="extension">Extension</option>
+          <option value="csv">CSV Import</option>
         </select>
       </div>
 
@@ -314,7 +321,7 @@ const InventoryView = (() => {
         <div class="empty-state">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v4M10 14h4"/></svg>
           <p class="empty-title">${I18N.t('inv.empty.title')}</p>
-          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market ? I18N.t('inv.empty.sub_filtered') : I18N.t('inv.empty.sub_empty')}</p>
+          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market || _state.filter.source ? I18N.t('inv.empty.sub_filtered') : I18N.t('inv.empty.sub_empty')}</p>
         </div>
       `;
       return;
@@ -380,16 +387,33 @@ const InventoryView = (() => {
   }
 
   function renderRow(item) {
-    const profit  = item.status === "SOLD" ? calcRealProfit(item) : null;
+    const profit  = (item.status === "SOLD" || item.status === "LISTED") ? calcRealProfit(item) : null;
+    const isEstimated = item.status === "LISTED" && profit != null;
+    const usesRealFee = item.ebay_fee != null;
     const age     = item.created_at ? Math.floor((Date.now() - new Date(item.created_at)) / 86400000) : null;
     const checked = _state.selected.has(item.id);
+
+    // Payout estimate for LISTED items (VK - fees - shipping)
+    let payoutHtml = "";
+    if (item.status === "LISTED" && item.sell_price != null) {
+      const vk      = Number(item.sell_price) || 0;
+      const shipOut = Number(item.ship_out)   || 0;
+      const fee     = calcMarketFee(vk, item.market || "ebay", item.cat_id);
+      const payout  = vk - fee - shipOut;
+      payoutHtml = `<div style="font-size:10px;color:var(--text-muted);margin-top:1px" title="VK ${fmtEur(vk)} − Gebühr ${fmtEur(fee)} − Versand ${fmtEur(shipOut)}">~${fmtEur(payout)} Payout</div>`;
+    }
+    // Real fee badge for SOLD items
+    let feeInfoHtml = "";
+    if (item.status === "SOLD" && profit != null && usesRealFee) {
+      feeInfoHtml = `<div style="font-size:9px;color:var(--accent);margin-top:1px" title="Echte Gebühr: ${fmtEur(item.ebay_fee)}${item.ebay_ship_cost != null ? ' · Versand: ' + fmtEur(item.ebay_ship_cost) : ''}">✓ echte Fees</div>`;
+    }
 
     // Profit chip (reuse batch classes)
     const profitHtml = profit != null
       ? profit > 0
-        ? `<div class="batch-profit batch-profit-pos">+${fmtEur(profit)}</div>`
-        : `<div class="batch-profit batch-profit-neg">${fmtEur(profit)}</div>`
-      : `<span class="text-dim">—</span>`;
+        ? `<div class="batch-profit batch-profit-pos">${isEstimated ? "~" : "+"}${fmtEur(profit)}</div>${payoutHtml}${feeInfoHtml}`
+        : `<div class="batch-profit batch-profit-neg">${isEstimated ? "~" : ""}${fmtEur(profit)}</div>${payoutHtml}${feeInfoHtml}`
+      : (payoutHtml || `<span class="text-dim">—</span>`);
 
     // Market badge — SVG icon + colors from FC.MARKET_COLORS (single source of truth)
     const mktKey   = (item.market || "other").toLowerCase();
@@ -421,10 +445,11 @@ const InventoryView = (() => {
             ${(item.qty || 1) > 1 ? `<span style="flex-shrink:0;font-size:10px;font-weight:700;color:var(--accent);background:var(--accent-subtle);padding:1px 5px;border-radius:4px">×${item.qty}</span>` : ""}
           </div>
           <div style="font-size:11px;color:var(--dim);margin-top:1px;font-family:var(--font-mono)">${esc(item.ean||"")}</div>
+          ${item.source === "ebay_sync" ? `<span class="badge" style="margin-top:3px;font-size:9px;background:rgba(99,102,241,.12);color:#818CF8;border:1px solid rgba(99,102,241,.25);padding:1px 5px" title="Automatisch von eBay importiert">⟳ eBay Sync</span>` : ""}
           ${item.label ? `<span class="badge badge-gray" style="margin-top:3px;font-size:10px">${esc(item.label)}</span>` : ""}
         </td>
         <td><span class="inv-mkt" style="${mktStyle}">${mktSvg} ${mktText}</span></td>
-        <td class="col-right col-num" style="font-size:12px">${fmtEur(item.ek)}</td>
+        <td class="col-right col-num" style="font-size:12px">${item.ek != null ? fmtEur(item.ek) : `<button class="btn-ek-quick" data-id="${esc(item.id)}" title="EK eingeben" style="background:rgba(245,158,11,.12);color:#F59E0B;border:1px solid rgba(245,158,11,.3);padding:1px 7px;border-radius:4px;font-size:10px;font-weight:600;cursor:pointer">+ EK</button>`}</td>
         <td class="col-right col-num" style="font-size:12px">${item.sell_price != null ? fmtEur(item.sell_price) : "—"}</td>
         <td class="col-right">${profitHtml}</td>
         <td><span class="badge status-${item.status||"IN_STOCK"}">${esc(STATUS_LABELS[item.status] || item.status || "—")}</span></td>
@@ -494,6 +519,12 @@ const InventoryView = (() => {
 
     container.querySelector("#invMarketFilter")?.addEventListener("change", e => {
       _state.filter.market = e.target.value;
+      renderTable(container);
+      updateCount(container);
+    });
+
+    container.querySelector("#invSourceFilter")?.addEventListener("change", e => {
+      _state.filter.source = e.target.value;
       renderTable(container);
       updateCount(container);
     });
@@ -583,10 +614,73 @@ const InventoryView = (() => {
         if (ean) openPricecheckModal(ean, ek, flipBtn);
         return;
       }
+
+      const ekBtn = e.target.closest(".btn-ek-quick");
+      if (ekBtn) { openQuickEkModal(ekBtn.dataset.id, container); return; }
     });
   }
 
   // ── Modals ───────────────────────────────────────────────────────────────
+
+  async function openQuickEkModal(itemId, container) {
+    const item = _state.items.find(i => i.id === itemId);
+    if (!item) return;
+
+    let _ekVal = null;
+    let _ekDate = new Date().toISOString().slice(0, 10);
+    let _shipOut = null;
+
+    const result = await Modal.open({
+      title: "Einkaufspreis eingeben",
+      width: 400,
+      body: `
+        <div style="margin-bottom:12px">
+          <div style="font-weight:600;font-size:13px;margin-bottom:2px">${esc(item.title || item.ean || "—")}</div>
+          ${item.ean ? `<div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono)">${esc(item.ean)}</div>` : ""}
+          ${item.sell_price != null ? `<div style="font-size:11px;color:var(--text-muted);margin-top:4px">VK: ${fmtEur(item.sell_price)}</div>` : ""}
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+          <div class="input-prefix-wrap" style="flex:1">
+            <span class="prefix">€</span>
+            <input id="quickEkInput" class="input" type="number" min="0" step="0.01" placeholder="EK"
+              style="text-align:right;padding-right:12px;padding-left:26px" />
+          </div>
+          <div class="input-prefix-wrap" style="flex:1">
+            <span class="prefix">€</span>
+            <input id="quickShipOut" class="input" type="number" min="0" step="0.01" placeholder="Versand" value="${item.ship_out || ""}"
+              style="text-align:right;padding-right:12px;padding-left:26px" />
+          </div>
+        </div>
+        <div>
+          <input id="quickEkDate" class="input" type="date" value="${_ekDate}" style="width:100%" />
+        </div>
+      `,
+      buttons: [
+        { label: "Abbrechen", variant: "btn-ghost", value: null },
+        { label: "Speichern", variant: "btn-primary", action: () => {
+          const inp = document.getElementById("quickEkInput");
+          const dateInp = document.getElementById("quickEkDate");
+          const shipInp = document.getElementById("quickShipOut");
+          _ekVal   = parseFloat(inp?.value);
+          _ekDate  = dateInp?.value || null;
+          _shipOut = shipInp?.value ? parseFloat(shipInp.value) : null;
+          Modal.close("save");
+        }},
+      ],
+    });
+
+    if (result !== "save" || !_ekVal || isNaN(_ekVal)) return;
+
+    try {
+      const updates = { ...item, ek: _ekVal, ek_date: _ekDate };
+      if (_shipOut != null && !isNaN(_shipOut)) updates.ship_out = _shipOut;
+      await Storage.upsertItem(updates);
+      Toast.success("EK gespeichert", `${fmtEur(_ekVal)} für ${item.title || item.ean}`);
+      await loadItems(container);
+    } catch (e) {
+      Toast.error("Fehler", e.message || "EK konnte nicht gespeichert werden.");
+    }
+  }
 
   async function openPricecheckModal(ean, ek, btn) {
     // Briefly show loading state on the trigger button

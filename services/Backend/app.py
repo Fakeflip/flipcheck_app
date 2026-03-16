@@ -1499,8 +1499,9 @@ async def update_research_cookie(request: Request, body: CookieUpdateBody):
 try:
     from ebay_seller import (
         seller_auth_url, seller_token_exchange, bulk_revise_prices,
-        is_connected, is_legacy_mode, get_my_active_listings,
+        is_connected, is_legacy_mode, get_my_active_listings, get_my_sold_list,
         save_legacy_token, remove_legacy_token,
+        get_sold_with_financials, get_order_financials,
     )
     _SELLER_AVAILABLE = True
 except ImportError:
@@ -1512,6 +1513,9 @@ except ImportError:
     def is_connected(): return False  # type: ignore[misc]
     def is_legacy_mode(): return False  # type: ignore[misc]
     async def get_my_active_listings(**_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def get_my_sold_list(**_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def get_sold_with_financials(**_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def get_order_financials(order_ids): return {}  # type: ignore[misc]
     def save_legacy_token(token): pass  # type: ignore[misc]
     def remove_legacy_token(): pass  # type: ignore[misc]
 
@@ -1856,6 +1860,19 @@ async def seller_active_listings(page: int = 1, per_page: int = 100):
         return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
     try:
         return await get_my_active_listings(page=page, per_page=min(int(per_page), 200))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+@app.get("/seller/listings/sold")
+async def seller_sold_listings(page: int = 1, per_page: int = 100, days: int = 60, financials: bool = True):
+    """Fetch seller's recently sold items, enriched with real eBay fees if available."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
+    try:
+        if financials:
+            return await get_sold_with_financials(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60))
+        return await get_my_sold_list(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60))
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 

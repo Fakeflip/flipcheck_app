@@ -47,7 +47,10 @@ EBAY_API_COMPAT = "967"
 SELL_SCOPES = " ".join([
     "https://api.ebay.com/oauth/api_scope/sell.inventory",
     "https://api.ebay.com/oauth/api_scope/sell.account",
+    "https://api.ebay.com/oauth/api_scope/sell.finances",
 ])
+
+EBAY_FINANCES_BASE = "https://apiz.ebay.com/sell/finances/v1"
 
 TOKEN_FILE   = Path(os.getenv("EBAY_SELLER_TOKEN_FILE", BASE_DIR / "ebay_seller_token.json"))
 _token_cache: Optional[Dict] = None
@@ -322,6 +325,108 @@ def _extract_ean_from_text(text: str) -> Optional[str]:
     return None
 
 
+async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60) -> Dict:
+    """
+    Fetch seller's recently sold items via Trading API GetMyeBaySelling → SoldList.
+    Returns list of {item_id, title, ean_guess, quantity_sold, total_price, transaction_date, buyer}.
+    No additional OAuth scopes needed — works with sell.inventory + sell.account.
+    """
+    token, is_legacy = await get_token_for_trading()
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetMyeBaySellingRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <SoldList>
+    <Include>true</Include>
+    <DurationInDays>{days}</DurationInDays>
+    <Pagination>
+      <EntriesPerPage>{min(per_page, 200)}</EntriesPerPage>
+      <PageNumber>{page}</PageNumber>
+    </Pagination>
+    <Sort>EndTime</Sort>
+  </SoldList>
+  <ErrorLanguage>de_DE</ErrorLanguage>
+  <WarningLevel>High</WarningLevel>
+</GetMyeBaySellingRequest>"""
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            EBAY_TRADING_URL,
+            headers=_trading_headers("GetMyeBaySelling", token, legacy=is_legacy),
+            content=xml_body.encode("utf-8"),
+            timeout=20,
+        )
+
+    try:
+        root = ET.fromstring(resp.text)
+    except ET.ParseError as e:
+        raise RuntimeError(f"GetMyeBaySelling (SoldList) XML parse error: {e}")
+
+    ack = _xml_tag(root, "Ack")
+    if ack not in ("Success", "Warning"):
+        error = _xml_tag(root, "Errors", "LongMessage") or f"Ack={ack}"
+        raise RuntimeError(f"GetMyeBaySelling (SoldList) failed: {error}")
+
+    ns = "urn:ebay:apis:eBLBaseComponents"
+    sold_el = root.find(f"{{{ns}}}SoldList/{{{ns}}}OrderTransactionArray")
+    if sold_el is None:
+        return {"ok": True, "total": 0, "total_pages": 1, "page": page, "items": []}
+
+    total_pages = _xml_tag(root, "SoldList", "PaginationResult", "TotalNumberOfPages")
+    total_items = _xml_tag(root, "SoldList", "PaginationResult", "TotalNumberOfEntries")
+
+    sold_items: List[Dict] = []
+    for ot_el in sold_el.findall(f"{{{ns}}}OrderTransaction"):
+        # Each OrderTransaction can have a Transaction inside
+        txn = ot_el.find(f"{{{ns}}}Transaction")
+        if txn is None:
+            continue
+
+        item_el = txn.find(f"{{{ns}}}Item")
+        if item_el is None:
+            continue
+
+        item_id = _xml_tag(item_el, "ItemID")
+        title   = _xml_tag(item_el, "Title") or ""
+
+        # Quantity sold in this transaction
+        qty_str   = _xml_tag(txn, "QuantityPurchased") or "1"
+        price_str = _xml_tag(txn, "TransactionPrice") or "0"
+        date_str  = _xml_tag(txn, "CreatedDate") or ""
+        buyer     = _xml_tag(txn, "Buyer", "UserID") or ""
+        order_id  = _xml_tag(txn, "OrderLineItemID") or ""
+
+        try:
+            qty   = int(qty_str)
+        except ValueError:
+            qty   = 1
+        try:
+            price = float(price_str)
+        except ValueError:
+            price = 0.0
+
+        ean_guess = _extract_ean_from_text(title)
+
+        sold_items.append({
+            "item_id":          item_id,
+            "title":            title,
+            "ean_guess":        ean_guess,
+            "quantity_sold":    qty,
+            "total_price":      round(price * qty, 2),
+            "unit_price":       price,
+            "transaction_date": date_str,
+            "buyer":            buyer[:3] + "***" if buyer else "",
+            "order_id":         order_id,
+            "url":              f"https://www.ebay.de/itm/{item_id}" if item_id else None,
+        })
+
+    return {
+        "ok":          True,
+        "total":       int(total_items or 0),
+        "total_pages": int(total_pages or 1),
+        "page":        page,
+        "items":       sold_items,
+    }
+
+
 async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
     """
     Fetch seller's active fixed-price listings via Trading API GetMyeBaySelling.
@@ -381,11 +486,26 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
             price = 0.0
         ean_guess = _extract_ean_from_text(title)
 
+        # Category ID (e.g. "9355" for Handys) — maps to fee tiers in the frontend
+        cat_id = _xml_tag(item_el, "PrimaryCategory", "CategoryID") or ""
+        cat_name = _xml_tag(item_el, "PrimaryCategory", "CategoryName") or ""
+
+        # Quantity available
+        qty_s = _xml_tag(item_el, "QuantityAvailable") or \
+                _xml_tag(item_el, "Quantity") or "1"
+        try:
+            qty = int(qty_s)
+        except ValueError:
+            qty = 1
+
         listings.append({
             "item_id":   item_id,
             "title":     title,
             "price":     price,
             "ean_guess": ean_guess,
+            "category_id":   cat_id,
+            "category_name": cat_name,
+            "qty":       qty,
             "url":       f"https://www.ebay.de/itm/{item_id}" if item_id else None,
         })
 
@@ -396,3 +516,158 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100) -> Dict:
         "page":        page,
         "items":       listings,
     }
+
+
+# ── Finances API — real fees & shipping costs per order ──────────────────────
+
+async def get_order_financials(order_ids: List[str]) -> Dict[str, Dict]:
+    """
+    Fetch real eBay fees + shipping costs for a list of order IDs using the
+    Finances API (sell.finances scope required).
+
+    Returns a dict keyed by order_id:
+    {
+      "orderId": {
+        "total_fee": 12.34,         # Total eBay fees (marketplace fee + intl fee etc.)
+        "shipping_cost": 5.99,      # Actual shipping label cost (0 if self-shipped)
+        "payout_amount": 45.67,     # Net payout from eBay
+        "fee_breakdown": {...}      # Individual fee types
+      }
+    }
+
+    Uses getTransactions endpoint with order_id filter.
+    Gracefully returns empty dict on auth errors (user needs re-auth with sell.finances).
+    """
+    if not order_ids:
+        return {}
+
+    # We need an OAuth2 token (not legacy) for RESTful Finances API
+    data = _load_token()
+    if not data or data.get("legacy_token") and not data.get("access_token"):
+        logger.warning("[Finances] No OAuth2 token available (legacy-only) — skipping")
+        return {}
+
+    try:
+        token = await get_seller_token()
+    except Exception as e:
+        logger.warning(f"[Finances] Token error: {e}")
+        return {}
+
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type":  "application/json",
+        "X-EBAY-C-MARKETPLACE-ID": "EBAY_DE",
+    }
+
+    results: Dict[str, Dict] = {}
+
+    # Process in batches — Finances API supports one order_id filter at a time
+    async with httpx.AsyncClient() as client:
+        for oid in order_ids:
+            if not oid:
+                continue
+            try:
+                # getTransactions filtered by orderId
+                params = {
+                    "filter": f"orderId:{{{oid}}}",
+                    "limit":  "50",
+                }
+                resp = await client.get(
+                    f"{EBAY_FINANCES_BASE}/transaction",
+                    headers=headers,
+                    params=params,
+                    timeout=12,
+                )
+                if resp.status_code == 401 or resp.status_code == 403:
+                    logger.warning(f"[Finances] Auth error ({resp.status_code}) — user may need to re-auth with sell.finances scope")
+                    return results  # Stop processing, scope likely missing
+                if resp.status_code != 200:
+                    logger.debug(f"[Finances] {oid}: HTTP {resp.status_code}")
+                    continue
+
+                body = resp.json()
+                transactions = body.get("transactions", [])
+
+                total_fee = 0.0
+                shipping_cost = 0.0
+                payout_amount = 0.0
+                fee_breakdown = {}
+
+                for txn in transactions:
+                    txn_type = txn.get("transactionType", "")
+
+                    # SALE transactions contain the fee breakdown
+                    if txn_type == "SALE":
+                        # orderLineItems contain fee details
+                        for oli in txn.get("orderLineItems", []):
+                            fees = oli.get("marketplaceFees", [])
+                            for fee in fees:
+                                fee_type = fee.get("feeType", "UNKNOWN")
+                                amt = fee.get("amount", {})
+                                fee_val = abs(float(amt.get("value", 0)))
+                                total_fee += fee_val
+                                fee_breakdown[fee_type] = fee_breakdown.get(fee_type, 0) + fee_val
+
+                        # Total amount from the sale
+                        total_amt = txn.get("totalFeeBasisAmount", txn.get("amount", {}))
+                        payout_amt = txn.get("amount", {})
+                        payout_amount += float(payout_amt.get("value", 0))
+
+                    # SHIPPING_LABEL transactions are the actual shipping cost
+                    elif txn_type == "SHIPPING_LABEL":
+                        ship_amt = txn.get("amount", {})
+                        shipping_cost += abs(float(ship_amt.get("value", 0)))
+
+                results[oid] = {
+                    "total_fee":      round(total_fee, 2),
+                    "shipping_cost":  round(shipping_cost, 2),
+                    "payout_amount":  round(payout_amount, 2),
+                    "fee_breakdown":  fee_breakdown,
+                }
+            except Exception as e:
+                logger.debug(f"[Finances] Error fetching {oid}: {e}")
+                continue
+
+    return results
+
+
+async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int = 60) -> Dict:
+    """
+    Convenience: fetch sold list + enrich with real fee data from Finances API.
+    Falls back gracefully if Finances API is unavailable (missing scope).
+    """
+    sold_result = await get_my_sold_list(page=page, per_page=per_page, days=days)
+    if not sold_result.get("ok") or not sold_result.get("items"):
+        return sold_result
+
+    # Collect unique order IDs for financial lookup
+    order_ids = list({
+        item["order_id"] for item in sold_result["items"]
+        if item.get("order_id")
+    })
+
+    if not order_ids:
+        return sold_result
+
+    try:
+        financials = await get_order_financials(order_ids)
+    except Exception as e:
+        logger.warning(f"[Finances] Bulk lookup failed: {e}")
+        financials = {}
+
+    # Enrich sold items with financial data
+    for item in sold_result["items"]:
+        oid = item.get("order_id")
+        if oid and oid in financials:
+            fin = financials[oid]
+            item["ebay_fee"]       = fin["total_fee"]
+            item["shipping_cost"]  = fin["shipping_cost"]
+            item["payout_amount"]  = fin["payout_amount"]
+            item["fee_breakdown"]  = fin["fee_breakdown"]
+        else:
+            item["ebay_fee"]       = None
+            item["shipping_cost"]  = None
+            item["payout_amount"]  = None
+
+    sold_result["has_financials"] = len(financials) > 0
+    return sold_result

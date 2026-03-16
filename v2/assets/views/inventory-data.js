@@ -109,6 +109,7 @@ const InventoryData = (() => {
     let rows = items.filter(i => {
       if (filter.status && i.status !== filter.status) return false;
       if (filter.market && i.market !== filter.market) return false;
+      if (filter.source && (i.source || "manual") !== filter.source) return false;
       if (q) {
         const hay = `${i.title} ${i.ean} ${i.sku} ${i.label}`.toLowerCase();
         if (!hay.includes(q)) return false;
