@@ -901,6 +901,17 @@
               <span class="fc-cmp-dot" style="background:#E63B2A"></span>Geizhals
             </a>
           </div>
+          <div class="fc-compare-row" id="fcMarketLinks" style="display:none">
+            <a class="fc-cmp-btn" id="fcLinkEbay" href="#" target="_blank" rel="noopener" style="display:none">
+              <span class="fc-cmp-dot" style="background:#E53238"></span>eBay
+            </a>
+            <a class="fc-cmp-btn" id="fcLinkAmazon" href="#" target="_blank" rel="noopener" style="display:none">
+              <span class="fc-cmp-dot" style="background:#FF9900"></span>Amazon
+            </a>
+            <a class="fc-cmp-btn" id="fcLinkKaufland" href="#" target="_blank" rel="noopener" style="display:none">
+              <span class="fc-cmp-dot" style="background:#E2001A"></span>Kaufland
+            </a>
+          </div>
           <div class="fc-alert-form" id="fcAlertForm">
             <span class="fc-alert-lbl">Zielpreis-Alarm</span>
             <div class="fc-alert-row">
@@ -1535,6 +1546,27 @@
         const geizhalsBtn = s.getElementById('fcGeizhalsBtn');
         if (idealoBtn)  idealoBtn.href  = `https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${qEnc}`;
         if (geizhalsBtn) geizhalsBtn.href = `https://geizhals.de/?fs=${qEnc}&hloc=at&hloc=de`;
+
+        // Cross-market links (show links to other markets, not the current one)
+        const marketLinksRow = s.getElementById('fcMarketLinks');
+        const linkEbay     = s.getElementById('fcLinkEbay');
+        const linkAmazon   = s.getElementById('fcLinkAmazon');
+        const linkKaufland = s.getElementById('fcLinkKaufland');
+        if (marketLinksRow) {
+          marketLinksRow.style.display = 'flex';
+          if (linkEbay) {
+            linkEbay.style.display = this._market === 'ebay' ? 'none' : '';
+            linkEbay.href = `https://www.ebay.de/sch/i.html?_nkw=${qEnc}`;
+          }
+          if (linkAmazon) {
+            linkAmazon.style.display = this._market === 'amazon' ? 'none' : '';
+            linkAmazon.href = `https://www.amazon.de/s?k=${qEnc}`;
+          }
+          if (linkKaufland) {
+            linkKaufland.style.display = this._market === 'kaufland' ? 'none' : '';
+            linkKaufland.href = `https://www.kaufland.de/s/?search_value=${qEnc}`;
+          }
+        }
       }
 
       // KPIs
