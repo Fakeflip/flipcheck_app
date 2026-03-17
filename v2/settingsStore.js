@@ -29,8 +29,10 @@ function loadSettings() {
 
 /**
  * Persist the given settings object to disk (pretty-printed JSON).
+ * **Merges** the supplied keys into the existing settings so that
+ * callers can pass a partial patch without losing unrelated keys.
  * Creates the settings directory if it does not exist.
- * Returns the saved object (or the input on write error).
+ * Returns the merged object (or the input on write error).
  *
  * @param {import('./assets/lib/types.js').FC_Settings} obj
  * @returns {import('./assets/lib/types.js').FC_Settings}
@@ -39,8 +41,10 @@ function saveSettings(obj) {
   try {
     const p = getSettingsPath();
     fs.mkdirSync(path.dirname(p), { recursive: true });
-    fs.writeFileSync(p, JSON.stringify(obj || {}, null, 2), "utf8");
-    return obj || {};
+    const current = loadSettings();
+    const merged  = { ...current, ...(obj || {}) };
+    fs.writeFileSync(p, JSON.stringify(merged, null, 2), "utf8");
+    return merged;
   } catch {
     return obj || {};
   }
