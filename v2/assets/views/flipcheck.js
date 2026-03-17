@@ -1489,15 +1489,23 @@ const FlipcheckView = (() => {
   // ─── Events ───────────────────────────────────────────────────────────────
   function attachEvents(container) {
     // Market toggle
-    container.querySelector("#mktEbay")?.addEventListener("click", () => {
-      if (selectedMarket !== "ebay") { selectedMarket = "ebay"; container.innerHTML = renderForm(); attachEvents(container); }
-    });
-    container.querySelector("#mktAmazon")?.addEventListener("click", () => {
-      if (selectedMarket !== "amazon") { selectedMarket = "amazon"; container.innerHTML = renderForm(); attachEvents(container); }
-    });
-    container.querySelector("#mktKaufland")?.addEventListener("click", () => {
-      if (selectedMarket !== "kaufland") { selectedMarket = "kaufland"; container.innerHTML = renderForm(); attachEvents(container); }
-    });
+    const _switchMarket = (newMarket) => {
+      if (selectedMarket === newMarket) return;
+      // Preserve current field values
+      const curState = {
+        ean:          container.querySelector("#fcEan")?.value || "",
+        ek:           container.querySelector("#fcEk")?.value || "",
+        category:     container.querySelector("#fcCategory")?.value || "sonstiges",
+        shipping_in:  container.querySelector("#fcShipIn")?.value || "",
+        shipping_out: container.querySelector("#fcShipOut")?.value || "",
+      };
+      selectedMarket = newMarket;
+      container.innerHTML = renderForm(curState);
+      attachEvents(container);
+    };
+    container.querySelector("#mktEbay")?.addEventListener("click", () => _switchMarket("ebay"));
+    container.querySelector("#mktAmazon")?.addEventListener("click", () => _switchMarket("amazon"));
+    container.querySelector("#mktKaufland")?.addEventListener("click", () => _switchMarket("kaufland"));
 
     // Amazon method toggle
     container.querySelectorAll("#fcAmzMethodSeg .seg-btn").forEach(btn => {

@@ -778,14 +778,13 @@ async def amazon_check(
     # BSR drops in last 30 days (signals sales activity)
     bsr_info   = _count_bsr_drops(rank_csv, days=30)
 
-    # ── 1 Drop = 1 Sale: integrate drops into sales estimate ────────────────
-    # If sales come from BSR estimate (no badge), use drops as floor:
-    # each rank drop = at least 1 sale event, so sales ≥ drops.
+    # ── 1 Drop = 1 Sale: drops replace BSR estimate ─────────────────────────
+    # BSR estimates are unreliable — actual BSR drops are ground truth.
+    # When no badge, use drops count directly as sales figure.
     drops_count = bsr_info.get("drops_count", 0) or 0
     if sales_30d_source == "bsr_estimate" and drops_count > 0:
-        if sales_30d is None or drops_count > sales_30d:
-            sales_30d = drops_count
-            sales_30d_source = "bsr_drops"
+        sales_30d = drops_count
+        sales_30d_source = "bsr_drops"
 
     # Rank series for chart (BSR over time)
     rank_series = _csv_to_rank_series(rank_csv)

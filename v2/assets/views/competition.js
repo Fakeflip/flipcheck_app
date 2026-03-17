@@ -548,10 +548,30 @@ const CompetitionView = (() => {
       </div>
     `;
 
+    // Estimated profit for each competitor (using user's EK, ship_out, cat_id)
+    const userEk     = Number(item.ek)       || 0;
+    const userShipOut = Number(item.ship_out) || 0;
+    const userShipIn  = Number(item.ship_in)  || 0;
+    const hasProfitData = userEk > 0;
+
+    // eBay seller username for own-listing highlight
+    const _mySellerId = typeof App !== "undefined" && App._ebaySellerUsername ? App._ebaySellerUsername.toLowerCase() : null;
+
     const rows = items.map((it, idx) => {
       const isCheapest = idx === 0;
-      const isMe = myPrice != null && Math.abs((it.total_price || 0) - myPrice) < 0.02;
+      const sellerLower = (it.seller_id || "").toLowerCase();
+      const isMe = _mySellerId ? sellerLower === _mySellerId
+                 : (myPrice != null && Math.abs((it.total_price || 0) - myPrice) < 0.02);
       const rowClass = isMe ? "comp-row-me" : isCheapest ? "comp-row-cheapest" : "";
+      // Profit estimate: competitor total_price minus user's costs
+      let profitHtml = "—";
+      if (hasProfitData && it.total_price != null) {
+        const vk = it.total_price;
+        const fee = typeof calcMarketFee === "function" ? calcMarketFee(vk, "ebay", item.cat_id) : vk * 0.13;
+        const profit = vk - fee - userEk - userShipIn - userShipOut;
+        const color = profit >= 0 ? "var(--green)" : "var(--red)";
+        profitHtml = `<span style="color:${color};font-weight:600">${profit >= 0 ? "+" : ""}${profit.toFixed(2)}€</span>`;
+      }
       return `
         <tr class="${rowClass}">
           <td class="text-xs font-semibold nowrap">
@@ -561,6 +581,7 @@ const CompetitionView = (() => {
           <td class="text-right font-bold tabular-nums nowrap">${fmtEur(it.price)}</td>
           <td class="text-muted text-right text-sm nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : I18N.t('comp.inv.incl')}</td>
           <td class="text-right font-bold" style="font-variant-numeric:tabular-nums;white-space:nowrap;color:${isCheapest && !isMe ? "var(--red)" : "var(--text-primary)"}">${fmtEur(it.total_price)}</td>
+          ${hasProfitData ? `<td class="text-right text-sm nowrap">${profitHtml}</td>` : ""}
           <td><span class="badge badge-muted" style="font-size:9px">${esc(it.condition || "—")}</span></td>
           <td class="text-xs nowrap">
             ${it.seller_feedback != null
@@ -595,11 +616,12 @@ const CompetitionView = (() => {
             <th class="text-right">${I18N.t('comp.inv.th.price')}</th>
             <th class="text-right">${I18N.t('comp.inv.th.shipping')}</th>
             <th class="text-right">${I18N.t('comp.inv.th.total')}</th>
+            ${hasProfitData ? `<th class="text-right">Profit</th>` : ""}
             <th>${I18N.t('comp.inv.th.condition')}</th>
             <th>${I18N.t('comp.inv.th.ratings')}</th>
             <th></th>
           </tr></thead>
-          <tbody>${rows || `<tr><td colspan="7" class="text-center text-muted" style="padding:32px">${I18N.t('comp.inv.no_offers')}</td></tr>`}</tbody>
+          <tbody>${rows || `<tr><td colspan="${hasProfitData ? 8 : 7}" class="text-center text-muted" style="padding:32px">${I18N.t('comp.inv.no_offers')}</td></tr>`}</tbody>
         </table>
       </div>
     `;

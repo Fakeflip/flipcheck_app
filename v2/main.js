@@ -1566,7 +1566,7 @@ ipcMain.handle("repricer:status", () => {
   const repricer = settings.repricer || {};
   const logEntries = readRepricerLog();
   return {
-    active:      !!_repricerTimer,
+    active:      repricer.enabled !== false && !!_repricerTimer,
     running:     _repricerRunning,
     lastRun:     logEntries[0]?.ts ? new Date(logEntries[0].ts).toISOString() : null,
     intervalMin: repricer.interval_min || 30,
@@ -1579,6 +1579,19 @@ ipcMain.handle("repricer:setInterval", (_e, min) => {
   saveSettings({ ...s, repricer: { ...(s.repricer || {}), interval_min: Math.max(10, min || 30) } });
   startRepricerMonitor();
   return { ok: true };
+});
+
+ipcMain.handle("repricer:setEnabled", (_e, enabled) => {
+  const s = loadSettings();
+  saveSettings({ ...s, repricer: { ...(s.repricer || {}), enabled: !!enabled } });
+  if (enabled) {
+    startRepricerMonitor();
+  } else if (_repricerTimer) {
+    clearInterval(_repricerTimer);
+    _repricerTimer = null;
+    console.log("[Repricer] Stopped by user.");
+  }
+  return { ok: true, active: !!enabled };
 });
 
 ipcMain.handle("repricer:authUrl", async () => {
@@ -1888,6 +1901,7 @@ function startRepricerMonitor() {
   if (_repricerTimer) { clearInterval(_repricerTimer); _repricerTimer = null; }
   const settings    = loadSettings();
   const repricer    = settings.repricer || {};
+  if (repricer.enabled === false) { console.log("[Repricer] Disabled by user."); return; }
   const intervalMin = Math.max(10, repricer.interval_min || 30);
   _repricerTimer = setInterval(runRepricerMonitor, intervalMin * 60 * 1000);
   // First run after 60s (give backend time to start)
@@ -1906,6 +1920,46 @@ function readSyncLog() {
 }
 function writeSyncLog(log) {
   try { fs.writeFileSync(EBAY_SYNC_LOG_FILE, JSON.stringify(log.slice(0, 50), null, 2), "utf8"); } catch {}
+}
+
+// eBay numeric category ID → local cat_id mapping (most common DE categories)
+const EBAY_CAT_MAP = {
+  // Geräte (6.5% + 3%)
+  "175672": "computer_tablets", "171485": "computer_tablets", "177": "computer_tablets",
+  "58058": "drucker",
+  "625":   "foto_camcorder", "31388": "foto_camcorder",
+  "15032": "handys", "9355": "handys",
+  "20710": "haushaltsgeraete",
+  "139971": "konsolen", "1249": "konsolen",
+  "182959": "scanner",
+  "18871": "speicherkarten",
+  "293":   "tv_video_audio", "32852": "tv_video_audio", "3270": "tv_video_audio",
+  "26395": "koerperpflege",
+  // Zubehör (11% + 3%)
+  "182060": "drucker_zubehoer", "170097": "drucker_zubehoer",
+  "9394":  "handy_zubehoer", "43304": "handy_zubehoer",
+  "48446": "batterien",
+  "182094": "kabel", "44923": "kabel",
+  "31432": "kameras_zubehoer", "179697": "kameras_zubehoer",
+  "31530": "notebook_zubehoer", "171957": "notebook_zubehoer",
+  "3323":  "objektive",
+  "30090": "stative",
+  "176971": "tablet_zubehoer",
+  "33963": "tastaturen_maeuse",
+  "14961": "tv_zubehoer",
+  "3676":  "pc_zubehoer", "38583": "pc_zubehoer",
+  "14969": "audio_zubehoer",
+  // Sonstiges
+  "11450": "mode", "15724": "mode",
+  "888":   "sport_freizeit", "382":  "sport_freizeit",
+  "220":   "spielzeug", "19169": "spielzeug",
+  "11700": "haushalt_garten", "159907": "haushalt_garten",
+  "267":   "buecher",
+};
+
+function mapEbayCategoryId(numericId) {
+  if (!numericId) return null;
+  return EBAY_CAT_MAP[String(numericId)] || null;
 }
 
 let _ebaySyncTimer   = null;
@@ -1995,7 +2049,8 @@ async function runEbaySyncCycle() {
         if (match.status !== "LISTED" && match.status !== "SOLD") { match.status = "LISTED"; changed = true; }
         if (listing.price && !match.sell_price) { match.sell_price = listing.price; changed = true; }
         if (listing.title && !match.title) { match.title = listing.title; changed = true; }
-        if (listing.category_id && (!match.cat_id || match.cat_id === "sonstiges")) { match.cat_id = listing.category_id; changed = true; }
+        const mappedCat = mapEbayCategoryId(listing.category_id);
+        if (mappedCat && (!match.cat_id || match.cat_id === "sonstiges")) { match.cat_id = mappedCat; changed = true; }
         if (listing.qty && listing.qty > 1 && match.qty === 1) { match.qty = listing.qty; changed = true; }
         if (changed) {
           match.updated_at = now;
@@ -2029,7 +2084,7 @@ async function runEbaySyncCycle() {
           qty:           listing.qty || 1,
           ek:            autoEk,
           ek_date:       autoEkDate,
-          cat_id:        listing.category_id || autoCatId,
+          cat_id:        mapEbayCategoryId(listing.category_id) || autoCatId || "sonstiges",
           ship_out:      autoShipOut,
           condition:     autoCondition,
           sell_price:    listing.price || null,
@@ -2193,12 +2248,15 @@ ipcMain.handle("ebaySync:status", async () => {
   const base     = apiBaseBackend();
   const token    = await getToken().catch(() => null);
   let connected  = false;
+  let username   = null;
   try {
     const res = await sellerApiCall(`${base}/seller/auth/status`, token);
     connected = !!res.data?.connected;
+    username  = res.data?.username || res.data?.seller_username || null;
   } catch {}
   return {
     connected,
+    username,
     enabled:      syncConf.enabled !== false,
     auto_create:  syncConf.auto_create !== false,
     interval_min: syncConf.interval_min || 30,

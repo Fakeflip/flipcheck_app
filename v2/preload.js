@@ -321,6 +321,8 @@ contextBridge.exposeInMainWorld("fc", {
   repricerStatus:      () => ipcRenderer.invoke("repricer:status"),
   /** @param {number} min @returns {Promise<{ok:boolean}>} */
   repricerSetInterval: (min)  => ipcRenderer.invoke("repricer:setInterval", min),
+  /** Enable/disable the entire repricer. @param {boolean} on @returns {Promise<{ok:boolean, active:boolean}>} */
+  repricerSetEnabled:  (on)   => ipcRenderer.invoke("repricer:setEnabled", on),
   /** @returns {Promise<string|null>} eBay OAuth consent URL */
   repricerAuthUrl:     () => ipcRenderer.invoke("repricer:authUrl"),
   /** @returns {Promise<boolean>} */

@@ -25,6 +25,7 @@ const App = {
   settings: {},
   currentView: null,
   viewInstances: {},
+  _ebaySellerUsername: null,   // eBay seller username (for own-listing highlight)
   _navId: 0,          // Navigation counter — lets async mounts detect stale renders
   _navPayload: null,  // One-shot payload passed between views (e.g. EAN for Flipcheck)
   _statusInterval: 0, // setInterval ID for backend-status polling (cleared on logout)
@@ -743,6 +744,21 @@ async function boot() {
     });
   } catch {}
 
+  // Listen for eBay seller token received (after OAuth deep link) → refresh current view
+  try {
+    window.fc.onEbaySellerTokenReceived(() => {
+      Toast.success("eBay verbunden", "Seller-Token erfolgreich empfangen");
+      // Re-mount current view to refresh connection status
+      if (App.currentView && App._views[App.currentView]?.unmount) {
+        try { App._views[App.currentView].unmount(); } catch {}
+      }
+      const container = document.getElementById("main-content");
+      if (container && App.currentView && App._views[App.currentView]?.mount) {
+        App._views[App.currentView].mount(container);
+      }
+    });
+  } catch {}
+
   // Backend unavailable banner (local/dev mode only — never fires in production)
   try {
     window.fc.onBackendUnavailable(() => {
@@ -895,6 +911,12 @@ async function initApp() {
       }
     } catch {}
   }
+
+  // Fetch eBay seller username for own-listing highlight in competition view
+  try {
+    const syncStatus = await window.fc.ebaySyncStatus();
+    if (syncStatus?.username) App._ebaySellerUsername = syncStatus.username;
+  } catch {}
 
   // Start price alert background timer (every 15 minutes) — store ID for cleanup
   if (typeof runAlertChecks === "function") {

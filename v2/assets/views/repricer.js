@@ -5,6 +5,7 @@ const RepricerView = (() => {
   let _log        = [];
   let _selected   = null;
   let _connected  = false;
+  let _active     = false;    // master on/off
   let _status     = null;
   let _settings   = {};
   let _inventory  = [];
@@ -106,6 +107,11 @@ const RepricerView = (() => {
             </svg>
             Einstellungen
           </button>
+          <button class="btn btn-sm" id="btnReprToggleActive" title="Repricer komplett an/ausschalten"
+            style="gap:4px;font-size:11px;border:1px solid var(--border);background:var(--bg-panel);color:var(--text-muted)">
+            <span id="reprActiveIcon" style="font-size:13px">⏸</span>
+            <span id="reprActiveLabel">Aus</span>
+          </button>
           <button class="btn btn-primary btn-sm" id="btnReprRun">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
               <polygon points="3,2 13,8 3,14" fill="currentColor"/>
@@ -124,7 +130,7 @@ const RepricerView = (() => {
               Hinzufügen
             </button>
           </div>
-          <div id="reprItemList" class="comp-seller-list"></div>
+          <div id="reprItemList" class="comp-seller-list" style="overflow-y:auto;max-height:calc(100vh - 220px)"></div>
         </div>
 
         <div class="comp-right" id="reprRight">
@@ -152,6 +158,7 @@ const RepricerView = (() => {
     const connStatus = await Storage.repricerIsConnected();
     _connected = typeof connStatus === "object" ? connStatus.connected : !!connStatus;
     if (typeof connStatus === "object" && _status) _status.is_legacy = connStatus.is_legacy;
+    _active = !!_status?.active;
     _render();
     _wireEvents();
   }
@@ -171,6 +178,16 @@ const RepricerView = (() => {
     }
     const disconnBtn = _container.querySelector("#btnReprDisconnect");
     if (disconnBtn) disconnBtn.style.display = _connected ? "" : "none";
+
+    const activeIcon  = _container.querySelector("#reprActiveIcon");
+    const activeLabel = _container.querySelector("#reprActiveLabel");
+    const activeBtn   = _container.querySelector("#btnReprToggleActive");
+    if (activeIcon && activeLabel && activeBtn) {
+      activeIcon.textContent  = _active ? "▶" : "⏸";
+      activeLabel.textContent = _active ? "An" : "Aus";
+      activeBtn.style.borderColor = _active ? "var(--green)" : "var(--border)";
+      activeBtn.style.color       = _active ? "var(--green)" : "var(--text-muted)";
+    }
 
     const countEl = _container.querySelector("#reprItemCount");
     if (countEl) countEl.textContent = `${_items.length} Artikel`;
@@ -541,6 +558,15 @@ const RepricerView = (() => {
           btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polygon points="3,2 13,8 3,14" fill="currentColor"/></svg> Jetzt ausführen`;
         }
       }
+    });
+
+    _container.querySelector("#btnReprToggleActive")?.addEventListener("click", async () => {
+      _active = !_active;
+      try {
+        await window.fc.repricerSetEnabled(_active);
+        _render();
+        Toast.success(_active ? "Repricer aktiviert" : "Repricer deaktiviert");
+      } catch { Toast.error("Fehler beim Umschalten"); }
     });
 
     _container.querySelector("#btnReprSettings")?.addEventListener("click", _showSettings);
