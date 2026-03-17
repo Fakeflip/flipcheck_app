@@ -4,7 +4,9 @@
  * Features: deduplication (30s), rate-limit (10/min), stack capture.
  */
 const ErrorReporter = (() => {
-  const WEBHOOK    = "https://discord.com/api/webhooks/1478520342233223169/Xm8AEoSvduusadIVPEv4z9XgNIACyosfB3wtV4ZtiHbAcVQrETFU5qHl1ABDswdfh6VM";
+  // Webhook URL loaded from main process (never hardcoded in source)
+  let WEBHOOK      = "";
+  try { if (window.fc?.errorWebhookUrl) window.fc.errorWebhookUrl().then(u => { WEBHOOK = u || ""; }).catch(() => {}); } catch {}
   const DEDUP_MS   = 30_000;   // same error within 30s → skip
   const MAX_PM     = 10;       // max 10 reports per minute
 

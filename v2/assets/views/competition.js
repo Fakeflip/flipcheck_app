@@ -10,6 +10,7 @@ const CompetitionView = (() => {
   let _listingFilter  = "all";     // "all" | "new" | "seen"
   let _lastListings   = null;      // { username, total, items, q, fbScore, fbPct, seenSet }
   const _compCache    = new Map();  // itemId → { total, items, fetchedAt }
+  let _compChart      = null;       // Chart.js instance for competition price history
 
   // Webhook state (loaded from settings)
   let _wh = {
@@ -29,6 +30,7 @@ const CompetitionView = (() => {
 
   function unmount() {
     if (_debounce) { clearTimeout(_debounce); _debounce = null; }
+    if (_compChart) { try { _compChart.destroy(); } catch {} _compChart = null; }
     _container = null;
   }
 
@@ -462,7 +464,12 @@ const CompetitionView = (() => {
       const items = data.items || [];
       _compCache.set(item.id, { total: data.total, items, fetchedAt: Date.now() });
       rerenderInvLeft();
-      if (right && !silent) { right.innerHTML = renderInvCompetition(item, data.total, items); bindRightRefresh(); }
+      if (right && !silent) { right.innerHTML = renderInvCompetition(item, data.total, items); bindRightRefresh(); renderCompChart(item.ean, right); }
+      // Save history snapshot
+      const cheapestPrice = items[0]?.total_price ?? null;
+      if (item.ean && cheapestPrice != null) {
+        try { window.fc?.compHistorySave(item.ean, cheapestPrice, data.total); } catch {}
+      }
       // Check if undercut → fire webhook if enabled
       if (_wh.url && _wh.events.undercut) {
         const myPrice  = item.sell_price || null;
@@ -497,6 +504,46 @@ const CompetitionView = (() => {
         }).join("")
       : `<div class="comp-list-empty">${I18N.t('comp.inv.no_items2')}</div>`;
     bindInvList(_container);
+  }
+
+  async function renderCompChart(ean, rightEl) {
+    if (!ean || !rightEl) return;
+    try {
+      const history = await window.fc?.compHistoryGet(ean);
+      if (!history?.length || history.length < 2) return;
+      const wrap = rightEl.querySelector("#compHistoryWrap");
+      if (wrap) wrap.style.display = "";
+      const canvas = rightEl.querySelector("#compHistoryChart");
+      if (!canvas) return;
+      if (_compChart) { try { _compChart.destroy(); } catch {} _compChart = null; }
+      const labels = history.map(h => h.date.slice(5)); // "MM-DD"
+      const prices = history.map(h => h.cheapest);
+      _compChart = new Chart(canvas, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            data: prices,
+            borderColor: "#6366F1",
+            backgroundColor: "rgba(99,102,241,0.08)",
+            borderWidth: 2,
+            pointRadius: history.length > 14 ? 0 : 3,
+            pointBackgroundColor: "#6366F1",
+            fill: true,
+            tension: 0.3,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.parsed.y.toFixed(2)}\u20ac` } } },
+          scales: {
+            x: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { color: "#475569", font: { size: 10 } } },
+            y: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { color: "#475569", font: { size: 10 }, callback: (v) => v.toFixed(0) + "\u20ac" } },
+          },
+        },
+      });
+    } catch {}
   }
 
   function renderInvCompetition(item, total, items) {
@@ -609,6 +656,10 @@ const CompetitionView = (() => {
       </div>
       ${banner}
       ${kpiBar}
+      <div id="compHistoryWrap" class="panel panel-sm" style="margin-bottom:12px;padding:12px 16px;display:none">
+        <div style="font-size:11px;font-weight:600;color:var(--text-secondary);margin-bottom:8px">Preisverlauf (g\u00fcnstigster Anbieter)</div>
+        <div style="height:120px"><canvas id="compHistoryChart"></canvas></div>
+      </div>
       <div class="comp-table-wrap">
         <table class="comp-table">
           <thead><tr>

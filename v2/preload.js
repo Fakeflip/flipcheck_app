@@ -232,6 +232,10 @@ contextBridge.exposeInMainWorld("fc", {
    */
   notify: (title, body) => ipcRenderer.invoke("notify", title, body),
 
+  // ── Competition Price History ─────────────────────────────────────────────
+  compHistorySave: (ean, cheapest, count) => ipcRenderer.invoke("compHistory:save", ean, cheapest, count),
+  compHistoryGet:  (ean) => ipcRenderer.invoke("compHistory:get", ean),
+
   // ── Barcode Scanner ───────────────────────────────────────────────────────
 
   /** @returns {Promise<{port: string|null, connected: boolean}>} */
@@ -362,4 +366,21 @@ contextBridge.exposeInMainWorld("fc", {
   onEbaySyncError:     (cb) => ipcRenderer.on("ebaySync:error", (_e, info) => cb(info)),
   /** Listen for eBay seller token received (after OAuth deep link). @param {(info: object) => void} cb */
   onEbaySellerTokenReceived: (cb) => ipcRenderer.on("ebaySellerToken:received", (_e, info) => cb(info)),
+
+  // ── Kaufland Seller Sync ─────────────────────────────────────────────────
+  kauflandSyncRun:         () => ipcRenderer.invoke("kauflandSync:run"),
+  kauflandSyncStatus:      () => ipcRenderer.invoke("kauflandSync:status"),
+  kauflandSyncSetInterval: (min) => ipcRenderer.invoke("kauflandSync:setInterval", min),
+  kauflandSyncSetEnabled:  (on) => ipcRenderer.invoke("kauflandSync:setEnabled", on),
+  kauflandSyncGetLog:      () => ipcRenderer.invoke("kauflandSync:getLog"),
+  onKauflandSyncCompleted: (cb) => ipcRenderer.on("kauflandSync:completed", (_e, stats) => cb(stats)),
+  onKauflandSyncError:     (cb) => ipcRenderer.on("kauflandSync:error", (_e, info) => cb(info)),
+
+  // Kaufland credentials
+  kauflandSaveCreds:   (creds) => ipcRenderer.invoke("kaufland:saveCreds", creds),
+  kauflandDeleteCreds: () => ipcRenderer.invoke("kaufland:deleteCreds"),
+  kauflandCredsStatus: () => ipcRenderer.invoke("kaufland:credsStatus"),
+
+  // Error reporter webhook URL (loaded from env, not hardcoded)
+  errorWebhookUrl: () => ipcRenderer.invoke("errorWebhookUrl"),
 });

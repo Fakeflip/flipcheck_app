@@ -132,6 +132,75 @@
   --shadow-xl: 0 20px 60px rgba(0,0,0,0.60);
 }
 
+/* ── Light Theme ─────────────────────────────────────────────────────── */
+[data-theme="light"] {
+  --bg-base:      #FFFFFF;
+  --bg-panel:     #F8F9FA;
+  --bg-elevated:  #F0F1F3;
+  --bg-hover:     #E8EAF0;
+  --bg-active:    #E0E3EA;
+
+  --border:        #E2E4E9;
+  --border-subtle: #EDEEF0;
+  --border-strong: #D0D3DA;
+
+  --accent:        #6366F1;
+  --accent-hover:  #5558E8;
+  --accent-subtle: rgba(99, 102, 241, 0.08);
+  --accent-text:   #4F46E5;
+  --accent-border: rgba(99, 102, 241, 0.20);
+
+  --text-primary:   #1A1A2E;
+  --text-secondary: #5A6070;
+  --text-muted:     #8A8F9E;
+  --text-disabled:  #B0B4C0;
+
+  --green:          #059669;
+  --green-subtle:   rgba(5, 150, 105, 0.08);
+  --green-border:   rgba(5, 150, 105, 0.20);
+  --yellow:         #D97706;
+  --yellow-subtle:  rgba(217, 119, 6, 0.08);
+  --yellow-border:  rgba(217, 119, 6, 0.20);
+  --red:            #DC2626;
+  --red-subtle:     rgba(220, 38, 38, 0.08);
+  --red-hover:      rgba(220, 38, 38, 0.12);
+  --red-border:     rgba(220, 38, 38, 0.20);
+  --blue:           #2563EB;
+  --blue-subtle:    rgba(37, 99, 235, 0.08);
+
+  --red-sub:    rgba(220, 38, 38, 0.08);
+  --red-bdr:    rgba(220, 38, 38, 0.20);
+  --green-sub:  rgba(5, 150, 105, 0.08);
+  --green-bdr:  rgba(5, 150, 105, 0.20);
+  --yellow-sub: rgba(217, 119, 6, 0.08);
+  --yellow-bdr: rgba(217, 119, 6, 0.20);
+  --surface2:   #F0F1F3;
+  --border2:    #D0D3DA;
+  --text2:      #5A6070;
+  --dim:        #8A8F9E;
+
+  --purple:        #7C3AED;
+  --purple-subtle: rgba(124, 58, 237, 0.08);
+  --purple-border: rgba(124, 58, 237, 0.20);
+  --blue-border:   rgba(37, 99, 235, 0.20);
+
+  --green-glow:    rgba(5, 150, 105, 0.04);
+  --yellow-glow:   rgba(217, 119, 6, 0.04);
+  --red-glow:      rgba(220, 38, 38, 0.04);
+  --accent-dim:    rgba(99, 102, 241, 0.04);
+
+  --modal-backdrop: rgba(0, 0, 0, 0.30);
+  --overlay-soft:   rgba(0, 0, 0, 0.12);
+
+  --shadow-xs: 0 1px 2px rgba(0,0,0,0.06);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+  --shadow:    0 4px 16px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --shadow-xl: 0 20px 60px rgba(0,0,0,0.16);
+
+  color-scheme: light;
+}
+
 /* ── Reset ───────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { height: 100%; }

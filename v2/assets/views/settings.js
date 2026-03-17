@@ -51,6 +51,7 @@ const SettingsView = (() => {
         packaging: !!container.querySelector("#sFcPackaging")?.checked,
         ad_rate:   !!container.querySelector("#sFcAdRate")?.checked,
       },
+      theme: container.querySelector("#sThemeSeg .seg-btn.active")?.dataset.val || "dark",
     };
   }
 
@@ -106,6 +107,24 @@ const SettingsView = (() => {
               </div>
               <div id="stLangSelector">
                 ${I18N.renderSelector(I18N.getLang())}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Design ────────────────────────────────────────────────────── -->
+        <div class="st-section">
+          ${sectionHeader("Design", icoPalette(), "Farbschema der App")}
+          <div class="panel st-panel">
+            <div class="settings-row" style="border:none">
+              <div class="settings-row-left">
+                <h4>Theme</h4>
+                <p>Dark oder Light Mode</p>
+              </div>
+              <div class="seg" id="sThemeSeg">
+                <button class="seg-btn ${(s?.theme || "dark") === "dark"   ? "active" : ""}" data-val="dark">Dark</button>
+                <button class="seg-btn ${(s?.theme || "dark") === "light"  ? "active" : ""}" data-val="light">Light</button>
+                <button class="seg-btn ${(s?.theme || "dark") === "system" ? "active" : ""}" data-val="system">System</button>
               </div>
             </div>
           </div>
@@ -257,6 +276,73 @@ const SettingsView = (() => {
           </div>
         </div>
 
+        <!-- ── Kaufland Seller Sync ────────────────────────────────────────── -->
+        <div class="st-section" id="kauflandSyncSection">
+          ${sectionHeader("Kaufland Seller Sync", icoSync(), "Automatischer Import von Kaufland-Listings & Bestellungen")}
+          <div class="panel st-panel" id="kauflandSyncPanel">
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Kaufland-Konto</h4>
+                <p id="klSyncConnStatus" style="margin-top:2px">Lade…</p>
+              </div>
+              <div id="klSyncConnBtn"></div>
+            </div>
+            <div id="klCredsForm" style="display:none">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Client Key</h4>
+                  <p>Aus dem Kaufland Seller Portal</p>
+                </div>
+                <input type="text" id="sKlClientKey" class="input" placeholder="Client Key" style="width:240px" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Secret Key</h4>
+                  <p>Geheimer API-Schlüssel</p>
+                </div>
+                <input type="password" id="sKlSecretKey" class="input" placeholder="Secret Key" style="width:240px" />
+              </div>
+              <div class="settings-row" style="border:none">
+                <div class="settings-row-left"></div>
+                <button class="btn btn-primary btn-sm" id="btnKlConnect">Verbinden</button>
+              </div>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Auto-Sync</h4>
+                <p>Inventar automatisch mit Kaufland synchronisieren</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sKlSyncEnabled" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Sync-Intervall</h4>
+                <p>Wie oft neue Daten von Kaufland geholt werden</p>
+              </div>
+              <select id="sKlSyncInterval" class="select" style="width:140px">
+                <option value="15">Alle 15 Min</option>
+                <option value="30" selected>Alle 30 Min</option>
+                <option value="60">Stündlich</option>
+                <option value="360">Alle 6 Std</option>
+              </select>
+            </div>
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Neue Listings importieren</h4>
+                <p>Kaufland-Units ohne Inventar-Eintrag automatisch anlegen</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sKlSyncAutoCreate" checked /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row" style="border:none">
+              <div class="settings-row-left">
+                <h4>Letzter Sync</h4>
+                <p id="klSyncLastInfo" style="margin-top:2px">—</p>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btnKlSyncNow">Jetzt synchronisieren</button>
+            </div>
+          </div>
+        </div>
+
         <!-- ── Shortcuts ──────────────────────────────────────────────────── -->
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.shortcuts'), icoKeyboard(), I18N.t('st.section.shortcuts.desc'))}
@@ -384,6 +470,13 @@ const SettingsView = (() => {
       <path d="M4 7h1M7 7h1M10 7h1M4 9.5h8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>`;
   }
+  function icoPalette() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/>
+      <circle cx="6" cy="6" r="1" fill="currentColor"/><circle cx="10" cy="6" r="1" fill="currentColor"/>
+      <circle cx="5.5" cy="9" r="1" fill="currentColor"/><circle cx="10.5" cy="9" r="1" fill="currentColor"/>
+    </svg>`;
+  }
   function icoApp() {
     return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.5"/>
@@ -425,12 +518,17 @@ const SettingsView = (() => {
     });
 
     // Seg buttons → auto-save
-    ["#sEkModeSeg", "#sModeSeg"].forEach(id => {
+    ["#sEkModeSeg", "#sModeSeg", "#sThemeSeg"].forEach(id => {
       container.querySelectorAll(`${id} .seg-btn`).forEach(btn => {
         btn.addEventListener("click", () => {
           container.querySelectorAll(`${id} .seg-btn`).forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           scheduleSave(container);
+          // Apply theme immediately
+          if (id === "#sThemeSeg" && typeof applyTheme === "function") {
+            applyTheme(btn.dataset.val);
+            if (typeof App !== "undefined") App.settings.theme = btn.dataset.val;
+          }
         });
       });
     });
@@ -561,6 +659,117 @@ const SettingsView = (() => {
           if (lastInfo) lastInfo.textContent = new Date().toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
         } else if (result?.reason === "not_connected") {
           Toast.error("Nicht verbunden", "Bitte zuerst eBay-Konto verbinden.");
+        } else {
+          Toast.error("Sync-Fehler", result?.error || "Unbekannter Fehler");
+        }
+      } catch (e) {
+        Toast.error("Sync-Fehler", e.message || "Verbindung fehlgeschlagen");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
+      }
+    });
+
+    // ── Kaufland Sync section ────────────────────────────────────────────────
+    (async () => {
+      try {
+        const klStatus   = await window.fc.kauflandSyncStatus();
+        const connStatus = container.querySelector("#klSyncConnStatus");
+        const connBtn    = container.querySelector("#klSyncConnBtn");
+        const credsForm  = container.querySelector("#klCredsForm");
+        const enabledCb  = container.querySelector("#sKlSyncEnabled");
+        const intervalSel = container.querySelector("#sKlSyncInterval");
+        const autoCreateCb = container.querySelector("#sKlSyncAutoCreate");
+        const lastInfo   = container.querySelector("#klSyncLastInfo");
+
+        if (connStatus) {
+          connStatus.textContent = klStatus.connected
+            ? "Verbunden mit Kaufland Seller API"
+            : "Nicht verbunden";
+          connStatus.style.color = klStatus.connected ? "var(--green)" : "var(--text-muted)";
+        }
+        if (connBtn) {
+          if (klStatus.connected) {
+            connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>
+              <button class="btn btn-secondary btn-sm" id="btnKlDisconnect" style="margin-left:8px;font-size:11px">Trennen</button>`;
+            if (credsForm) credsForm.style.display = "none";
+            connBtn.querySelector("#btnKlDisconnect")?.addEventListener("click", async () => {
+              await window.fc.kauflandDeleteCreds();
+              Toast.info("Getrennt", "Kaufland-Verbindung wurde entfernt.");
+              if (connStatus) { connStatus.textContent = "Nicht verbunden"; connStatus.style.color = "var(--text-muted)"; }
+              if (connBtn) connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnKlShowForm">Verbinden</button>`;
+              if (credsForm) credsForm.style.display = "";
+              connBtn.querySelector("#btnKlShowForm")?.addEventListener("click", () => { if (credsForm) credsForm.style.display = ""; });
+            });
+          } else {
+            connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnKlShowForm">Verbinden</button>`;
+            connBtn.querySelector("#btnKlShowForm")?.addEventListener("click", () => { if (credsForm) credsForm.style.display = ""; });
+            if (credsForm) credsForm.style.display = "";
+          }
+        }
+
+        // Restore saved state
+        if (enabledCb)    enabledCb.checked = klStatus.enabled !== false;
+        if (intervalSel)  intervalSel.value = String(klStatus.interval_min || 30);
+        if (autoCreateCb) autoCreateCb.checked = klStatus.auto_create !== false;
+
+        // Last sync info
+        if (lastInfo && klStatus.last_sync_at) {
+          const d = new Date(klStatus.last_sync_at);
+          lastInfo.textContent = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        }
+
+        // Event listeners
+        enabledCb?.addEventListener("change", () => window.fc.kauflandSyncSetEnabled(enabledCb.checked));
+        intervalSel?.addEventListener("change", () => window.fc.kauflandSyncSetInterval(parseInt(intervalSel.value)));
+        autoCreateCb?.addEventListener("change", async () => {
+          const s = await Storage.getSettings();
+          await Storage.saveSettings({ kaufland_sync: { ...(s.kaufland_sync || {}), auto_create: autoCreateCb.checked } });
+        });
+      } catch (e) {
+        console.error("[Settings] Kaufland sync init error:", e);
+      }
+    })();
+
+    // Kaufland Connect button
+    container.querySelector("#btnKlConnect")?.addEventListener("click", async () => {
+      const btn = container.querySelector("#btnKlConnect");
+      const ck  = container.querySelector("#sKlClientKey")?.value?.trim();
+      const sk  = container.querySelector("#sKlSecretKey")?.value?.trim();
+      if (!ck || !sk) { Toast.error("Fehler", "Bitte Client Key und Secret Key eingeben."); return; }
+      if (btn) { btn.disabled = true; btn.textContent = "Prüfe…"; }
+      try {
+        const result = await window.fc.kauflandSaveCreds({ client_key: ck, secret_key: sk });
+        if (result?.ok) {
+          Toast.success("Verbunden", "Kaufland Seller API erfolgreich verbunden!");
+          const connStatus = container.querySelector("#klSyncConnStatus");
+          const connBtn    = container.querySelector("#klSyncConnBtn");
+          const credsForm  = container.querySelector("#klCredsForm");
+          if (connStatus) { connStatus.textContent = "Verbunden mit Kaufland Seller API"; connStatus.style.color = "var(--green)"; }
+          if (connBtn) connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>`;
+          if (credsForm) credsForm.style.display = "none";
+        } else {
+          Toast.error("Verbindung fehlgeschlagen", result?.error || "Client Key oder Secret Key ungültig.");
+        }
+      } catch (e) {
+        Toast.error("Fehler", e.message || "Verbindung fehlgeschlagen");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Verbinden"; }
+      }
+    });
+
+    // Kaufland Sync Now button
+    container.querySelector("#btnKlSyncNow")?.addEventListener("click", async () => {
+      const btn = container.querySelector("#btnKlSyncNow");
+      if (btn) { btn.disabled = true; btn.textContent = "Synchronisiere…"; }
+      try {
+        const result = await window.fc.kauflandSyncRun();
+        if (result?.ok && result.stats) {
+          const s = result.stats;
+          Toast.success("Sync abgeschlossen", `${s.active_fetched} aktiv, ${s.sold_marked} verkauft, ${s.new_items} neu importiert`);
+          const lastInfo = container.querySelector("#klSyncLastInfo");
+          if (lastInfo) lastInfo.textContent = new Date().toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+        } else if (result?.reason === "not_connected") {
+          Toast.error("Nicht verbunden", "Bitte zuerst Kaufland-Konto verbinden.");
         } else {
           Toast.error("Sync-Fehler", result?.error || "Unbekannter Fehler");
         }

@@ -882,6 +882,8 @@ app.whenReady().then(async () => {
   startRepricerMonitor();
   // Background eBay inventory sync (pull active + sold listings → inventory)
   startEbaySyncMonitor();
+  // Load Kaufland credentials from keytar into memory, then start sync
+  _initKauflandCreds().then(() => startKauflandSyncMonitor());
 });
 
 app.on("window-all-closed", () => {
@@ -1467,6 +1469,41 @@ ipcMain.handle("notify", (_e, title, body) => {
   return true;
 });
 
+// ─── IPC: Competition Price History ───────────────────────────────────────────
+const COMP_HISTORY_FILE = path.join(app.getPath("userData"), "competition_history.json");
+
+function readCompHistory() {
+  try {
+    if (!fs.existsSync(COMP_HISTORY_FILE)) return {};
+    return JSON.parse(fs.readFileSync(COMP_HISTORY_FILE, "utf8") || "{}") || {};
+  } catch { return {}; }
+}
+
+function writeCompHistory(data) {
+  try { fs.writeFileSync(COMP_HISTORY_FILE, JSON.stringify(data), "utf8"); } catch {}
+}
+
+ipcMain.handle("compHistory:save", (_e, ean, cheapest, count) => {
+  const history = readCompHistory();
+  if (!history[ean]) history[ean] = [];
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = history[ean];
+  // Update today's entry or append
+  const existing = entries.findIndex(e => e.date === today);
+  const point = { date: today, cheapest, count };
+  if (existing !== -1) entries[existing] = point;
+  else entries.push(point);
+  // Keep max 90 days
+  if (entries.length > 90) entries.splice(0, entries.length - 90);
+  writeCompHistory(history);
+  return true;
+});
+
+ipcMain.handle("compHistory:get", (_e, ean) => {
+  const history = readCompHistory();
+  return history[ean] || [];
+});
+
 // ─── IPC: Scanner ─────────────────────────────────────────────────────────────
 ipcMain.handle("scanner:getInfo", () => {
   const ip = getLocalIP();
@@ -1854,9 +1891,22 @@ async function runRepricerMonitor() {
             competitor_2nd: upd.competitor_2nd,
           }).catch(e => console.error("[Repricer] webhook error:", e.message));
         }
+
+        // Desktop notification for price changes
+        try {
+          if (ElectronNotif.isSupported() && repricer.desktop_notifications !== false) {
+            const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
+            const name = (invItem?.title || upd.ean || upd.sku || "").slice(0, 40);
+            const arrow = upd.status === "RAISED" ? "\u2191" : "\u2193";
+            new ElectronNotif({
+              title: `Repricer: ${arrow} Preis ${upd.status === "RAISED" ? "erh\u00f6ht" : "gesenkt"}`,
+              body:  `${name}\n${(upd.old_price || 0).toFixed(2)}\u20ac \u2192 ${(upd.new_price || 0).toFixed(2)}\u20ac`,
+            }).show();
+          }
+        } catch {}
       }
 
-      // Discord webhook for AT_FLOOR events
+      // Discord webhook + notification for AT_FLOOR events
       if (upd.status === "AT_FLOOR") {
         const webhookUrl = settings.webhook_url;
         if (webhookUrl && repricer.webhook_floor !== false) {
@@ -1867,6 +1917,17 @@ async function runRepricerMonitor() {
             competitor_min: upd.competitor_min,
           }).catch(e => console.error("[Repricer] webhook floor error:", e.message));
         }
+        // Desktop notification for floor hit
+        try {
+          if (ElectronNotif.isSupported() && repricer.desktop_notifications !== false) {
+            const invItem = (readInv().items || []).find(i => i.ean === upd.ean);
+            const name = (invItem?.title || upd.ean || upd.sku || "").slice(0, 40);
+            new ElectronNotif({
+              title: "Repricer: Mindestpreis erreicht",
+              body:  `${name}\nFloor: ${(upd.floor_price || 0).toFixed(2)}\u20ac \u00b7 Konkurrenz: ${(upd.competitor_min || 0).toFixed(2)}\u20ac`,
+            }).show();
+          }
+        } catch {}
       }
 
       // Discord webhook for EBAY_FAILED events
@@ -2283,6 +2344,475 @@ ipcMain.handle("ebaySync:setEnabled", (_e, enabled) => {
 
 ipcMain.handle("ebaySync:getLog", () => readSyncLog());
 
+
+// ─── Kaufland Seller Sync ──────────────────────────────────────────────────────
+const KL_SVC = "flipcheck-kaufland";
+const KL_ACC = "seller-creds";
+const KAUFLAND_CREDS_PATH    = path.join(app.getPath("userData"), "kaufland_seller_creds.json");
+const KAUFLAND_SYNC_LOG_FILE = path.join(app.getPath("userData"), "kaufland_sync_log.json");
+
+// In-memory cache for Kaufland creds (loaded from keytar on startup, file as fallback)
+let _kauflandCredsCache = null;
+
+function loadKauflandCreds() {
+  if (_kauflandCredsCache) return _kauflandCredsCache;
+  // Fallback: file-based (keytar loads async on startup → see _initKauflandCreds)
+  try {
+    const data = JSON.parse(fs.readFileSync(KAUFLAND_CREDS_PATH, "utf8"));
+    _kauflandCredsCache = data;
+    return data;
+  } catch { return null; }
+}
+
+async function _initKauflandCreds() {
+  // Load from keytar (encrypted OS keychain) into memory cache
+  try {
+    const raw = await keytar.getPassword(KL_SVC, KL_ACC);
+    if (raw) {
+      _kauflandCredsCache = JSON.parse(raw);
+      return;
+    }
+  } catch {}
+  // If keytar empty but file exists, migrate file → keytar
+  try {
+    const data = JSON.parse(fs.readFileSync(KAUFLAND_CREDS_PATH, "utf8"));
+    if (data?.client_key) {
+      _kauflandCredsCache = data;
+      keytar.setPassword(KL_SVC, KL_ACC, JSON.stringify(data)).catch(() => {});
+    }
+  } catch {}
+}
+
+function saveKauflandCreds(data) {
+  _kauflandCredsCache = data;
+  // Store in keytar (encrypted) — primary
+  keytar.setPassword(KL_SVC, KL_ACC, JSON.stringify(data)).catch(e =>
+    console.warn("[KauflandCreds] Keytar save failed:", e.message)
+  );
+  // File fallback (for keytar failures, e.g. macOS Keychain denied)
+  try {
+    fs.writeFileSync(KAUFLAND_CREDS_PATH, JSON.stringify(data, null, 2), "utf8");
+    console.log("[KauflandCreds] Saved locally");
+  } catch (e) { console.error("[KauflandCreds] Save failed:", e.message); }
+}
+
+function deleteKauflandCreds() {
+  _kauflandCredsCache = null;
+  keytar.deletePassword(KL_SVC, KL_ACC).catch(() => {});
+  try { fs.unlinkSync(KAUFLAND_CREDS_PATH); } catch {}
+  console.log("[KauflandCreds] Deleted");
+}
+
+function encodeKauflandCreds(data) {
+  if (!data) return "";
+  return Buffer.from(JSON.stringify(data)).toString("base64");
+}
+
+function readKauflandSyncLog() {
+  try {
+    if (!fs.existsSync(KAUFLAND_SYNC_LOG_FILE)) return [];
+    return JSON.parse(fs.readFileSync(KAUFLAND_SYNC_LOG_FILE, "utf8") || "[]") || [];
+  } catch { return []; }
+}
+function writeKauflandSyncLog(log) {
+  try { fs.writeFileSync(KAUFLAND_SYNC_LOG_FILE, JSON.stringify(log.slice(0, 50), null, 2), "utf8"); } catch {}
+}
+
+/**
+ * Make a GET request with auth + Kaufland credentials headers.
+ */
+function kauflandApiCall(urlStr, authToken) {
+  const creds = loadKauflandCreds();
+  return new Promise((resolve, reject) => {
+    const url  = new URL(urlStr);
+    const mod  = url.protocol === "https:" ? https : http;
+    const headers = { "Content-Type": "application/json" };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (creds) headers["X-Kaufland-Credentials"] = encodeKauflandCreds(creds);
+    const opts = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "GET",
+      headers,
+    };
+    const req = mod.request(opts, res => {
+      let body = "";
+      res.on("data", c => body += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.end();
+  });
+}
+
+function kauflandApiPost(urlStr, body, authToken) {
+  const creds = loadKauflandCreds();
+  return new Promise((resolve, reject) => {
+    const payload = JSON.stringify(body);
+    const url     = new URL(urlStr);
+    const mod     = url.protocol === "https:" ? https : http;
+    const headers = {
+      "Content-Type":   "application/json",
+      "Content-Length": Buffer.byteLength(payload),
+    };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (creds) headers["X-Kaufland-Credentials"] = encodeKauflandCreds(creds);
+    const opts = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method:   "POST",
+      headers,
+    };
+    const req = mod.request(opts, res => {
+      let data = "";
+      res.on("data", c => data += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(data) }); }
+        catch { resolve({ status: res.statusCode, data: null }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("timeout")); });
+    req.write(payload);
+    req.end();
+  });
+}
+
+let _kauflandSyncTimer   = null;
+let _kauflandSyncRunning = false;
+
+async function runKauflandSyncCycle() {
+  if (_kauflandSyncRunning) return { ok: false, reason: "already_running" };
+  _kauflandSyncRunning = true;
+  console.log("[KauflandSync] Cycle started");
+  const stats = { active_fetched: 0, sold_fetched: 0, new_items: 0, updated: 0, sold_marked: 0, archived: 0 };
+  try {
+    const settings  = loadSettings();
+    const syncConf  = settings.kaufland_sync || {};
+    if (syncConf.enabled === false) { console.log("[KauflandSync] Disabled."); return { ok: true, skipped: true }; }
+
+    const token = await getToken().catch(() => null);
+    const base  = apiBaseBackend();
+
+    // 1. Check connection
+    const statusRes = await kauflandApiCall(`${base}/kaufland/auth/status`, token);
+    if (!statusRes.data) {
+      console.log("[KauflandSync] Backend unreachable.");
+      return { ok: false, reason: "backend_unavailable" };
+    }
+    if (!statusRes.data.connected) { console.log("[KauflandSync] Not connected."); return { ok: false, reason: "not_connected" }; }
+
+    // 2. Fetch ALL active units (paginated)
+    const allActive = [];
+    let page = 1;
+    while (true) {
+      const res = await kauflandApiCall(`${base}/kaufland/listings/active?page=${page}&per_page=200`, token);
+      if (!res.data?.ok) break;
+      allActive.push(...(res.data.items || []));
+      if (page >= (res.data.total_pages || 1)) break;
+      page++;
+    }
+    stats.active_fetched = allActive.length;
+    console.log(`[KauflandSync] Fetched ${allActive.length} active units`);
+
+    // 3. Fetch sold orders (since last sync, max 60 days)
+    const lastSync = syncConf.last_sync_at ? new Date(syncConf.last_sync_at) : null;
+    const daysSince = lastSync ? Math.min(60, Math.ceil((Date.now() - lastSync.getTime()) / 86400000) + 1) : 30;
+    const allSold = [];
+    page = 1;
+    while (true) {
+      const res = await kauflandApiCall(`${base}/kaufland/listings/sold?page=${page}&per_page=200&days=${daysSince}`, token);
+      if (!res.data?.ok) break;
+      allSold.push(...(res.data.items || []));
+      if (page >= (res.data.total_pages || 1)) break;
+      page++;
+    }
+    stats.sold_fetched = allSold.length;
+    console.log(`[KauflandSync] Fetched ${allSold.length} sold items (last ${daysSince} days)`);
+
+    // 4. Read current inventory
+    const invData = readInv();
+    const items   = invData.items || [];
+    const now     = nowIso();
+
+    // Build index for fast matching
+    const byKauflandId = new Map();
+    const byEan        = new Map();
+    for (const it of items) {
+      if (it.kaufland_unit_id) byKauflandId.set(it.kaufland_unit_id, it);
+      if (it.ean)              byEan.set(it.ean, it);
+    }
+
+    const activeUnitIds = new Set();
+
+    // 5. Process active listings
+    for (const listing of allActive) {
+      const unitId = listing.item_id;
+      if (!unitId) continue;
+      activeUnitIds.add(unitId);
+
+      let match = byKauflandId.get(unitId);
+      if (!match && listing.ean) match = byEan.get(listing.ean);
+
+      if (match) {
+        let changed = false;
+        if (!match.kaufland_unit_id) { match.kaufland_unit_id = unitId; changed = true; }
+        if (match.status !== "LISTED" && match.status !== "SOLD") { match.status = "LISTED"; changed = true; }
+        if (listing.price && !match.sell_price) { match.sell_price = listing.price; changed = true; }
+        if (listing.title && !match.title) { match.title = listing.title; changed = true; }
+        if (listing.kaufland_product_id && !match.kaufland_product_id) { match.kaufland_product_id = listing.kaufland_product_id; changed = true; }
+        if (listing.quantity && listing.quantity > 1 && match.qty === 1) { match.qty = listing.quantity; changed = true; }
+        if (changed) {
+          match.updated_at = now;
+          stats.updated++;
+        }
+      } else if (syncConf.auto_create !== false) {
+        // Smart EK match: find existing item with same EAN that has an EK set
+        let autoEk = null, autoEkDate = null, autoCatId = null, autoShipOut = 0, autoCondition = null;
+        if (listing.ean) {
+          const ekDonor = items.find(i => i.ean === listing.ean && i.ek != null);
+          if (ekDonor) {
+            autoEk        = ekDonor.ek;
+            autoEkDate    = ekDonor.ek_date;
+            autoCatId     = ekDonor.cat_id;
+            autoShipOut   = ekDonor.ship_out || 0;
+            autoCondition = ekDonor.condition;
+          }
+        }
+        const newItem = normalizeItem({
+          title:              listing.title || "",
+          ean:                listing.ean || "",
+          sku:                listing.ean || unitId,
+          source:             "kaufland_sync",
+          market:             "kaufland",
+          status:             "LISTED",
+          qty:                listing.quantity || 1,
+          ek:                 autoEk,
+          ek_date:            autoEkDate,
+          cat_id:             autoCatId || "sonstiges",
+          ship_out:           autoShipOut,
+          condition:          autoCondition || listing.condition || "new",
+          sell_price:         listing.price || null,
+          kaufland_unit_id:   unitId,
+          kaufland_product_id: listing.kaufland_product_id || null,
+        });
+        items.push(newItem);
+        byKauflandId.set(unitId, newItem);
+        if (newItem.ean) byEan.set(newItem.ean, newItem);
+        stats.new_items++;
+      }
+    }
+
+    // 6. Process sold orders — dedup by order_id
+    const processedOrders = new Set();
+    for (const sold of allSold) {
+      if (!sold.item_id) continue;
+      if (sold.order_id && processedOrders.has(sold.order_id)) continue;
+      if (sold.order_id) processedOrders.add(sold.order_id);
+
+      const alreadyProcessed = items.some(i =>
+        i.kaufland_order_id === sold.order_id && i.status === "SOLD" && sold.order_id
+      );
+      if (alreadyProcessed) continue;
+
+      let match = byKauflandId.get(sold.item_id);
+      if (!match && sold.ean_guess) match = byEan.get(sold.ean_guess);
+
+      if (match && match.status !== "SOLD") {
+        const qtySold = sold.quantity_sold || 1;
+
+        if (match.qty > qtySold) {
+          match.qty -= qtySold;
+          match.updated_at = now;
+          const clone = normalizeItem({
+            ...JSON.parse(JSON.stringify(match)),
+            id:                 undefined,
+            qty:                qtySold,
+            status:             "SOLD",
+            sell_price:         sold.unit_price || sold.total_price || match.sell_price,
+            sold_at:            sold.transaction_date || now,
+            kaufland_order_id:  sold.order_id || null,
+            source:             match.source || "kaufland_sync",
+          });
+          items.push(clone);
+        } else {
+          match.status            = "SOLD";
+          match.sell_price        = sold.unit_price || sold.total_price || match.sell_price;
+          match.sold_at           = sold.transaction_date || now;
+          match.kaufland_order_id = sold.order_id || null;
+          match.updated_at        = now;
+        }
+        stats.sold_marked++;
+      }
+    }
+
+    // 6.5. Return / Refund detection — check sold data for return statuses
+    stats.returns_detected = 0;
+    const returnMap = new Map();
+    for (const sold of allSold) {
+      if (sold.order_id && sold.is_return) {
+        returnMap.set(sold.order_id, {
+          refund_amount:  sold.refund_amount || sold.unit_price || 0,
+          refund_date:    sold.transaction_date || now,
+          return_status:  sold.status,
+        });
+      }
+    }
+    if (returnMap.size > 0) {
+      for (const item of items) {
+        if (item.status !== "SOLD" || !item.kaufland_order_id) continue;
+        const refund = returnMap.get(item.kaufland_order_id);
+        if (!refund) continue;
+        item.status         = "RETURN";
+        item.refund_amount  = refund.refund_amount;
+        item.refund_date    = refund.refund_date;
+        item.updated_at     = now;
+        stats.returns_detected++;
+      }
+      if (stats.returns_detected > 0) console.log(`[KauflandSync] ${stats.returns_detected} return(s) detected`);
+    }
+
+    // 7. Stale detection — items LISTED with kaufland_unit_id but not in active units
+    for (const it of items) {
+      if (it.status === "LISTED" && it.kaufland_unit_id && it.source === "kaufland_sync") {
+        if (!activeUnitIds.has(it.kaufland_unit_id)) {
+          it.status     = "ARCHIVED";
+          it.updated_at = now;
+          stats.archived++;
+        }
+      }
+    }
+
+    // 8. Write back
+    invData.items = items;
+    writeInv(invData);
+
+    // 9. Update last_sync_at
+    saveSettings({ kaufland_sync: { ...syncConf, last_sync_at: now } });
+
+    // 10. Log
+    const logEntry = { ts: Date.now(), ...stats };
+    const log = readKauflandSyncLog();
+    log.unshift(logEntry);
+    writeKauflandSyncLog(log);
+
+    // 11. Notify renderer
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("kauflandSync:completed", stats);
+    }
+
+    console.log(`[KauflandSync] Done — ${stats.new_items} new, ${stats.updated} updated, ${stats.sold_marked} sold, ${stats.returns_detected || 0} returns, ${stats.archived} archived`);
+    return { ok: true, stats };
+  } catch (e) {
+    console.error("[KauflandSync] Cycle error:", e.message);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send("kauflandSync:error", { error: e.message });
+    }
+    return { ok: false, error: e.message };
+  } finally {
+    _kauflandSyncRunning = false;
+  }
+}
+
+function startKauflandSyncMonitor() {
+  if (_kauflandSyncTimer) { clearInterval(_kauflandSyncTimer); _kauflandSyncTimer = null; }
+  const settings    = loadSettings();
+  const syncConf    = settings.kaufland_sync || {};
+  if (syncConf.enabled === false) { console.log("[KauflandSync] Disabled, not starting monitor."); return; }
+  const creds = loadKauflandCreds();
+  if (!creds?.client_key) { console.log("[KauflandSync] No credentials, not starting monitor."); return; }
+  const intervalMin = Math.max(15, syncConf.interval_min || 30);
+  _kauflandSyncTimer = setInterval(runKauflandSyncCycle, intervalMin * 60 * 1000);
+  setTimeout(runKauflandSyncCycle, 120 * 1000);
+  console.log(`[KauflandSync] Monitor started — interval: ${intervalMin} min`);
+}
+
+// Kaufland sync IPC handlers
+ipcMain.handle("kauflandSync:run", async () => runKauflandSyncCycle());
+
+ipcMain.handle("kauflandSync:status", async () => {
+  const settings = loadSettings();
+  const syncConf = settings.kaufland_sync || {};
+  const creds    = loadKauflandCreds();
+  let connected  = !!(creds?.client_key && creds?.secret_key);
+  // Verify credentials if available
+  if (connected) {
+    try {
+      const base  = apiBaseBackend();
+      const token = await getToken().catch(() => null);
+      const res   = await kauflandApiCall(`${base}/kaufland/auth/status`, token);
+      connected   = !!res.data?.connected;
+    } catch { connected = false; }
+  }
+  return {
+    connected,
+    enabled:      syncConf.enabled !== false,
+    auto_create:  syncConf.auto_create !== false,
+    interval_min: syncConf.interval_min || 30,
+    last_sync_at: syncConf.last_sync_at || null,
+    syncing:      _kauflandSyncRunning,
+  };
+});
+
+ipcMain.handle("kauflandSync:setInterval", (_e, min) => {
+  const val = Math.max(15, Math.min(360, parseInt(min) || 30));
+  const settings = loadSettings();
+  saveSettings({ kaufland_sync: { ...(settings.kaufland_sync || {}), interval_min: val } });
+  startKauflandSyncMonitor();
+  return { ok: true, interval_min: val };
+});
+
+ipcMain.handle("kauflandSync:setEnabled", (_e, enabled) => {
+  const settings = loadSettings();
+  saveSettings({ kaufland_sync: { ...(settings.kaufland_sync || {}), enabled: !!enabled } });
+  if (enabled) startKauflandSyncMonitor();
+  else if (_kauflandSyncTimer) { clearInterval(_kauflandSyncTimer); _kauflandSyncTimer = null; }
+  return { ok: true, enabled: !!enabled };
+});
+
+ipcMain.handle("kauflandSync:getLog", () => readKauflandSyncLog());
+
+// Kaufland credential management
+ipcMain.handle("kaufland:saveCreds", async (_e, { client_key, secret_key }) => {
+  if (!client_key || !secret_key) return { ok: false, error: "Client Key und Secret Key erforderlich" };
+  // Save first, then verify
+  saveKauflandCreds({ client_key, secret_key });
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const res   = await kauflandApiCall(`${base}/kaufland/auth/status`, token);
+    if (res.data?.connected) {
+      startKauflandSyncMonitor();
+      return { ok: true };
+    }
+    deleteKauflandCreds();
+    return { ok: false, error: res.data?.error || "Credentials ungueltig" };
+  } catch (e) {
+    deleteKauflandCreds();
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle("kaufland:deleteCreds", () => {
+  deleteKauflandCreds();
+  if (_kauflandSyncTimer) { clearInterval(_kauflandSyncTimer); _kauflandSyncTimer = null; }
+  return { ok: true };
+});
+
+ipcMain.handle("kaufland:credsStatus", () => {
+  const creds = loadKauflandCreds();
+  return { connected: !!(creds?.client_key && creds?.secret_key) };
+});
+
+
+// ─── IPC: Error Reporter Webhook (loaded from env, never hardcoded in renderer) ──
+ipcMain.handle("errorWebhookUrl", () => process.env.DISCORD_ERROR_WEBHOOK || "");
 
 // ─── IPC: Auto-Updater ────────────────────────────────────────────────────────
 ipcMain.handle("updater:check", async () => {

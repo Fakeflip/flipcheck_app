@@ -812,6 +812,12 @@ async function boot() {
     if (settings?.language && typeof I18N !== 'undefined') {
       I18N.setLang(settings.language, { save: false });
     }
+    // Apply saved theme
+    applyTheme(settings?.theme);
+    // Listen for system theme changes
+    window.matchMedia?.("(prefers-color-scheme: light)")?.addEventListener("change", () => {
+      if (App.settings?.theme === "system") applyTheme("system");
+    });
   } catch {}
 
   // Load version
@@ -937,6 +943,35 @@ async function initApp() {
     } catch { /* non-critical — skip silently */ }
   }, 1500);
 
+  // ── Keyboard shortcuts — Cmd/Ctrl + 1-9 for view navigation ─────────────────
+  document.addEventListener("keydown", (e) => {
+    // Skip if user is typing in an input/textarea/select
+    const tag = /** @type {HTMLElement} */ (e.target)?.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+    // Skip if modal is open
+    if (document.getElementById("modal-overlay")?.style.display !== "none") return;
+
+    const isMod = navigator.platform?.includes("Mac") ? e.metaKey : e.ctrlKey;
+    if (!isMod || e.shiftKey || e.altKey) return;
+
+    const viewShortcuts = {
+      "1": "analytics",
+      "2": "flipcheck",
+      "3": "batch",
+      "4": "inventory",
+      "5": "history",
+      "6": "competition",
+      "7": "repricer",
+      "8": "alerts",
+      "9": "settings",
+    };
+    const view = viewShortcuts[e.key];
+    if (view && VIEW_MAP[view]) {
+      e.preventDefault();
+      navigateTo(view);
+    }
+  });
+
   // ── Deep-link check handler — navigate to Flipcheck + auto-run ───────────────
   if (window.fc?.onCheckLink) {
     window.fc.onCheckLink((p) => {
@@ -995,6 +1030,17 @@ async function initApp() {
       _showUpdateChangelog(version, info?.releaseNotes);
     });
   }
+}
+
+// ─── Theme ───────────────────────────────────────────────────────────────────
+function applyTheme(theme) {
+  let effective = theme || "dark";
+  if (effective === "system") {
+    effective = window.matchMedia?.("(prefers-color-scheme: light)").matches ? "light" : "dark";
+  }
+  document.documentElement.dataset.theme = effective === "light" ? "light" : "";
+  // Remove attribute entirely for dark (default)
+  if (effective !== "light") document.documentElement.removeAttribute("data-theme");
 }
 
 // ─── Global Error Handlers ────────────────────────────────────────────────────

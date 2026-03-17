@@ -181,6 +181,16 @@ const BatchView = (() => {
           </div>
 
           <div class="input-group" style="margin-bottom:12px">
+            <label class="input-label">Marktplatz</label>
+            <div class="seg" id="batchMarketSeg" style="display:flex;gap:0">
+              <button class="seg-btn active" data-val="ebay">eBay</button>
+              <button class="seg-btn" data-val="amazon">Amazon</button>
+              <button class="seg-btn" data-val="kaufland">Kaufland</button>
+              <button class="seg-btn" data-val="all" title="Alle Marktpl\u00e4tze vergleichen">Alle</button>
+            </div>
+          </div>
+
+          <div class="input-group" style="margin-bottom:12px">
             <label class="input-label">${I18N.t('bt.form.category')}</label>
             <select id="batchCategory" class="select">
               ${buildCatOptions("sonstiges")}
@@ -420,11 +430,13 @@ const BatchView = (() => {
       ? `<span class="batch-marg ${margin >= 20 ? "batch-marg-hi" : margin >= 10 ? "batch-marg-mid" : "batch-marg-lo"}">${fmtPct(margin)}</span>`
       : `<span class="text-dim">—</span>`;
 
+    const mktBadge = r._market ? `<span class="badge badge-muted" style="font-size:9px;margin-left:4px">${esc(r._market)}</span>` : "";
+
     return `
       <tr>
         <td class="text-mono text-xs text-dim">${esc(r.ean)}</td>
         <td style="max-width:200px">
-          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(r.title||r.ean)}">${esc(r.title||"—")}</div>
+          <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px" title="${esc(r.title||r.ean)}">${esc(r.title||"\u2014")}${mktBadge}</div>
         </td>
         <td class="col-right col-num" style="font-size:12px">${fmtEur(r.ek)}</td>
         <td class="col-right col-num" style="font-size:12px">${vk != null ? fmtEur(vk) : "—"}</td>
@@ -496,6 +508,14 @@ const BatchView = (() => {
       if (file) parseFile(file, container);
     });
 
+    // Market seg
+    container.querySelectorAll("#batchMarketSeg .seg-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        container.querySelectorAll("#batchMarketSeg .seg-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+      });
+    });
+
     container.querySelector("#btnBatchRun")?.addEventListener("click",  () => runBatch(container));
     container.querySelector("#btnBatchStop")?.addEventListener("click", () => { _running = false; });
   }
@@ -553,8 +573,10 @@ const BatchView = (() => {
       return;
     }
 
-    const catId = categorySelect?.value || "sonstiges";
-    const mode  = modeSelect?.value    || "mid";
+    const catId    = categorySelect?.value || "sonstiges";
+    const mode     = modeSelect?.value    || "mid";
+    const batchMkt = container.querySelector("#batchMarketSeg .seg-btn.active")?.dataset.val || "ebay";
+    const markets  = batchMkt === "all" ? ["ebay", "amazon", "kaufland"] : [batchMkt];
 
     _running = true;
     _results = [];
@@ -589,37 +611,43 @@ const BatchView = (() => {
       if (tbodyEl) tbodyEl.insertAdjacentHTML("beforeend", renderLoadingRow(ean));
 
       try {
-        const { ok, data } = await API.flipcheck(ean, defaultEk, mode, {
-          vat_mode:  _vatMode,
-          ek_mode:   _ekMode,
-          category:  catId,
-        });
-        if (!ok || !data) {
-          const errMsg = data?.error || data?.detail || "Backend-Fehler";
-          throw new Error(errMsg);
+        // Multi-market: check all markets, pick best profit
+        let bestResult = null;
+        for (const mkt of markets) {
+          if (!_running) break;
+          try {
+            const { ok, data } = await API.flipcheck(ean, defaultEk, mode, {
+              vat_mode: _vatMode, ek_mode: _ekMode, category: catId, market: mkt,
+            });
+            if (!ok || !data) continue;
+            const vk = data.sell_price_median ?? data.sell_price_avg ?? null;
+            const calc = vk != null ? calcProfit(vk, defaultEk, catId, _vatMode, _ekMode) : null;
+            const profit = calc?.profit ?? data.profit_median ?? -Infinity;
+            if (!bestResult || profit > (bestResult._calc?.profit ?? bestResult.profit_median ?? -Infinity)) {
+              bestResult = { ean, ek: defaultEk, _calc: calc, _market: mkt, ...data };
+            }
+          } catch {}
+          if (markets.length > 1) await new Promise(r => setTimeout(r, 200));
         }
+        if (!bestResult) throw new Error("Kein Ergebnis");
 
-        // Frontend profit calc (tiered fees + VAT applied to sell_price_median)
-        const vk = data.sell_price_median ?? data.sell_price_avg ?? null;
-        const calc = vk != null ? calcProfit(vk, defaultEk, catId, _vatMode, _ekMode) : null;
-
-        _results.push({ ean, ek: defaultEk, _calc: calc, ...data });
+        _results.push(bestResult);
 
         // Save price history — one point for today
         try {
           await Storage.savePrice({
             ean,
-            title:          data.title || ean,
-            browse_avg:     data.browse_avg,
-            browse_median:  data.sell_price_median,
-            research_avg:   data.sell_price_avg,
-            sales_30d:      data.sales_30d,
+            title:          bestResult.title || ean,
+            browse_avg:     bestResult.browse_avg,
+            browse_median:  bestResult.sell_price_median,
+            research_avg:   bestResult.sell_price_avg,
+            sales_30d:      bestResult.sales_30d,
           });
         } catch {}
 
         // Save 30-day Research series if available
-        if (data.price_series?.length) {
-          Storage.savePriceSeries({ ean, title: data.title || ean, price_series: data.price_series, qty_series: data.qty_series || [] });
+        if (bestResult.price_series?.length) {
+          Storage.savePriceSeries({ ean, title: bestResult.title || ean, price_series: bestResult.price_series, qty_series: bestResult.qty_series || [] });
         }
 
       } catch (err) {
@@ -650,8 +678,38 @@ const BatchView = (() => {
     if (btnStop) btnStop.style.display = "none";
     _running = false;
 
-    const buyCount = _results.filter(r => r.verdict === "BUY").length;
-    Toast.success(I18N.t('bt.run.done'), `${uniqueEans.length} ${I18N.t('bt.run.done_sub')} · ${buyCount} BUY`);
+    const buyCount  = _results.filter(r => r.verdict === "BUY").length;
+    const errCount  = _results.filter(r => r.error).length;
+    const doneMsg   = `${uniqueEans.length} ${I18N.t('bt.run.done_sub')} \u00b7 ${buyCount} BUY${errCount > 0 ? ` \u00b7 ${errCount} Fehler` : ""}`;
+    Toast.success(I18N.t('bt.run.done'), doneMsg);
+
+    // Show retry button for failed EANs
+    if (errCount > 0) {
+      const retryWrap = document.createElement("div");
+      retryWrap.style.cssText = "display:flex;justify-content:center;padding:8px 0";
+      retryWrap.innerHTML = `<button class="btn btn-secondary btn-sm" id="btnBatchRetry" style="gap:6px">
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M13 8A5 5 0 1 1 3.07 5.65M3 2v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        ${errCount} fehlgeschlagene EANs erneut pr\u00fcfen
+      </button>`;
+      resultsEl?.appendChild(retryWrap);
+      retryWrap.querySelector("#btnBatchRetry")?.addEventListener("click", async () => {
+        retryWrap.remove();
+        const failedEans = _results.filter(r => r.error).map(r => r.ean);
+        // Remove error results
+        _results = _results.filter(r => !r.error);
+        // Remove error rows from DOM
+        failedEans.forEach(ean => {
+          const rows = resultsEl?.querySelectorAll("tr");
+          rows?.forEach(row => {
+            if (row.querySelector("td")?.textContent?.trim() === ean && row.querySelector("td[colspan]")) row.remove();
+          });
+        });
+        // Re-run for failed EANs
+        const textarea = container.querySelector("#batchEanList");
+        if (textarea) textarea.value = failedEans.join("\\n");
+        runBatch(container);
+      });
+    }
 
     setTimeout(() => {
       if (progressEl) progressEl.style.display = "none";

@@ -105,6 +105,11 @@ function normalizeItem(input) {
   it.refund_date       = it.refund_date       || null;
   it.refund_fee_credit = it.refund_fee_credit !== undefined ? (Number(it.refund_fee_credit) || 0) : 0;
 
+  // Kaufland sync fields — linking inventory items to Kaufland listings/orders
+  it.kaufland_unit_id    = it.kaufland_unit_id    || null;  // Kaufland unit ID (links to active listing)
+  it.kaufland_product_id = it.kaufland_product_id || null;  // Kaufland product ID
+  it.kaufland_order_id   = it.kaufland_order_id   || null;  // Kaufland order ID (dedup for sold items)
+
   return /** @type {import('./assets/lib/types.js').FC_InventoryItem} */ (it);
 }
 

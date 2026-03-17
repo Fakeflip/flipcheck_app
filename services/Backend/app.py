@@ -1987,6 +1987,99 @@ async def seller_sold_listings(request: Request, page: int = 1, per_page: int = 
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
+# ─── Kaufland Seller API ─────────────────────────────────────────────────────
+try:
+    from kaufland_seller import (
+        verify_credentials as kl_verify_credentials,
+        get_active_units as kl_get_active_units,
+        get_orders as kl_get_orders,
+        update_unit_price as kl_update_unit_price,
+        parse_kaufland_creds,
+    )
+    _KAUFLAND_SELLER_AVAILABLE = True
+except ImportError:
+    _KAUFLAND_SELLER_AVAILABLE = False
+
+    async def kl_verify_credentials(ck, sk): return {"ok": False, "error": "kaufland_seller module not available"}  # type: ignore[misc]
+    async def kl_get_active_units(ck, sk, **_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def kl_get_orders(ck, sk, **_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def kl_update_unit_price(ck, sk, uid, price): return {"ok": False, "error": "not available"}  # type: ignore[misc]
+    def parse_kaufland_creds(raw): return None  # type: ignore[misc]
+
+
+def _get_kaufland_creds_from_request(request) -> tuple | None:
+    """Extract client_key and secret_key from X-Kaufland-Credentials header (base64 JSON)."""
+    raw = request.headers.get("x-kaufland-credentials", "")
+    if not raw:
+        return None
+    creds = parse_kaufland_creds(raw)
+    if creds:
+        return creds.get("client_key"), creds.get("secret_key")
+    return None
+
+
+@app.get("/kaufland/auth/status")
+async def kaufland_auth_status(request: Request):
+    """Verify Kaufland API credentials."""
+    if not _KAUFLAND_SELLER_AVAILABLE:
+        return {"ok": True, "connected": False}
+    creds = _get_kaufland_creds_from_request(request)
+    if not creds:
+        return {"ok": True, "connected": False}
+    try:
+        result = await kl_verify_credentials(creds[0], creds[1])
+        return {"ok": True, "connected": result.get("connected", False)}
+    except Exception as e:
+        return {"ok": True, "connected": False, "error": str(e)}
+
+
+@app.get("/kaufland/listings/active")
+async def kaufland_active_listings(request: Request, page: int = 1, per_page: int = 100):
+    """Fetch seller's active Kaufland units."""
+    if not _KAUFLAND_SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "Kaufland seller not configured"}, status_code=503)
+    creds = _get_kaufland_creds_from_request(request)
+    if not creds:
+        return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
+    try:
+        return await kl_get_active_units(creds[0], creds[1], page=page, per_page=min(int(per_page), 200))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+@app.get("/kaufland/listings/sold")
+async def kaufland_sold_listings(request: Request, page: int = 1, per_page: int = 100, days: int = 30):
+    """Fetch seller's recent Kaufland orders."""
+    if not _KAUFLAND_SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "Kaufland seller not configured"}, status_code=503)
+    creds = _get_kaufland_creds_from_request(request)
+    if not creds:
+        return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
+    try:
+        return await kl_get_orders(creds[0], creds[1], days=min(int(days), 60), page=page, per_page=min(int(per_page), 200))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+class KauflandRepriceBody(BaseModel):
+    unit_id: str
+    new_price: float
+
+
+@app.post("/kaufland/listings/reprice")
+async def kaufland_reprice(body: KauflandRepriceBody, request: Request):
+    """Update the price of a Kaufland unit."""
+    if not _KAUFLAND_SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "Kaufland seller not configured"}, status_code=503)
+    creds = _get_kaufland_creds_from_request(request)
+    if not creds:
+        return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
+    try:
+        return await kl_update_unit_price(creds[0], creds[1], body.unit_id, body.new_price)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
 if __name__ == "__main__":
     import os
     import uvicorn

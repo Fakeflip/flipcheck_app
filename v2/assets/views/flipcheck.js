@@ -217,6 +217,20 @@ const FlipcheckView = (() => {
 
     // Register barcode scanner IPC listener
     window.fc?.onScannerEan(_onScannerEan);
+
+    // Clipboard EAN detection — suggest auto-fill if clipboard has an EAN
+    try {
+      const eanInp = container.querySelector("#fcEan");
+      if (eanInp && !eanInp.value) {
+        const clip = await navigator.clipboard.readText().catch(() => "");
+        const trimmed = (clip || "").trim();
+        if (/^\d{8,14}$/.test(trimmed)) {
+          eanInp.value = trimmed;
+          eanInp.dispatchEvent(new Event("input", { bubbles: true }));
+          if (typeof Toast !== "undefined") Toast.info("EAN aus Zwischenablage", trimmed);
+        }
+      }
+    } catch {} // clipboard permission denied — ignore silently
   }
 
   function unmount() {
@@ -1799,8 +1813,34 @@ const FlipcheckView = (() => {
       resultEl.querySelector("#btnAddToInv")?.addEventListener("click",     () => addToInventory(ean, ek, data, "ebay"));
       resultEl.querySelector("#btnReset")?.addEventListener("click",         () => { resultEl.innerHTML = renderResultPlaceholder(); });
 
+      // Cache result offline
+      try {
+        const cacheKey = `fc_cache:${selectedMarket}:${identifier}`;
+        localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), ek, data: lastResult }));
+      } catch {}
+
     } catch (err) {
       ErrorReporter.report(err, `runCheck:${selectedMarket}`);
+      // Try offline cache fallback
+      try {
+        const cacheKey = `fc_cache:${selectedMarket}:${identifier}`;
+        const cached = JSON.parse(localStorage.getItem(cacheKey) || "null");
+        if (cached?.data) {
+          const age = Math.round((Date.now() - cached.ts) / 60000);
+          Toast.info("Offline-Cache", `Zeige gespeichertes Ergebnis (${age} Min. alt)`);
+          lastResult = cached.data; lastEan = identifier; lastEk = cached.ek || ek;
+          if (selectedMarket === "amazon") {
+            resultEl.innerHTML = renderResultAmazon(cached.data, identifier, cached.ek || ek, 0);
+          } else if (selectedMarket === "kaufland") {
+            resultEl.innerHTML = renderResultKaufland(cached.data, identifier, cached.ek || ek);
+          } else {
+            resultEl.innerHTML = renderResult(cached.data, identifier, cached.ek || ek, "sonstiges", 0, 0, 0);
+          }
+          resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
+          if (btn) btn.disabled = false;
+          return;
+        }
+      } catch {}
       resultEl.innerHTML = renderError(err.message || "Unbekannter Fehler");
       resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
     } finally {

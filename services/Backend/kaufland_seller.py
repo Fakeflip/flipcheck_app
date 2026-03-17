@@ -1,0 +1,298 @@
+"""
+Kaufland Marketplace Seller API client.
+Uses API client_key + secret_key with HMAC-SHA256 signatures.
+Mirrors ebay_seller.py in structure and response format.
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+from typing import Dict, List, Optional
+from urllib.parse import urlencode
+
+import httpx
+
+logger = logging.getLogger("kaufland_seller")
+
+KAUFLAND_API_BASE = "https://sellerapi.kaufland.com/v2"
+
+# Kaufland order unit statuses that indicate a return/refund
+_RETURN_STATUSES = {
+    "return_requested", "return_received", "return_accepted",
+    "refund_granted", "refund_completed", "cancelled", "cancelled_by_buyer",
+    # Uppercase variants (API may return either)
+    "RETURN_REQUESTED", "RETURN_RECEIVED", "RETURN_ACCEPTED",
+    "REFUND_GRANTED", "REFUND_COMPLETED", "CANCELLED", "CANCELLED_BY_BUYER",
+}
+
+
+# ── HMAC-SHA256 Signing ─────────────────────────────────────────────────────
+
+def _sign_request(secret_key: str, method: str, url: str, body: str, timestamp: str) -> str:
+    """Compute Kaufland HMAC-SHA256 signature."""
+    plain = "\n".join([method, url, body, timestamp])
+    sig = hmac.new(secret_key.encode("utf-8"), plain.encode("utf-8"), hashlib.sha256)
+    return sig.hexdigest()
+
+
+def _build_headers(client_key: str, secret_key: str, method: str, url: str, body: str = "") -> Dict[str, str]:
+    """Build signed headers for Kaufland Seller API request."""
+    ts = str(int(time.time()))
+    sig = _sign_request(secret_key, method, url, body, ts)
+    return {
+        "Shop-Client-Key": client_key,
+        "Shop-Timestamp": ts,
+        "Shop-Signature": sig,
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+        "User-Agent": "Flipcheck/2.6",
+    }
+
+
+# ── Generic Request Helper ──────────────────────────────────────────────────
+
+async def _kaufland_request(
+    method: str,
+    path: str,
+    client_key: str,
+    secret_key: str,
+    params: Optional[Dict] = None,
+    body: Optional[Dict] = None,
+    timeout: float = 30.0,
+) -> Dict:
+    """Execute a signed request to the Kaufland Seller API."""
+    url = f"{KAUFLAND_API_BASE}/{path.lstrip('/')}"
+    if params:
+        url += "?" + urlencode(params)
+
+    body_str = json.dumps(body) if body else ""
+    headers = _build_headers(client_key, secret_key, method.upper(), url, body_str)
+
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        resp = await client.request(
+            method.upper(),
+            url,
+            headers=headers,
+            content=body_str if body else None,
+        )
+
+    if resp.status_code == 401:
+        return {"ok": False, "error": "Unauthorized – invalid credentials", "status": 401}
+    if resp.status_code == 403:
+        return {"ok": False, "error": "Forbidden – insufficient permissions", "status": 403}
+    if resp.status_code == 404:
+        return {"ok": False, "error": "Not found", "status": 404}
+    if resp.status_code >= 400:
+        try:
+            err = resp.json()
+        except Exception:
+            err = resp.text
+        return {"ok": False, "error": f"API error {resp.status_code}: {err}", "status": resp.status_code}
+
+    try:
+        return {"ok": True, "data": resp.json(), "status": resp.status_code}
+    except Exception:
+        return {"ok": True, "data": resp.text, "status": resp.status_code}
+
+
+# ── Credential helpers ──────────────────────────────────────────────────────
+
+def parse_kaufland_creds(raw: str) -> Optional[Dict]:
+    """Decode base64-encoded JSON credentials from X-Kaufland-Credentials header."""
+    if not raw:
+        return None
+    try:
+        decoded = base64.b64decode(raw).decode("utf-8")
+        data = json.loads(decoded)
+        if data.get("client_key") and data.get("secret_key"):
+            return data
+    except Exception:
+        pass
+    # Try raw JSON
+    try:
+        data = json.loads(raw)
+        if data.get("client_key") and data.get("secret_key"):
+            return data
+    except Exception:
+        pass
+    return None
+
+
+def encode_kaufland_creds(data: Dict) -> str:
+    """Encode credentials dict to base64 string."""
+    return base64.b64encode(json.dumps(data).encode("utf-8")).decode("utf-8")
+
+
+# ── Public API Functions ────────────────────────────────────────────────────
+
+async def verify_credentials(client_key: str, secret_key: str) -> Dict:
+    """Verify Kaufland API credentials with a lightweight test call."""
+    result = await _kaufland_request("GET", "/units/", client_key, secret_key, params={"limit": "1"})
+    if result.get("ok"):
+        return {"ok": True, "connected": True}
+    return {"ok": False, "connected": False, "error": result.get("error", "Unknown error")}
+
+
+async def get_active_units(
+    client_key: str,
+    secret_key: str,
+    page: int = 1,
+    per_page: int = 100,
+) -> Dict:
+    """Fetch active units (listings) from Kaufland Seller API, paginated.
+    Returns format matching eBay's get_my_active_listings response.
+    """
+    offset = (page - 1) * per_page
+    params = {
+        "status": "ACTIVE",
+        "limit": str(min(per_page, 200)),
+        "offset": str(offset),
+    }
+
+    result = await _kaufland_request("GET", "/units/", client_key, secret_key, params=params)
+    if not result.get("ok"):
+        return {"ok": False, "error": result.get("error", "Failed to fetch units"), "items": []}
+
+    data = result.get("data", {})
+    raw_items = data.get("data", [])
+    total = data.get("pagination", {}).get("total", len(raw_items))
+    total_pages = max(1, -(-total // per_page))  # ceil division
+
+    items = []
+    for unit in raw_items:
+        # Kaufland returns prices in cents
+        price_cents = unit.get("listing_price") or unit.get("price") or 0
+        price_euro = round(price_cents / 100, 2) if price_cents else 0
+
+        ean = unit.get("ean") or ""
+        product_id = str(unit.get("id_product", "")) if unit.get("id_product") else None
+        unit_id = str(unit.get("id_unit", "")) if unit.get("id_unit") else None
+
+        items.append({
+            "item_id": unit_id,
+            "title": unit.get("title") or unit.get("product_title") or "",
+            "ean": ean,
+            "price": price_euro,
+            "quantity": unit.get("amount") or unit.get("quantity") or 1,
+            "status": unit.get("status", "ACTIVE"),
+            "condition": _map_condition(unit.get("condition")),
+            "url": f"https://www.kaufland.de/product/{product_id}/" if product_id else None,
+            "kaufland_product_id": product_id,
+        })
+
+    return {
+        "ok": True,
+        "total": total,
+        "total_pages": total_pages,
+        "page": page,
+        "items": items,
+    }
+
+
+async def get_orders(
+    client_key: str,
+    secret_key: str,
+    days: int = 30,
+    page: int = 1,
+    per_page: int = 100,
+) -> Dict:
+    """Fetch recent orders from Kaufland Seller API, flattened to sold items.
+    Returns format matching eBay's get_my_sold_list response.
+    """
+    since = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    offset = (page - 1) * per_page
+    params = {
+        "ts_created_from_iso": since,
+        "limit": str(min(per_page, 200)),
+        "offset": str(offset),
+        "sort": "ts_created:desc",
+    }
+
+    result = await _kaufland_request("GET", "/orders/", client_key, secret_key, params=params)
+    if not result.get("ok"):
+        return {"ok": False, "error": result.get("error", "Failed to fetch orders"), "items": []}
+
+    data = result.get("data", {})
+    raw_orders = data.get("data", [])
+    total = data.get("pagination", {}).get("total", len(raw_orders))
+    total_pages = max(1, -(-total // per_page))
+
+    items = []
+    for order in raw_orders:
+        order_id = str(order.get("id_order", ""))
+        order_status = order.get("status", "")
+        ts_created = order.get("ts_created") or order.get("ts_units_created") or ""
+        buyer_name = order.get("buyer", {}).get("name", "") if isinstance(order.get("buyer"), dict) else ""
+        # Mask buyer name for privacy
+        if buyer_name and len(buyer_name) > 3:
+            buyer_name = buyer_name[:3] + "***"
+
+        order_units = order.get("order_units", [])
+        for ou in order_units:
+            price_cents = ou.get("price") or ou.get("unit_price") or 0
+            price_euro = round(price_cents / 100, 2) if price_cents else 0
+            qty = ou.get("quantity") or 1
+
+            unit_status = ou.get("status") or order_status
+            is_return = unit_status in _RETURN_STATUSES
+
+            # Refund amount: Kaufland refunds the unit price on return
+            refund_amount = price_euro if is_return else 0
+
+            items.append({
+                "item_id": str(ou.get("id_unit", "")) if ou.get("id_unit") else None,
+                "order_id": order_id,
+                "title": ou.get("product_title") or ou.get("title") or "",
+                "ean_guess": ou.get("ean") or "",
+                "quantity_sold": qty,
+                "unit_price": price_euro,
+                "total_price": round(price_euro * qty, 2),
+                "transaction_date": ts_created,
+                "buyer": buyer_name,
+                "status": unit_status,
+                "is_return": is_return,
+                "refund_amount": refund_amount,
+            })
+
+    return {
+        "ok": True,
+        "total": total,
+        "total_pages": total_pages,
+        "page": page,
+        "items": items,
+    }
+
+
+async def update_unit_price(
+    client_key: str,
+    secret_key: str,
+    unit_id: str,
+    new_price: float,
+) -> Dict:
+    """Update the listing price of a Kaufland unit. Price in euros, converted to cents."""
+    price_cents = int(round(new_price * 100))
+    result = await _kaufland_request(
+        "PATCH",
+        f"/units/{unit_id}/",
+        client_key,
+        secret_key,
+        body={"listing_price": price_cents},
+    )
+    if result.get("ok"):
+        return {"ok": True, "unit_id": unit_id, "new_price": new_price}
+    return {"ok": False, "unit_id": unit_id, "error": result.get("error", "Update failed")}
+
+
+# ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _map_condition(raw) -> str:
+    """Map Kaufland condition codes to normalized strings."""
+    mapping = {
+        1: "new", "NEW": "new", "new": "new",
+        2: "used_like_new", 4: "used_good", 5: "used_acceptable",
+    }
+    return mapping.get(raw, "new")

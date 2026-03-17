@@ -79,10 +79,7 @@ STRIPE_CANCEL_URL     = os.environ.get("STRIPE_CANCEL_URL",  "https://gate.joinf
 DISCORD_BOT_TOKEN    = os.environ.get("DISCORD_BOT_TOKEN", "")
 DISCORD_GUILD_ID     = os.environ.get("DISCORD_GUILD_ID", "")
 DISCORD_PAID_ROLE_ID = os.environ.get("DISCORD_PAID_ROLE_ID", "")
-DISCORD_NOTIFY_WEBHOOK = os.environ.get(
-    "DISCORD_NOTIFY_WEBHOOK",
-    "https://discord.com/api/webhooks/1480624484388962335/SaEs4vrxxRBXfSc8Q7awi2A6bFLcwda93kMi3ySaOC_qnXQIaNIm43JxCET4siw2KPri",
-)
+DISCORD_NOTIFY_WEBHOOK = os.environ.get("DISCORD_NOTIFY_WEBHOOK", "")
 
 # Backend service (internal)
 BACKEND_URL = os.environ.get("BACKEND_URL", "http://127.0.0.1:8001")
