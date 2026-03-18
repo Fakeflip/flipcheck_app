@@ -114,6 +114,7 @@ const FlipcheckView = (() => {
             <input id="fcEan" class="input" type="text" placeholder="z.B. 4010355040672 oder B0CX4F5P1S"
                    maxlength="20" inputmode="numeric" autocomplete="off" style="flex:1"/>
             <button class="btn btn-ghost" id="fcScanBtn" title="Barcode scannen" style="padding:8px 10px;font-size:16px">📷</button>
+            <input type="file" id="fcScanFile" accept="image/*" capture="environment" style="display:none"/>
           </div>
         </div>
 
@@ -757,8 +758,13 @@ const FlipcheckView = (() => {
       autoDetectMarket(e.target.value);
     });
 
-    // Barcode scanner
+    // Barcode scanner — live camera + photo fallback
     container.querySelector("#fcScanBtn")?.addEventListener("click", () => openBarcodeScanner(container));
+    container.querySelector("#fcScanFile")?.addEventListener("change", (e) => {
+      const file = e.target.files?.[0];
+      if (file) scanFromImage(file, container);
+      e.target.value = "";
+    });
 
     // Market toggle
     container.querySelectorAll("#fcMarketSeg .seg-btn").forEach(btn => {
@@ -809,6 +815,41 @@ const FlipcheckView = (() => {
     _container = null;
   }
 
+  /* ── Barcode from Photo (fallback for older devices) ────────────── */
+  async function scanFromImage(file, container) {
+    if (typeof Html5Qrcode === "undefined") {
+      Toast.error("Scanner nicht verfügbar", "Library nicht geladen.");
+      return;
+    }
+    Toast.info("Scanne Bild…", "Barcode wird analysiert");
+    try {
+      const scanner = new Html5Qrcode("__fcImgScan__", /* verbose */ false);
+      // Create a temporary hidden div for the scanner
+      const tmp = document.createElement("div");
+      tmp.id = "__fcImgScan__";
+      tmp.style.display = "none";
+      document.body.appendChild(tmp);
+
+      const result = await scanner.scanFileV2(file, /* showImage */ false);
+      const code = result?.decodedText;
+      if (code && /^\d{8,14}$/.test(code)) {
+        const inp = container.querySelector("#fcEan");
+        if (inp) inp.value = code;
+        autoDetectMarket(code);
+        Toast.success("Barcode erkannt", code);
+      } else if (code) {
+        Toast.warning("Unbekannter Code", code);
+      } else {
+        Toast.error("Kein Barcode", "Konnte keinen Barcode im Bild finden. Versuche näher/schärfer.");
+      }
+      scanner.clear();
+      tmp.remove();
+    } catch (e) {
+      Toast.error("Scan fehlgeschlagen", "Kein Barcode erkannt. Bild scharf und nah genug?");
+      document.getElementById("__fcImgScan__")?.remove();
+    }
+  }
+
   /* ── Barcode Scanner (html5-qrcode — works on Safari, Chrome, Firefox) */
   let _html5Scanner = null;
 
@@ -822,6 +863,12 @@ const FlipcheckView = (() => {
       <div style="text-align:center">
         <div id="scannerRegion" style="width:100%;max-width:400px;margin:0 auto;border-radius:var(--r);overflow:hidden"></div>
         <div id="scannerStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px">Kamera wird gestartet…</div>
+        <div style="margin-top:12px;display:flex;gap:8px;justify-content:center">
+          <label class="btn btn-secondary btn-sm" style="cursor:pointer" id="scannerPhotoLabel">
+            📸 Foto scannen
+            <input type="file" accept="image/*" capture="environment" id="scannerPhotoInput" style="display:none"/>
+          </label>
+        </div>
       </div>
     `;
 
@@ -831,6 +878,18 @@ const FlipcheckView = (() => {
       buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }],
     });
 
+    // Photo fallback inside modal
+    setTimeout(() => {
+      document.getElementById("scannerPhotoInput")?.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (file) {
+          stopScanner();
+          try { Modal.close(true); } catch {}
+          scanFromImage(file, container);
+        }
+      });
+    }, 100);
+
     await new Promise(r => setTimeout(r, 200));
     const region = document.getElementById("scannerRegion");
     const status = document.getElementById("scannerStatus");
@@ -839,16 +898,19 @@ const FlipcheckView = (() => {
     try {
       _html5Scanner = new Html5Qrcode("scannerRegion");
 
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      const isIOS    = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isMobile = isIOS || /Android/i.test(navigator.userAgent);
 
       await _html5Scanner.start(
         { facingMode: "environment" },
         {
-          fps: isIOS ? 5 : 15,
-          // No qrbox on iOS — scan entire frame for better detection
-          ...(isIOS ? {} : { qrbox: { width: 280, height: 150 } }),
-          aspectRatio: isIOS ? 1.0 : 1.333,
+          fps: isMobile ? 5 : 15,
+          // Safari + iOS: scan entire frame (no qrbox) for better detection
+          ...(isSafari || isIOS ? {} : { qrbox: { width: 280, height: 150 } }),
+          aspectRatio: isMobile ? 1.0 : 1.333,
           disableFlip: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: false }, // force ZXing on all browsers for consistency
           formatsToSupport: [
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
