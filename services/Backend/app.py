@@ -691,7 +691,9 @@ async def flipcheck(request: Request):
         except Exception as e:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": f"Kaufland-Check fehlgeschlagen: {e}"})
 
-        sell = kl.get("min_total_new")
+        # VK Custom override
+        _sell_custom = _to_float(str((_src.get("sell_custom") or "")))
+        sell = _sell_custom if _sell_custom and _sell_custom > 0 else kl.get("min_total_new")
         if not sell:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": "Kein Kaufland-Preis gefunden"})
 
@@ -806,8 +808,9 @@ async def flipcheck(request: Request):
         return templates.TemplateResponse("index.html", {"request": request, "result": result})
 
     # ── Always recalculate profit with tiered fees + VAT adjustment ──────────
-    sell_avg_gross = float(m.get("sell_price_avg")    or 0)
-    sell_med_gross = float(m.get("sell_price_median") or 0)
+    _ebay_sell_custom = _to_float(str((_src.get("sell_custom") or "")))
+    sell_avg_gross = _ebay_sell_custom if _ebay_sell_custom and _ebay_sell_custom > 0 else float(m.get("sell_price_avg") or 0)
+    sell_med_gross = _ebay_sell_custom if _ebay_sell_custom and _ebay_sell_custom > 0 else float(m.get("sell_price_median") or 0)
 
     # VAT: eBay prices are gross (inkl. MwSt). For Regelbesteuerer, work in net.
     # eBay fees are charged on gross price but you recover the VAT (Vorsteuer),
@@ -1518,6 +1521,7 @@ class AmazonCheckRequest(BaseModel):
     prep_fee: float = 0.0
     vat_mode: str   = "no_vat"  # "no_vat" | "ust_19"
     ek_mode:  str   = "gross"   # "gross" | "net"
+    sell_custom: Optional[float] = None
 
 
 @app.post("/amazon-check")
@@ -1533,6 +1537,7 @@ async def amazon_check_endpoint(req: AmazonCheckRequest):
         prep_fee = req.prep_fee,
         vat_mode = req.vat_mode,
         ek_mode  = req.ek_mode,
+        sell_custom = req.sell_custom,
     )
     return result
 

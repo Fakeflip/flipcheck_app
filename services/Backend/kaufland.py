@@ -94,25 +94,56 @@ def parse_rating(html: str) -> Tuple[Optional[float], Optional[int]]:
             review_count = int(m5.group(1))
     return rating, review_count
 
-def demand_score(offers_count: Optional[int], bestseller: Optional[bool]) -> Tuple[int, str]:
-    score = 50
+def demand_score(
+    offers_count: Optional[int],
+    bestseller: Optional[bool],
+    rating: Optional[float] = None,
+    review_count: Optional[int] = None,
+    has_used_offers: bool = False,
+) -> Tuple[int, str]:
+    score = 40  # base
+
+    # Bestseller badge = strong demand signal
     if bestseller is True:
-        score += 20
-    if offers_count is None or offers_count < 0:
-        pass
-    elif offers_count <= 2:
-        score -= 10
-    elif 3 <= offers_count <= 8:
-        score += 10
-    elif 9 <= offers_count <= 15:
-        score += 0
-    else:
-        score -= 15
+        score += 25
+
+    # Competition (offers count)
+    if offers_count is not None and offers_count >= 0:
+        if offers_count <= 2:
+            score -= 5     # very few offers = niche but risky
+        elif 3 <= offers_count <= 10:
+            score += 15    # healthy competition = good demand
+        elif 11 <= offers_count <= 20:
+            score += 5     # moderate — still ok
+        else:
+            score -= 10    # >20 offers = saturated
+
+    # Rating signal
+    if rating is not None:
+        if rating >= 4.5:
+            score += 10
+        elif rating >= 4.0:
+            score += 5
+        elif rating < 3.0:
+            score -= 10
+
+    # Review count = demand proxy
+    if review_count is not None:
+        if review_count >= 100:
+            score += 10
+        elif review_count >= 30:
+            score += 5
+        elif review_count >= 10:
+            score += 2
+
+    # Used offers exist = product has resale demand
+    if has_used_offers:
+        score += 5
 
     score = max(0, min(100, score))
-    if score >= 75:
+    if score >= 70:
         label = "HOT"
-    elif score >= 55:
+    elif score >= 50:
         label = "OK"
     else:
         label = "RISK"
@@ -427,7 +458,11 @@ def batch_check_ean(eans: List[str], sleep_s: float = 0.2) -> List[dict]:
             rating = bs.get("rating") if bs.get("ok") else None
             review_count = bs.get("review_count") if bs.get("ok") else None
 
-            score, label = demand_score(offers_count_new, bestseller)
+            score, label = demand_score(
+                offers_count_new, bestseller,
+                rating=rating, review_count=review_count,
+                has_used_offers=min_total_used is not None,
+            )
 
             out.append({
                 "ean": ean,

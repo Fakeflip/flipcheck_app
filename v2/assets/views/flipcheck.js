@@ -419,6 +419,17 @@ const FlipcheckView = (() => {
               </div>
             </div>
 
+            <!-- VK Custom (optional override) — all markets -->
+            <div class="input-group">
+              <label class="input-label">VK Custom <span class="text-xs text-muted">(optional)</span></label>
+              <div class="input-prefix-wrap">
+                <span class="prefix">€</span>
+                <input id="fcVkCustom" class="input" type="number" step="0.01" min="0" placeholder="eigener VK"
+                  value="" />
+              </div>
+              <span class="input-hint">Überschreibt den Marktpreis mit deinem eigenen Verkaufspreis</span>
+            </div>
+
             <div style="display:flex;gap:6px;margin-top:4px">
               <button class="btn btn-primary" id="btnCheck" style="flex:1;justify-content:center">
                 <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
@@ -706,10 +717,18 @@ const FlipcheckView = (() => {
       ? `<path d="M8 2v7M5 12h6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`
       : `<path d="M2 2l12 12M14 2L2 14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>`;
 
-    // Recalculate with Kaufland fee
+    // Recalculate with Kaufland fee + VAT adjustment
     const ekNum  = parseFloat(ek) || 0;
     const shipIn  = parseFloat(_container?.querySelector("#fcShipIn")?.value) || 0;
     const shipOut = parseFloat(_container?.querySelector("#fcShipOut")?.value) || 0;
+    const vatDiv  = isVAT ? 1.19 : 1.0;
+    const _ekMode = _container?._ekMode || "gross";
+    // Net values for cost breakdown (Regelbesteuerung)
+    const sellNet = sell != null ? sell / vatDiv : null;
+    const feeNet  = fee != null ? fee / vatDiv : null;
+    const siNet   = shipIn / vatDiv;
+    const soNet   = shipOut / vatDiv;
+    const ekNet   = (isVAT && _ekMode === "gross") ? ekNum / vatDiv : ekNum;
 
     return `
       <div class="result-card ${vc}">
@@ -766,12 +785,12 @@ const FlipcheckView = (() => {
         <!-- ── Market Signals ── -->
         <div class="fc-market-row mb-16">
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">VK (günstigster Neu)</span>
+            <span class="fc-market-chip-l">VK (günstigster Neu)${isVAT ? " brutto" : ""}</span>
             <span class="fc-market-chip-v">${sell != null ? fmtEur(sell) : "—"}</span>
           </div>
           <div class="fc-market-chip">
-            <span class="fc-market-chip-l">Kaufland Gebühr (${feeRate})</span>
-            <span class="fc-market-chip-v text-red">${fee != null ? "−" + fmtEur(fee) : "—"}</span>
+            <span class="fc-market-chip-l">Kaufland Gebühr (${feeRate})${isVAT ? " netto" : ""}</span>
+            <span class="fc-market-chip-v text-red">${fee != null ? "−" + fmtEur(isVAT ? feeNet : fee) : "—"}</span>
           </div>
           ${usedPrice != null ? `
           <div class="fc-market-chip">
@@ -802,13 +821,13 @@ const FlipcheckView = (() => {
 
         <!-- ── Cost Breakdown ── -->
         <details class="fc-accordion mb-16" style="border:1px solid var(--border);border-radius:var(--r-sm);padding:0">
-          <summary style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-secondary)">Kostenaufstellung</summary>
+          <summary style="padding:8px 12px;cursor:pointer;font-size:12px;font-weight:600;color:var(--text-secondary)">Kostenaufstellung${isVAT ? " (netto)" : ""}</summary>
           <div style="padding:8px 12px;display:grid;grid-template-columns:1fr auto;gap:4px 12px;font-size:12px">
-            <span>Verkaufspreis (brutto)</span><span style="text-align:right">${sell != null ? fmtEur(sell) : "—"}</span>
-            <span>Kaufland Gebühr (${feeRate})</span><span style="text-align:right;color:var(--red)">−${fee != null ? fmtEur(fee) : "—"}</span>
-            ${shipIn > 0 ? `<span>Versand Inbound</span><span style="text-align:right;color:var(--red)">−${fmtEur(shipIn)}</span>` : ""}
-            ${shipOut > 0 ? `<span>Versand Outbound</span><span style="text-align:right;color:var(--red)">−${fmtEur(shipOut)}</span>` : ""}
-            <span>EK</span><span style="text-align:right;color:var(--red)">−${fmtEur(ekNum)}</span>
+            <span>Verkaufspreis${isVAT ? " (netto)" : " (brutto)"}</span><span style="text-align:right">${isVAT ? (sellNet != null ? fmtEur(sellNet) : "—") : (sell != null ? fmtEur(sell) : "—")}</span>
+            <span>Kaufland Gebühr (${feeRate})</span><span style="text-align:right;color:var(--red)">−${isVAT ? (feeNet != null ? fmtEur(feeNet) : "—") : (fee != null ? fmtEur(fee) : "—")}</span>
+            ${shipIn > 0 ? `<span>Versand Inbound${isVAT ? " (netto)" : ""}</span><span style="text-align:right;color:var(--red)">−${fmtEur(isVAT ? siNet : shipIn)}</span>` : ""}
+            ${shipOut > 0 ? `<span>Versand Outbound${isVAT ? " (netto)" : ""}</span><span style="text-align:right;color:var(--red)">−${fmtEur(isVAT ? soNet : shipOut)}</span>` : ""}
+            <span>EK${isVAT ? " (netto)" : ""}</span><span style="text-align:right;color:var(--red)">−${fmtEur(isVAT ? ekNet : ekNum)}</span>
             <div style="grid-column:1/-1;border-top:1px solid var(--border);margin:4px 0"></div>
             <span style="font-weight:700">Profit${isVAT ? " (netto)" : ""}</span>
             <span style="text-align:right;font-weight:700" class="${profitColor}">${profit != null ? fmtEur(profit) : "—"}</span>
@@ -819,12 +838,12 @@ const FlipcheckView = (() => {
         <div class="row mt-16" style="gap:8px;flex-wrap:wrap">
           <button class="btn btn-secondary btn-sm" id="btnAddToInv">
             <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><rect x="1" y="5" width="14" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/><path d="M5 5V4a3 3 0 0 1 6 0v1M6 10h4M8 8v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            ${I18N.t('fc.btn.add_inventory')}
+            ${I18N.t('fc.action.add_inventory')}
           </button>
           ${productUrl ? `<a class="btn btn-ghost btn-sm" href="${productUrl}" target="_blank" rel="noopener" style="text-decoration:none">
             Kaufland öffnen ↗
           </a>` : ""}
-          <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.btn.reset')}</button>
+          <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
           <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
@@ -1660,13 +1679,14 @@ const FlipcheckView = (() => {
           ? (parseFloat(container.querySelector("#fcAmzShipIn")?.value) || 4.99)
           : (parseFloat(container.querySelector("#fcAmzShipIn")?.value) || 0);
         const prepFee  = parseFloat(container.querySelector("#fcAmzPrepFee")?.value) || 0;
+        const amzVkCustom = parseFloat(container.querySelector("#fcVkCustom")?.value) || 0;
 
         // Detect if input looks like ASIN (B0...) or EAN (digits)
         const isAsin = /^[A-Z0-9]{10}$/.test(identifier.toUpperCase()) && /[A-Z]/.test(identifier.toUpperCase());
         const asin   = isAsin ? identifier.toUpperCase() : null;
         const ean    = isAsin ? null : identifier;
 
-        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode);
+        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode, amzVkCustom > 0 ? amzVkCustom : undefined);
         if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
         if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
@@ -1720,26 +1740,59 @@ const FlipcheckView = (() => {
 
       // ── Kaufland branch ──────────────────────────────────────────────────
       if (selectedMarket === "kaufland") {
+        // Auto-resolve ASIN → EAN if user typed an ASIN
+        let klEan = identifier;
+        const klMightBeAsin = /^[A-Z0-9]{10}$/.test(identifier.toUpperCase()) && /[A-Z]/.test(identifier.toUpperCase());
+        if (klMightBeAsin) {
+          resultEl.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text2);font-size:12px">ASIN wird zu EAN aufgelöst…</div>`;
+          try {
+            const { ok: aok, data: adata } = await API.amazonCheck(identifier.toUpperCase(), null, ek, mode, "fba", 0, "sonstiges", 0);
+            if (aok && adata?.ean) {
+              klEan = adata.ean;
+              const eanInp = container.querySelector("#fcEan");
+              if (eanInp) eanInp.value = klEan;
+              Toast.info("ASIN → EAN", `${identifier.toUpperCase()} → EAN ${klEan}`);
+              resultEl.innerHTML = renderLoading("kaufland");
+            } else {
+              resultEl.innerHTML = renderErrorCard(
+                "ASIN nicht auflösbar",
+                `Für ${esc(identifier.toUpperCase())} konnte keine EAN gefunden werden.`
+              );
+              if (btn) btn.disabled = false;
+              return;
+            }
+          } catch {
+            resultEl.innerHTML = renderErrorCard(
+              "ASIN-Auflösung fehlgeschlagen",
+              "Das Backend konnte die ASIN nicht in eine EAN umwandeln."
+            );
+            if (btn) btn.disabled = false;
+            return;
+          }
+        }
+
         const klCat  = container.querySelector("#fcCategory")?.value || "kl_sonstiges";
         const shipIn  = parseFloat(container.querySelector("#fcShipIn")?.value)  || 0;
         const shipOut = parseFloat(container.querySelector("#fcShipOut")?.value) || 0;
+        const klVkCustom = parseFloat(container.querySelector("#fcVkCustom")?.value) || 0;
 
-        const { ok, data } = await API.flipcheck(identifier, ek, mode, {
+        const { ok, data } = await API.flipcheck(klEan, ek, mode, {
           market:       "kaufland",
           category:     klCat,
           shipping_in:  shipIn,
           shipping_out: shipOut,
           vat_mode:     _vatMode,
           ek_mode:      _ekMode,
+          ...(klVkCustom > 0 ? { sell_custom: klVkCustom } : {}),
         });
 
         if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
         if (!ok || !data) throw new Error(data?.detail || data?.error || "Backend nicht erreichbar");
 
-        lastResult = data; lastEan = identifier; lastEk = ek;
-        resultEl.innerHTML = renderResultKaufland(data, identifier, ek);
+        lastResult = data; lastEan = klEan; lastEk = ek;
+        resultEl.innerHTML = renderResultKaufland(data, klEan, ek);
 
-        resultEl.querySelector("#btnAddToInv")?.addEventListener("click", () => addToInventory(identifier, ek, data, "kaufland"));
+        resultEl.querySelector("#btnAddToInv")?.addEventListener("click", () => addToInventory(klEan, ek, data, "kaufland"));
         resultEl.querySelector("#btnReset")?.addEventListener("click",    () => { resultEl.innerHTML = renderResultPlaceholder(); });
 
         if (btn) btn.disabled = false;
@@ -1783,6 +1836,7 @@ const FlipcheckView = (() => {
       const shipOut  = parseFloat(container.querySelector("#fcShipOut")?.value)   || 0;
       const packaging = parseFloat(container.querySelector("#fcPackaging")?.value) || 0;
       const adRate   = parseFloat(container.querySelector("#fcAdRate")?.value)    || 0;
+      const ebayVkCustom = parseFloat(container.querySelector("#fcVkCustom")?.value) || 0;
 
       const { ok, data } = await API.flipcheck(ean, ek, mode, {
         category:     cat,
@@ -1790,6 +1844,7 @@ const FlipcheckView = (() => {
         shipping_out: shipOut,
         vat_mode:     _vatMode,
         ek_mode:      _ekMode,
+        ...(ebayVkCustom > 0 ? { sell_custom: ebayVkCustom } : {}),
       });
 
       if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }

@@ -705,6 +705,7 @@ async def amazon_check(
     prep_fee: float = 0.0,
     vat_mode: str   = "no_vat",  # "no_vat" | "ust_19"
     ek_mode:  str   = "gross",   # "gross" | "net"
+    sell_custom: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Full Amazon profitability check for an ASIN.
@@ -748,7 +749,7 @@ async def amazon_check(
     new_avg30     = _keepa_price(avg30[1]  if len(avg30) > 1  else -1)
 
     # Prefer 30-day average — more stable for flip decisions than current snapshot.
-    sell_price = buy_box_avg30 or buy_box_current or new_avg30 or new_current or 0.0
+    sell_price = (sell_custom if sell_custom and sell_custom > 0 else None) or buy_box_avg30 or buy_box_current or new_avg30 or new_current or 0.0
 
     # Sales rank → monthly sales estimate
     rank_current = current[11] if len(current) > 11 else -1
