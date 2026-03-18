@@ -41,7 +41,7 @@
   <div class="legal-wrap">
     <a href="/" class="back-link">← Zurück zur Startseite</a>
     <h1>Datenschutzerklärung</h1>
-    <p class="subtitle">Stand: 9. März 2026</p>
+    <p class="subtitle">Stand: 18. März 2026</p>
 
     <div class="toc">
       <h3>Inhaltsübersicht</h3>
@@ -58,6 +58,9 @@
         <li><a href="#webhosting">Bereitstellung des Onlineangebots und Webhosting</a></li>
         <li><a href="#discord">Authentifizierung über Discord</a></li>
         <li><a href="#stripe">Zahlungsabwicklung über Stripe</a></li>
+        <li><a href="#ebay-seller">eBay Seller Sync</a></li>
+        <li><a href="#kaufland-seller">Kaufland Seller Sync</a></li>
+        <li><a href="#lokale-speicherung">Lokale Datenspeicherung auf dem Gerät</a></li>
         <li><a href="#kontakt">Kontaktaufnahme</a></li>
         <li><a href="#aenderung">Änderung und Aktualisierung</a></li>
       </ol>
@@ -177,6 +180,37 @@
     <p>Beim Abschluss eines Abonnements werden Ihre Zahlungsdaten direkt an Stripe übermittelt. Wir speichern keine vollständigen Zahlungsdaten (Kreditkartennummern, IBAN etc.) auf unseren Servern. Stripe stellt uns lediglich eine Kunden-ID und Abonnementstatus zur Verfügung.</p>
     <p>Von Stripe verarbeitete Daten umfassen insbesondere: Name, E-Mail-Adresse, Zahlungsmitteldetails, IP-Adresse, Transaktionsdaten.</p>
     <p>Die Übermittlung von Daten an Stripe Inc. in die USA erfolgt auf Grundlage des EU-U.S. Data Privacy Framework und der EU-Standardvertragsklauseln. Weitere Informationen finden Sie in der Datenschutzerklärung von Stripe: <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">stripe.com/de/privacy</a>.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
+
+    <h2 id="ebay-seller">eBay Seller Sync</h2>
+    <p>Nutzer können ihren eBay-Seller-Account mit FLIPCHECK verbinden, um Listings, Verkäufe und Retouren automatisch zu synchronisieren. Die Verbindung erfolgt über eBay OAuth 2.0. FLIPCHECK erhält dabei Zugriff auf folgende Daten:</p>
+    <ul>
+      <li>Aktive Angebote (Titel, Preis, Artikelnummer, EAN)</li>
+      <li>Bestellungen/Verkäufe (Bestellnummer, Preis, Zeitstempel)</li>
+      <li>Rücksendungen/Gutschriften (sofern vorhanden)</li>
+    </ul>
+    <p>Das eBay OAuth-Token wird <strong>ausschließlich lokal und verschlüsselt</strong> auf dem Gerät des Nutzers gespeichert (über den Betriebssystem-Schlüsselbund via Keytar). Es wird zu keinem Zeitpunkt an unsere Server übermittelt. Die Daten werden nur innerhalb der Desktop-Applikation des Nutzers verarbeitet und nicht an Dritte weitergegeben. Käufernamen und persönliche Daten aus Bestellungen werden anonymisiert dargestellt.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung) sowie Art. 6 Abs. 1 S. 1 lit. a) DSGVO (Einwilligung durch OAuth-Autorisierung).</p>
+
+    <h2 id="kaufland-seller">Kaufland Seller Sync</h2>
+    <p>Nutzer können ihren Kaufland-Seller-Account mit FLIPCHECK verbinden, um Listings, Verkäufe und Retouren automatisch zu synchronisieren. Die Verbindung erfolgt über die Kaufland Marketplace API mittels Client Key und Secret Key. FLIPCHECK erhält dabei Zugriff auf folgende Daten:</p>
+    <ul>
+      <li>Aktive Angebote (Titel, Preis, Artikelnummer, EAN)</li>
+      <li>Bestellungen/Verkäufe (Bestellnummer, Preis, Zeitstempel, Status)</li>
+      <li>Rücksendungen/Gutschriften (sofern vorhanden)</li>
+    </ul>
+    <p>Die Kaufland API-Schlüssel (Client Key und Secret Key) werden <strong>ausschließlich lokal und verschlüsselt</strong> auf dem Gerät des Nutzers gespeichert (über den Betriebssystem-Schlüsselbund via Keytar, mit JSON-Datei als Fallback). Sie werden zu keinem Zeitpunkt an unsere Server übermittelt. Die Daten werden nur innerhalb der Desktop-Applikation des Nutzers verarbeitet und nicht an Dritte weitergegeben. Käufernamen und persönliche Daten aus Bestellungen werden nicht gespeichert.</p>
+    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
+
+    <h2 id="lokale-speicherung">Lokale Datenspeicherung auf dem Gerät</h2>
+    <p>FLIPCHECK speichert verschiedene Daten lokal auf dem Gerät des Nutzers:</p>
+    <ul>
+      <li><strong>Inventardaten:</strong> Gespeichert als JSON-Datei im App-Verzeichnis des Betriebssystems (userData). Enthält Produktdaten, Einkaufspreise, Verkaufspreise, Status und Notizen.</li>
+      <li><strong>Preishistorie:</strong> Gespeichert als JSON-Datei im App-Verzeichnis. Enthält historische Marktpreise der vom Nutzer analysierten Produkte.</li>
+      <li><strong>Einstellungen:</strong> Gespeichert als JSON-Datei im App-Verzeichnis. Enthält Konfigurationsdaten wie Sync-Intervalle, Webhook-URLs und Benutzereinstellungen.</li>
+      <li><strong>Zugangsdaten (Tokens/API-Keys):</strong> Gespeichert über den Betriebssystem-Schlüsselbund (Keytar) für maximale Sicherheit. Umfasst eBay OAuth-Token und Kaufland API-Schlüssel.</li>
+    </ul>
+    <p>Diese lokal gespeicherten Daten werden nicht an den Anbieter oder Dritte übermittelt. Bei Deinstallation der Applikation können diese Daten manuell gelöscht werden.</p>
     <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
 
     <h2 id="supabase">Datenspeicherung (Supabase)</h2>

@@ -4,9 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FLIPCHECK — Reseller Tool für eBay, Amazon &amp; Kaufland</title>
-  <meta name="description" content="Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden. BUY, HOLD oder SKIP — mit echten Marktdaten und Gewinnkalkulation." />
+  <meta name="description" content="Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden. BUY, HOLD oder SKIP — mit echten Marktdaten, Gewinnkalkulation und automatischem Repricer." />
   <meta property="og:title" content="FLIPCHECK — Reseller Tool für eBay, Amazon &amp; Kaufland" />
-  <meta property="og:description" content="Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden. BUY, HOLD oder SKIP — mit echten Marktdaten und Gewinnkalkulation." />
+  <meta property="og:description" content="Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden. BUY, HOLD oder SKIP — mit echten Marktdaten, Gewinnkalkulation und automatischem Repricer." />
   <meta property="og:image" content="https://joinflipcheck.app/og.png" />
   <link rel="icon" href="favicon.ico" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -19,17 +19,18 @@
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="container header-inner">
-      <div class="logo">▲ FLIPCHECK</div>
+      <a href="/" class="logo"><span>▲</span> FLIPCHECK</a>
       <nav class="nav">
         <a href="#features">Features</a>
+        <a href="#sync">Seller Sync</a>
         <a href="#extension">Extension</a>
         <a href="#pricing">Preise</a>
         <a href="/guides">Guides</a>
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
       </nav>
       <div style="display:flex;align-items:center;gap:8px">
-        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)">Mein Konto</a>
-        <a href="/dashboard" class="btn btn-sm">Jetzt starten</a>
+        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Mein Konto</a>
+        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
       </div>
       <button class="hamburger" id="hamburger" aria-label="Menü öffnen" aria-expanded="false">
         <span></span><span></span><span></span>
@@ -38,6 +39,7 @@
   </header>
   <nav class="mobile-nav" id="mobileNav">
     <a href="#features" class="mobile-link">Features</a>
+    <a href="#sync" class="mobile-link">Seller Sync</a>
     <a href="#extension" class="mobile-link">Extension</a>
     <a href="#pricing" class="mobile-link">Preise</a>
     <a href="/guides" class="mobile-link">Guides</a>
@@ -48,17 +50,19 @@
   <!-- ── Hero ───────────────────────────────────────────────────────────── -->
   <section class="hero">
     <div class="container">
-      <div class="badge">Jetzt verfügbar — v2.2</div>
-      <h1>Mehr Profit.<br />Weniger Risiko.</h1>
-      <p class="hero-sub">
-        Flipcheck analysiert Produkte auf eBay, Amazon und Kaufland in Sekunden.
-        Einfach EAN scannen oder eingeben — du bekommst sofort BUY, HOLD oder SKIP
-        mit echten Marktdaten, Gewinnkalkulation und Preisverlauf.
+      <div class="badge animate-up"><span class="badge-dot"></span> Neu — v2.6</div>
+      <h1 class="animate-up animate-up-d1">Mehr Profit.<br>Weniger Risiko.</h1>
+      <p class="hero-sub animate-up animate-up-d2">
+        Scanne jede EAN — in unter 2 Sekunden weißt du, ob sich der Flip lohnt.
+        Mit echten Marktdaten von eBay, Amazon und Kaufland.
       </p>
-      <div class="hero-cta">
+      <div class="hero-cta animate-up animate-up-d3">
         <a href="/dashboard" class="btn btn-primary btn-lg">
           Jetzt kostenlos testen
           <span class="btn-sub">7 Tage gratis · Kein Risiko · Jederzeit kündbar</span>
+        </a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener" class="btn btn-lg" style="font-size:15px">
+          Discord beitreten
         </a>
       </div>
     </div>
@@ -68,32 +72,32 @@
   <section class="demo">
     <div class="container">
       <div class="demo-cards">
-        <div class="verdict-card buy">
+        <div class="verdict-card buy animate-up animate-up-d1">
           <div class="verdict-badge">BUY</div>
           <div class="verdict-product">Samsung Galaxy Buds2 Pro</div>
           <div class="verdict-kpis">
-            <div class="kpi"><span class="kpi-v">€45.99</span><span class="kpi-l">Median VK</span></div>
-            <div class="kpi"><span class="kpi-v green">+€12.40</span><span class="kpi-l">Profit</span></div>
+            <div class="kpi"><span class="kpi-v">€45,99</span><span class="kpi-l">Median VK</span></div>
+            <div class="kpi"><span class="kpi-v green">+€12,40</span><span class="kpi-l">Profit</span></div>
             <div class="kpi"><span class="kpi-v">27%</span><span class="kpi-l">Marge</span></div>
             <div class="kpi"><span class="kpi-v">48</span><span class="kpi-l">Verk./30d</span></div>
           </div>
         </div>
-        <div class="verdict-card hold">
+        <div class="verdict-card hold animate-up animate-up-d2">
           <div class="verdict-badge">HOLD</div>
           <div class="verdict-product">Philips Hue Bridge v2</div>
           <div class="verdict-kpis">
-            <div class="kpi"><span class="kpi-v">€32.50</span><span class="kpi-l">Median VK</span></div>
-            <div class="kpi"><span class="kpi-v yellow">+€3.20</span><span class="kpi-l">Profit</span></div>
+            <div class="kpi"><span class="kpi-v">€32,50</span><span class="kpi-l">Median VK</span></div>
+            <div class="kpi"><span class="kpi-v yellow">+€3,20</span><span class="kpi-l">Profit</span></div>
             <div class="kpi"><span class="kpi-v">10%</span><span class="kpi-l">Marge</span></div>
             <div class="kpi"><span class="kpi-v">12</span><span class="kpi-l">Verk./30d</span></div>
           </div>
         </div>
-        <div class="verdict-card skip">
+        <div class="verdict-card skip animate-up animate-up-d3">
           <div class="verdict-badge">SKIP</div>
           <div class="verdict-product">Logitech MX Keys Mini</div>
           <div class="verdict-kpis">
-            <div class="kpi"><span class="kpi-v">€58.00</span><span class="kpi-l">Median VK</span></div>
-            <div class="kpi"><span class="kpi-v red">−€4.10</span><span class="kpi-l">Verlust</span></div>
+            <div class="kpi"><span class="kpi-v">€58,00</span><span class="kpi-l">Median VK</span></div>
+            <div class="kpi"><span class="kpi-v red">−€4,10</span><span class="kpi-l">Verlust</span></div>
             <div class="kpi"><span class="kpi-v">—</span><span class="kpi-l">Marge</span></div>
             <div class="kpi"><span class="kpi-v">6</span><span class="kpi-l">Verk./30d</span></div>
           </div>
@@ -102,41 +106,147 @@
     </div>
   </section>
 
+  <!-- ── Platforms ────────────────────────────────────────────────────────── -->
+  <section class="platforms">
+    <div class="container">
+      <div class="platforms-label">Unterstützte Marktplätze</div>
+      <div class="platform-logos">
+        <div class="platform-logo">eBay</div>
+        <div class="platform-logo">Amazon</div>
+        <div class="platform-logo">Kaufland</div>
+        <div class="platform-logo">idealo</div>
+        <div class="platform-logo">Geizhals</div>
+      </div>
+    </div>
+  </section>
+
   <!-- ── Features ───────────────────────────────────────────────────────── -->
   <section class="features" id="features">
     <div class="container">
-      <h2>Alles was du brauchst.</h2>
-      <p class="section-sub">Entwickelt von Resellern für Reseller — für eBay, Amazon und Kaufland.</p>
+      <div class="section-header">
+        <h2>Alles was du brauchst.</h2>
+        <p class="section-sub">Entwickelt von Resellern, für Reseller — auf eBay, Amazon und Kaufland.</p>
+      </div>
       <div class="features-grid">
         <div class="feature-card">
           <div class="feature-icon">⚡</div>
           <h3>Instant Flipcheck</h3>
-          <p>EAN eingeben oder scannen — in unter 2 Sekunden weißt du ob ein Produkt profitabel ist. Mit echten Verkaufsdaten von eBay, Amazon und Kaufland.</p>
+          <p>EAN eingeben oder scannen — in unter 2 Sekunden bekommst du BUY, HOLD oder SKIP mit echten Verkaufsdaten und Gewinnkalkulation.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔄</div>
+          <div class="feature-tag tag-new">Neu</div>
+          <h3>Automatischer Repricer</h3>
+          <p>Optimiere deine eBay-Preise automatisch. Der Repricer passt Verkaufspreise nach deinen Regeln an — Mindestmarge, Konkurrenz und Nachfrage.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📦</div>
           <h3>Inventar</h3>
-          <p>Verwalte deinen gesamten Bestand mit EK, VK, Status und Notizen. Automatische Gewinnberechnung nach Plattformgebühren.</p>
+          <p>Verwalte deinen Bestand mit EK, VK, Status und Notizen. Automatische Gewinnberechnung nach Plattformgebühren. Verkäufe werden automatisch erkannt.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📈</div>
           <h3>Preisverlauf</h3>
-          <p>Verfolge wie sich der Marktpreis eines Produkts über Wochen und Monate entwickelt. Kaufe zum richtigen Zeitpunkt.</p>
+          <p>Verfolge wie sich der Marktpreis über Wochen und Monate entwickelt. Kaufe zum richtigen Zeitpunkt und maximiere deine Marge.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">🔍</div>
           <h3>Deal Scanner</h3>
-          <p>Scanne Batch-Listen aus Großhandel oder Auktionen. Lade CSV hoch und bekomme sofort für jedes Produkt ein Urteil.</p>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🔔</div>
-          <h3>Preisalarme</h3>
-          <p>Lege Alarme fest und werde benachrichtigt wenn ein Produkt unter deinen Zielpreis fällt. Nie wieder eine Chance verpassen.</p>
+          <p>Scanne Batch-Listen aus Großhandel oder Auktionen. CSV hochladen und sofort für jedes Produkt ein Urteil bekommen.</p>
         </div>
         <div class="feature-card">
           <div class="feature-icon">📊</div>
-          <h3>Analytics</h3>
-          <p>Überblick über Gesamtbestand, Kapital, durchschnittliche Marge und monatliche Performance — auf einen Blick.</p>
+          <h3>Analytics Dashboard</h3>
+          <p>Gesamtbestand, investiertes Kapital, Marge und monatliche Performance — alles auf einen Blick mit Charts und Statistiken.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔔</div>
+          <h3>Preisalarme &amp; Webhooks</h3>
+          <p>Alarme wenn Produkte unter deinen Zielpreis fallen. Discord-Webhook-Benachrichtigungen für Sync-Events und Verkäufe.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🏷️</div>
+          <h3>ASIN-to-EAN</h3>
+          <p>Hast du nur eine ASIN? Flipcheck konvertiert automatisch zwischen ASIN und EAN — funktioniert auf allen Plattformen.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💰</div>
+          <h3>Custom VK</h3>
+          <p>Eigenen Verkaufspreis eingeben und sofort sehen wie sich Profit und Marge verändern — für eBay, Amazon und Kaufland.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Seller Sync ──────────────────────────────────────────────────────── -->
+  <section class="sync-section" id="sync">
+    <div class="container">
+      <div class="sync-inner">
+        <div class="sync-text">
+          <div class="badge"><span class="badge-dot"></span> Seller Sync</div>
+          <h2>Dein Shop. Automatisch synchronisiert.</h2>
+          <p>Verbinde deinen eBay- oder Kaufland-Seller-Account und Flipcheck synchronisiert automatisch deine aktiven Listings, Verkäufe, Retouren und Gutschriften — direkt in dein Inventar.</p>
+          <div class="sync-features">
+            <div class="sync-feat">
+              <div class="sync-feat-icon">📋</div>
+              <div class="sync-feat-text">
+                <h4>Aktive Listings</h4>
+                <p>Alle Angebote automatisch im Inventar</p>
+              </div>
+            </div>
+            <div class="sync-feat">
+              <div class="sync-feat-icon">💸</div>
+              <div class="sync-feat-text">
+                <h4>Verkäufe erkennen</h4>
+                <p>Verkaufte Artikel werden automatisch markiert</p>
+              </div>
+            </div>
+            <div class="sync-feat">
+              <div class="sync-feat-icon">↩️</div>
+              <div class="sync-feat-text">
+                <h4>Retouren &amp; Gutschriften</h4>
+                <p>Rücksendungen werden automatisch erkannt</p>
+              </div>
+            </div>
+            <div class="sync-feat">
+              <div class="sync-feat-icon">🔗</div>
+              <div class="sync-feat-text">
+                <h4>Multi-Plattform</h4>
+                <p>eBay &amp; Kaufland gleichzeitig verbinden</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="sync-visual">
+          <div class="sync-mockup">
+            <div class="sync-mockup-header">
+              <span class="sync-mockup-dot"></span> eBay Sync — Letzte Aktualisierung vor 2 Min.
+            </div>
+            <div class="sync-row">
+              <span class="sync-row-icon">📱</span>
+              <span class="sync-row-name">iPhone 15 Hülle</span>
+              <span class="sync-row-status status-synced">Aktiv</span>
+              <span class="sync-row-price">€14,99</span>
+            </div>
+            <div class="sync-row">
+              <span class="sync-row-icon">🎧</span>
+              <span class="sync-row-name">AirPods Pro 2</span>
+              <span class="sync-row-status status-sold">Verkauft</span>
+              <span class="sync-row-price green">€189,00</span>
+            </div>
+            <div class="sync-row">
+              <span class="sync-row-icon">⌚</span>
+              <span class="sync-row-name">Galaxy Watch 6</span>
+              <span class="sync-row-status status-synced">Aktiv</span>
+              <span class="sync-row-price">€219,00</span>
+            </div>
+            <div class="sync-row">
+              <span class="sync-row-icon">🖥️</span>
+              <span class="sync-row-name">Dell Monitor 27"</span>
+              <span class="sync-row-status status-return">Retoure</span>
+              <span class="sync-row-price yellow">€249,00</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -148,24 +258,24 @@
       <div class="ext-text">
         <div class="badge">Chrome Extension</div>
         <h2>Direkt im Browser.</h2>
-        <p>Die Flipcheck Browser Extension bringt BUY/HOLD/SKIP-Badges direkt in deine Suche — auf eBay, Amazon, Kaufland und 15 weiteren Shops. Auf Produktseiten öffnet sich automatisch ein Panel mit dem vollständigen Profit-Check.</p>
+        <p>Die Flipcheck Extension bringt BUY/HOLD/SKIP direkt in deine Suchergebnisse — auf eBay, Amazon, Kaufland, MediaMarkt und 15 weiteren Shops.</p>
         <ul class="ext-list">
-          <li>✓ Auto-EAN Erkennung auf eBay, Amazon, Kaufland, MediaMarkt &amp; mehr</li>
-          <li>✓ BUY/HOLD/SKIP Badges direkt in den Suchergebnissen</li>
-          <li>✓ Direkt ins Inventar speichern</li>
-          <li>✓ Verbindet sich automatisch mit der Desktop-App</li>
+          <li><span class="ext-check">✓</span> Auto-EAN Erkennung auf eBay, Amazon, Kaufland &amp; mehr</li>
+          <li><span class="ext-check">✓</span> BUY/HOLD/SKIP Badges in den Suchergebnissen</li>
+          <li><span class="ext-check">✓</span> Direkt ins Inventar speichern</li>
+          <li><span class="ext-check">✓</span> Verbindet sich automatisch mit der Desktop-App</li>
         </ul>
-        <a href="https://chrome.google.com/webstore" class="btn btn-secondary" target="_blank" rel="noopener">Im Chrome Web Store</a>
+        <a href="https://chromewebstore.google.com/detail/flipcheck/mogfcmjfhigpmkgpdaojhjfaiacokjkf" class="btn btn-secondary" target="_blank" rel="noopener">Im Chrome Web Store ansehen</a>
       </div>
       <div class="ext-visual">
         <div class="ext-mockup">
-          <div class="ext-header">▲ FLIPCHECK <span class="ext-dot">●</span></div>
+          <div class="ext-header"><span class="logo-accent">▲</span> FLIPCHECK <span class="ext-dot">●</span></div>
           <div class="ext-body">
             <div class="ext-ean">4010355040672</div>
             <div class="ext-verdict buy-bg">BUY</div>
             <div class="ext-kpis-mini">
-              <span>VK €45.99</span>
-              <span class="green">+€12.40</span>
+              <span>VK €45,99</span>
+              <span class="green">+€12,40</span>
               <span>27%</span>
             </div>
           </div>
@@ -177,37 +287,51 @@
   <!-- ── Pricing ─────────────────────────────────────────────────────────── -->
   <section class="pricing" id="pricing">
     <div class="container">
-      <h2>Einfache Preise.</h2>
-      <p class="section-sub">Ein Plan. Alles drin. Keine versteckten Kosten.</p>
-      <div class="pricing-grid" style="grid-template-columns: 1fr; max-width: 420px;">
+      <div class="section-header">
+        <h2>Einfache Preise.</h2>
+        <p class="section-sub">Ein Plan. Alles drin. Keine versteckten Kosten.</p>
+      </div>
+      <div class="pricing-grid">
         <div class="price-card featured">
           <div class="price-name">Pro</div>
-          <div class="price-amount">€19,99<span>/Monat</span></div>
+          <div class="price-amount">€19,99<span> /Monat</span></div>
+          <div class="price-period">7 Tage kostenlos testen · Jederzeit kündbar</div>
+          <div class="price-divider"></div>
           <ul class="price-features">
-            <li>✓ Unbegrenzte Flipchecks</li>
-            <li>✓ eBay, Amazon &amp; Kaufland</li>
-            <li>✓ Unbegrenztes Inventar</li>
-            <li>✓ Preisverlauf (90 Tage)</li>
-            <li>✓ Browser Extension</li>
-            <li>✓ Batch / CSV Import</li>
-            <li>✓ Preisalarme</li>
-            <li>✓ Deal Scanner</li>
+            <li><span class="price-check">✓</span> Unbegrenzte Flipchecks</li>
+            <li><span class="price-check">✓</span> eBay, Amazon &amp; Kaufland</li>
+            <li><span class="price-check">✓</span> Automatischer Repricer</li>
+            <li><span class="price-check">✓</span> eBay &amp; Kaufland Sync</li>
+            <li><span class="price-check">✓</span> Unbegrenztes Inventar</li>
+            <li><span class="price-check">✓</span> Preisverlauf (90 Tage)</li>
+            <li><span class="price-check">✓</span> Browser Extension</li>
+            <li><span class="price-check">✓</span> Batch / CSV Import</li>
+            <li><span class="price-check">✓</span> Preisalarme &amp; Webhooks</li>
+            <li><span class="price-check">✓</span> Deal Scanner</li>
+            <li><span class="price-check">✓</span> ASIN-to-EAN</li>
+            <li><span class="price-check">✓</span> Analytics Dashboard</li>
           </ul>
-          <a href="/dashboard" class="btn btn-primary btn-full" id="btnTrial">
+          <a href="/dashboard" class="btn btn-primary btn-full btn-lg" id="btnTrial">
             7 Tage kostenlos testen
           </a>
-          <p style="font-size:12px;color:var(--dim,#555);text-align:center;margin-top:10px">
-            Danach € 19,99/Monat · Jederzeit kündbar · Kein Risiko
-          </p>
         </div>
       </div>
+    </div>
+  </section>
+
+  <!-- ── CTA ─────────────────────────────────────────────────────────────── -->
+  <section class="cta-section">
+    <div class="container">
+      <h2>Bereit für mehr Profit?</h2>
+      <p>Starte jetzt kostenlos und finde profitable Flips in Sekunden.</p>
+      <a href="/dashboard" class="btn btn-primary btn-lg">Kostenlos starten</a>
     </div>
   </section>
 
   <!-- ── Footer ─────────────────────────────────────────────────────────── -->
   <footer class="footer">
     <div class="container footer-inner">
-      <div class="footer-logo">▲ FLIPCHECK</div>
+      <div class="footer-logo"><span>▲</span> FLIPCHECK</div>
       <div class="footer-links">
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
         <a href="mailto:marco.arnold.sk8@gmail.com">Kontakt</a>
@@ -221,7 +345,7 @@
   </footer>
 
   <script>
-    // Hamburger menu toggle
+    // Hamburger
     const hamburger = document.getElementById('hamburger');
     const mobileNav = document.getElementById('mobileNav');
     hamburger?.addEventListener('click', () => {
@@ -229,13 +353,44 @@
       hamburger.classList.toggle('open', isOpen);
       hamburger.setAttribute('aria-expanded', isOpen);
     });
-    // Close mobile nav when a link is clicked
     document.querySelectorAll('.mobile-link').forEach(link => {
       link.addEventListener('click', () => {
         mobileNav.classList.remove('open');
         hamburger.classList.remove('open');
         hamburger.setAttribute('aria-expanded', 'false');
       });
+    });
+
+    // Intersection Observer for scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.animationPlayState = 'running';
+          observer.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+    document.querySelectorAll('.feature-card, .sync-feat, .sync-mockup').forEach(el => {
+      el.style.opacity = '0';
+      el.style.transform = 'translateY(20px)';
+      el.style.transition = 'opacity .5s ease, transform .5s ease';
+      observer.observe(el);
+    });
+
+    const revealObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.style.opacity = '1';
+          entry.target.style.transform = 'translateY(0)';
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -20px 0px' });
+
+    document.querySelectorAll('.feature-card, .sync-feat, .sync-mockup').forEach((el, i) => {
+      el.style.transitionDelay = `${i * 60}ms`;
+      revealObserver.observe(el);
     });
   </script>
 </body>
