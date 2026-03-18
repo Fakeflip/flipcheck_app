@@ -398,6 +398,82 @@ const FlipcheckView = (() => {
     `;
   }
 
+  /* ── Kaufland Result ─────────────────────────────────────────────── */
+  function renderResultKaufland(d, ean) {
+    if (!d) return "";
+    const vc     = FC.VERDICT_COLORS[d.verdict] || FC.VERDICT_COLORS.SKIP;
+    const sell   = d.sell_price_avg ?? null;
+    const profit = d.profit_median ?? d.profit_avg ?? null;
+    const margin = d.margin_pct ?? null;
+    const fee    = d.fees_median ?? null;
+    const feeRate= d.fee_rate ? `${(d.fee_rate * 100).toFixed(1)}%` : "~10.5%";
+    const offers = d.offers_count ?? null;
+    const bestseller = d.bestseller;
+    const score  = d.score ?? null;
+    const label  = d.label;
+    const productUrl = d.product_url ?? null;
+    const sellerName = d.best_seller_name ?? null;
+    const volEbay    = d.volume_hint_ebay ?? null;
+
+    const profitColor = profit > 0 ? "var(--green)" : profit < 0 ? "var(--red)" : "var(--text-secondary)";
+    const marginColor = (margin ?? 0) >= 20 ? "var(--green)" : (margin ?? 0) >= 10 ? "var(--yellow)" : "var(--red)";
+    const scoreColor  = score >= 70 ? "var(--green)" : score >= 50 ? "var(--yellow)" : "var(--red)";
+    const labelText   = label === "HOT" ? "Hohe Nachfrage" : label === "OK" ? "Moderate Nachfrage" : "Geringes Interesse";
+
+    return `
+      <div class="card" style="border-left:3px solid ${vc.text}">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <span class="badge" style="background:${vc.bg};color:${vc.text};border:1px solid ${vc.border};font-weight:700;font-size:11px;padding:3px 12px;border-radius:var(--r-full)">✕ ${d.verdict || "SKIP"}</span>
+            ${score != null ? `<span style="font-size:11px;color:var(--text-muted);margin-left:8px">Score <strong style="color:${scoreColor}">${score}</strong>/100</span>` : ""}
+          </div>
+          ${label ? `<span class="badge" style="background:${score >= 70 ? "var(--green-subtle)" : score >= 50 ? "var(--yellow-subtle)" : "var(--red-subtle)"};color:${scoreColor};font-size:10px">${esc(label)} — ${labelText}</span>` : ""}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary);margin-bottom:2px">${esc(d.title || ean)}</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:16px;font-family:var(--font-mono)">${esc(ean)}</div>
+
+        ${bestseller ? `<div style="margin-bottom:12px"><span style="background:#fef3c7;color:#b45309;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600">⭐ Bestseller</span></div>` : ""}
+
+        <!-- KPI Strip -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px">
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Profit (netto)</div>
+            <div style="font-size:18px;font-weight:700;color:${profitColor}">${profit != null ? fmtEurPlain(profit) : "—"}</div>
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Marge</div>
+            <div style="font-size:18px;font-weight:700;color:${marginColor}">${margin != null ? fmtPct(margin) : "—"}</div>
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Angebote</div>
+            <div style="font-size:18px;font-weight:700;color:var(--text-primary)">${offers ?? "—"}</div>
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em">Nachfrage</div>
+            <div style="font-size:18px;font-weight:700;color:${scoreColor}">${score ?? "—"}</div>
+          </div>
+        </div>
+
+        <!-- Market Chips -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          <span class="badge badge-muted" style="font-size:11px">VK (günstigster Neu) <strong>${sell != null ? fmtEurPlain(sell) : "—"}</strong></span>
+          <span class="badge badge-muted" style="font-size:11px">Kaufland Gebühr (${feeRate}) <strong style="color:var(--red)">−${fee != null ? fmtEurPlain(fee) : "—"}</strong></span>
+          ${sellerName ? `<span class="badge badge-muted" style="font-size:11px">Günstigster Seller <strong>${esc(sellerName)}</strong></span>` : ""}
+          ${volEbay ? `<span class="badge badge-muted" style="font-size:11px">eBay Verk./Mo <strong>~${volEbay}</strong></span>` : ""}
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:16px">
+          <button class="btn btn-secondary btn-sm" id="fcAddInv">+ Inventar</button>
+          ${productUrl ? `<a class="btn btn-ghost btn-sm" href="${esc(productUrl)}" target="_blank" rel="noopener" style="text-decoration:none">Kaufland öffnen ↗</a>` : ""}
+          <button class="btn btn-ghost btn-sm" id="fcAddAlert">🔔 Alarm</button>
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px">🏷 Idealo ↗</a>
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px">💰 Geizhals ↗</a>
+        </div>
+      </div>
+    `;
+  }
+
   /* ── Mini chart ──────────────────────────────────────────────────── */
   function drawMiniChart(priceSeries) {
     const canvas = _container?.querySelector("#fcMiniChart");
@@ -482,6 +558,8 @@ const FlipcheckView = (() => {
 
       if (_market === "amazon") {
         resEl.innerHTML = d ? renderResultAmazon(d, ean) : `<p style="color:var(--red)">Kein Ergebnis</p>`;
+      } else if (_market === "kaufland") {
+        resEl.innerHTML = d ? renderResultKaufland(d, ean) : `<p style="color:var(--red)">Kein Ergebnis</p>`;
       } else {
         resEl.innerHTML = d ? renderResult(d, ean) : `<p style="color:var(--red)">Kein Ergebnis</p>`;
       }
