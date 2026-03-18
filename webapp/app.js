@@ -157,14 +157,26 @@ function calcRealProfit(item) {
   return vk - ek - shipOut - fee;
 }
 
+// ── Market fee helper (used by Sales, Batch etc.) ──────────────────────
+function calcMarketFee(vk, market, catId) {
+  if (market === "ebay" || !market) return calcEbayFee(vk, catId || "sonstiges");
+  const FLAT = { amz: 0.15, kaufland: 0.105, other: 0 };
+  return vk * (FLAT[market] || 0);
+}
+
 // ── Router ─────────────────────────────────────────────────────────────────
 const VIEWS = {
-  flipcheck: () => FlipcheckView,
-  inventory: () => InventoryView,
-  analytics: () => AnalyticsView,
-  history:   () => HistoryView,
-  alerts:    () => AlertsView,
-  settings:  () => SettingsView,
+  flipcheck:   () => FlipcheckView,
+  batch:       () => BatchView,
+  marketplace: () => MarketplaceView,
+  sales:       () => SalesView,
+  inventory:   () => InventoryView,
+  analytics:   () => AnalyticsView,
+  history:     () => HistoryView,
+  alerts:      () => AlertsView,
+  repricer:    () => RepricerView,
+  competition: () => CompetitionView,
+  settings:    () => SettingsView,
 };
 
 const App = {
