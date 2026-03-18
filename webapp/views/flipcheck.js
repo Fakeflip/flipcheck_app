@@ -2,7 +2,7 @@
 const FlipcheckView = (() => {
   let _container = null;
   let _miniChart = null;
-  let _market    = "ebay";   // "ebay" | "amazon"
+  let _market    = "ebay";   // "ebay" | "amazon" | "kaufland"
   let _ekMode    = "gross";
   let _vatMode   = "no_vat";
   let _lastResult = null;
@@ -95,7 +95,7 @@ const FlipcheckView = (() => {
       <div class="page-header">
         <div class="page-header-left">
           <h1>Flipcheck</h1>
-          <p>eBay &amp; Amazon Profitabilitätsanalyse</p>
+          <p>eBay, Amazon &amp; Kaufland Profitabilitätsanalyse</p>
         </div>
       </div>
 
@@ -103,6 +103,7 @@ const FlipcheckView = (() => {
         <!-- Market Toggle -->
         <div class="seg" id="fcMarketSeg" style="margin-bottom:14px">
           <button class="seg-btn active" data-mkt="ebay">🛒 eBay</button>
+          <button class="seg-btn"        data-mkt="kaufland">🏪 Kaufland</button>
           <button class="seg-btn"        data-mkt="amazon">📦 Amazon</button>
         </div>
 
@@ -455,7 +456,15 @@ const FlipcheckView = (() => {
     try {
       let d;
       if (_market === "amazon") {
-        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, shipping_in: shipIn });
+        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, ship_in: shipIn });
+      } else if (_market === "kaufland") {
+        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut, market: "kaufland" });
+        if (d && d.sell_price_median != null) {
+          d.ek = ek; d.ship_in = shipIn; d.ship_out = shipOut; d.category = cat;
+          const klFee = d.sell_price_median * 0.105;
+          d.profit_median = +(d.sell_price_median - ek - shipIn - shipOut - klFee).toFixed(2);
+          d.margin_pct = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        }
       } else {
         d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut });
         // Local profit recalc (server doesn't include shipping + VAT)
@@ -546,7 +555,7 @@ const FlipcheckView = (() => {
     const ebayFields = _container.querySelector("#fcEbayFields");
     const amzFields  = _container.querySelector("#fcAmzFields");
     const modeWrap   = _container.querySelector("#fcModeWrap");
-    if (ebayFields) ebayFields.style.display = mkt === "ebay"   ? "" : "none";
+    if (ebayFields) ebayFields.style.display = (mkt === "ebay" || mkt === "kaufland") ? "" : "none";
     if (amzFields)  amzFields.style.display  = mkt === "amazon" ? "" : "none";
     // Clear result when switching market
     const ean = _container.querySelector("#fcEan").value.trim();

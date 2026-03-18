@@ -2,7 +2,7 @@
 const FlipcheckView = (() => {
   let _container = null;
   let _miniChart = null;
-  let _market    = "ebay";   // "ebay" | "amazon"
+  let _market    = "ebay";   // "ebay" | "amazon" | "kaufland"
   let _ekMode    = "gross";
   let _vatMode   = "no_vat";
   let _lastResult = null;
@@ -72,8 +72,11 @@ const FlipcheckView = (() => {
       if (rem <= 0) break;
     }
     fee = Math.max(fee, 0.35);
-    const ekNet = _ekMode === "net" ? ekGross * 1.19 : ekGross;
-    return vkGross - fee - (shipIn || 0) - (shipOut || 0) - ekNet;
+    const vat    = _vatMode === "ust_19" ? 1.19 : 1.0;
+    const vkNet  = vkGross / vat;
+    const feeNet = fee / vat;
+    const ekNet  = (_vatMode === "ust_19" && _ekMode === "gross") ? ekGross / vat : ekGross;
+    return vkNet - feeNet - (shipIn || 0) - (shipOut || 0) - ekNet;
   }
 
   function _deriveScore(d) {
@@ -92,7 +95,7 @@ const FlipcheckView = (() => {
       <div class="page-header">
         <div class="page-header-left">
           <h1>Flipcheck</h1>
-          <p>eBay &amp; Amazon Profitabilitätsanalyse</p>
+          <p>eBay, Amazon &amp; Kaufland Profitabilitätsanalyse</p>
         </div>
       </div>
 
@@ -100,6 +103,7 @@ const FlipcheckView = (() => {
         <!-- Market Toggle -->
         <div class="seg" id="fcMarketSeg" style="margin-bottom:14px">
           <button class="seg-btn active" data-mkt="ebay">🛒 eBay</button>
+          <button class="seg-btn"        data-mkt="kaufland">🏪 Kaufland</button>
           <button class="seg-btn"        data-mkt="amazon">📦 Amazon</button>
         </div>
 
@@ -201,12 +205,23 @@ const FlipcheckView = (() => {
     const score  = _deriveScore(d);
     const pColor = profit != null ? (profit >= 0 ? "var(--green)" : "var(--red)") : "var(--text-secondary)";
     const sColor = score >= 60 ? "var(--green)" : score >= 30 ? "var(--yellow)" : "var(--red)";
-    const fee    = vk != null ? (vk - (profit ?? 0) - (d.ek ?? 0)) : null;
+    /* Calculate eBay fee directly from category tiers */
+    let fee = null;
+    if (vk != null) {
+      const fcat = CATEGORIES.find(c => c.id === (d.category || "sonstiges")) || CATEGORIES[CATEGORIES.length - 1];
+      fee = 0; let fRem = vk;
+      for (const [limit, pct] of fcat.tiers) {
+        if (limit == null) { fee += fRem * pct; break; }
+        const chunk = Math.min(fRem, limit); fee += chunk * pct; fRem = Math.max(0, fRem - limit);
+        if (fRem <= 0) break;
+      }
+      fee = Math.max(fee, 0.35);
+    }
 
     /* Waterfall steps */
     const wfSteps = [];
     if (vk != null) wfSteps.push({ label:"Median VK", val: vk, color:"var(--text-primary)", plus:true });
-    if (fee != null && fee > 0) wfSteps.push({ label:"eBay-Gebühr", val:-Math.abs(fee), color:"var(--red)" });
+    if (fee != null && fee > 0) wfSteps.push({ label:"eBay-Gebühr", val:-fee, color:"var(--red)" });
     if (d.ship_in  > 0) wfSteps.push({ label:"Versand rein",  val:-d.ship_in,  color:"var(--red)" });
     if (d.ship_out > 0) wfSteps.push({ label:"Versand raus",  val:-d.ship_out, color:"var(--red)" });
     if (d.ek != null)   wfSteps.push({ label:"EK",            val:-d.ek,       color:"var(--red)" });
@@ -441,9 +456,26 @@ const FlipcheckView = (() => {
     try {
       let d;
       if (_market === "amazon") {
-        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, shipping_in: shipIn });
+        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, ship_in: shipIn });
+      } else if (_market === "kaufland") {
+        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut, market: "kaufland" });
+        if (d && d.sell_price_median != null) {
+          d.ek = ek; d.ship_in = shipIn; d.ship_out = shipOut; d.category = cat;
+          const klFee = d.sell_price_median * 0.105;
+          d.profit_median = +(d.sell_price_median - ek - shipIn - shipOut - klFee).toFixed(2);
+          d.margin_pct = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        }
       } else {
         d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut });
+        // Local profit recalc (server doesn't include shipping + VAT)
+        if (d && d.sell_price_median != null) {
+          d.ek       = ek;
+          d.ship_in  = shipIn;
+          d.ship_out = shipOut;
+          d.category = cat;
+          d.profit_median = +calcProfit(d.sell_price_median, ek, cat, shipIn, shipOut).toFixed(2);
+          d.margin_pct    = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        }
       }
 
       _lastResult = d ? { ...d, ean, ek, market: _market } : null;
@@ -523,7 +555,7 @@ const FlipcheckView = (() => {
     const ebayFields = _container.querySelector("#fcEbayFields");
     const amzFields  = _container.querySelector("#fcAmzFields");
     const modeWrap   = _container.querySelector("#fcModeWrap");
-    if (ebayFields) ebayFields.style.display = mkt === "ebay"   ? "" : "none";
+    if (ebayFields) ebayFields.style.display = (mkt === "ebay" || mkt === "kaufland") ? "" : "none";
     if (amzFields)  amzFields.style.display  = mkt === "amazon" ? "" : "none";
     // Clear result when switching market
     const ean = _container.querySelector("#fcEan").value.trim();
