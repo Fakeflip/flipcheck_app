@@ -220,8 +220,9 @@ const SettingsView = (() => {
         <!-- Footer -->
         <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px;padding-bottom:32px">
           Flipcheck Web App ·
-          <a href="https://joinflipcheck.app/datenschutz" target="_blank" rel="noopener">Datenschutz</a> ·
-          <a href="https://joinflipcheck.app/impressum" target="_blank" rel="noopener">Impressum</a>
+          <a href="https://joinflipcheck.app/privacy" target="_blank" rel="noopener">Datenschutz</a> ·
+          <a href="https://joinflipcheck.app/terms" target="_blank" rel="noopener">AGB</a> ·
+          <a href="https://joinflipcheck.app/imprint" target="_blank" rel="noopener">Impressum</a>
         </div>
 
       </div>

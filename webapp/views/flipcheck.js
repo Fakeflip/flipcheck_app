@@ -110,8 +110,11 @@ const FlipcheckView = (() => {
         <!-- EAN -->
         <div class="field" style="margin-bottom:10px">
           <label class="input-label">EAN / ASIN</label>
-          <input id="fcEan" class="input" type="text" placeholder="z.B. 4010355040672 oder B0CX4F5P1S"
-                 maxlength="20" inputmode="numeric" autocomplete="off"/>
+          <div style="display:flex;gap:6px">
+            <input id="fcEan" class="input" type="text" placeholder="z.B. 4010355040672 oder B0CX4F5P1S"
+                   maxlength="20" inputmode="numeric" autocomplete="off" style="flex:1"/>
+            <button class="btn btn-ghost" id="fcScanBtn" title="Barcode scannen" style="padding:8px 10px;font-size:16px">📷</button>
+          </div>
         </div>
 
         <!-- EK + Mode row -->
@@ -754,6 +757,9 @@ const FlipcheckView = (() => {
       autoDetectMarket(e.target.value);
     });
 
+    // Barcode scanner
+    container.querySelector("#fcScanBtn")?.addEventListener("click", () => openBarcodeScanner(container));
+
     // Market toggle
     container.querySelectorAll("#fcMarketSeg .seg-btn").forEach(btn => {
       btn.addEventListener("click", () => setMarket(btn.dataset.mkt));
@@ -801,6 +807,90 @@ const FlipcheckView = (() => {
   function unmount() {
     if (_miniChart) { _miniChart.destroy(); _miniChart = null; }
     _container = null;
+  }
+
+  /* ── Barcode Scanner (Browser Camera) ────────────────────────────── */
+  let _scannerStream = null;
+
+  async function openBarcodeScanner(container) {
+    // Check if BarcodeDetector is available (Chrome/Edge)
+    const hasBarcodeAPI = typeof BarcodeDetector !== "undefined";
+
+    const body = `
+      <div style="text-align:center">
+        <video id="scannerVideo" autoplay playsinline muted style="width:100%;max-width:400px;border-radius:var(--r);background:#000;aspect-ratio:4/3"></video>
+        <div id="scannerStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px">Kamera wird gestartet…</div>
+        ${!hasBarcodeAPI ? `<div style="font-size:11px;color:var(--yellow);margin-top:8px">⚠ BarcodeDetector nicht verfügbar. Nutze Chrome oder Edge für Kamera-Scanning.</div>` : ""}
+      </div>
+    `;
+
+    Modal.open({
+      title: "📷 Barcode Scanner",
+      body,
+      buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }],
+    });
+
+    // Wait for modal DOM
+    await new Promise(r => setTimeout(r, 100));
+    const video = document.getElementById("scannerVideo");
+    const status = document.getElementById("scannerStatus");
+    if (!video) return;
+
+    try {
+      _scannerStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+      });
+      video.srcObject = _scannerStream;
+      if (status) status.textContent = "Halte einen Barcode vor die Kamera…";
+
+      if (hasBarcodeAPI) {
+        const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+        const scanLoop = async () => {
+          if (!_scannerStream || !video.srcObject) return;
+          try {
+            const barcodes = await detector.detect(video);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              if (/^\d{8,14}$/.test(code)) {
+                // Found EAN!
+                const inp = container.querySelector("#fcEan");
+                if (inp) inp.value = code;
+                autoDetectMarket(code);
+                Toast.success("Barcode erkannt", code);
+                stopScanner();
+                Modal.close(true);
+                return;
+              }
+            }
+          } catch {}
+          requestAnimationFrame(scanLoop);
+        };
+        requestAnimationFrame(scanLoop);
+      } else {
+        if (status) status.textContent = "BarcodeDetector nicht verfügbar. Bitte EAN manuell eingeben.";
+      }
+    } catch (e) {
+      if (status) status.textContent = `Kamera-Fehler: ${e.message}`;
+    }
+
+    // Cleanup on modal close
+    const overlay = document.getElementById("modal-overlay");
+    if (overlay) {
+      const obs = new MutationObserver(() => {
+        if (overlay.style.display === "none" || !overlay.classList.contains("open")) {
+          stopScanner();
+          obs.disconnect();
+        }
+      });
+      obs.observe(overlay, { attributes: true, attributeFilter: ["style", "class"] });
+    }
+  }
+
+  function stopScanner() {
+    if (_scannerStream) {
+      _scannerStream.getTracks().forEach(t => t.stop());
+      _scannerStream = null;
+    }
   }
 
   return { mount, unmount };

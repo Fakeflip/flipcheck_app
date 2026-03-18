@@ -70,7 +70,7 @@ const SettingsView = (() => {
               <div class="st-username">${esc(username)}</div>
               <div class="st-plan-row">
                 <span class="st-plan-badge ${isPaid ? "st-plan-pro" : "st-plan-free"}">${isPaid ? "✦ Pro" : "Free"}</span>
-                ${!isPaid ? `<button onclick="(async()=>{const r=await createCheckoutSession(7);if(r?.checkout_url)window.open(r.checkout_url,'_blank');})()" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:11px">7 Tage gratis →</button>` : ""}
+                ${!isPaid ? `<a href="https://whop.com/flipcheck" target="_blank" rel="noopener" class="btn btn-primary btn-sm" style="padding:3px 10px;font-size:11px">Upgrade →</a>` : ""}
               </div>
             </div>
           </div>
@@ -220,8 +220,9 @@ const SettingsView = (() => {
         <!-- Footer -->
         <div style="text-align:center;font-size:11px;color:var(--text-muted);margin-top:8px;padding-bottom:32px">
           Flipcheck Web App ·
-          <a href="https://joinflipcheck.app/datenschutz" target="_blank" rel="noopener">Datenschutz</a> ·
-          <a href="https://joinflipcheck.app/impressum" target="_blank" rel="noopener">Impressum</a>
+          <a href="https://joinflipcheck.app/privacy" target="_blank" rel="noopener">Datenschutz</a> ·
+          <a href="https://joinflipcheck.app/terms" target="_blank" rel="noopener">AGB</a> ·
+          <a href="https://joinflipcheck.app/imprint" target="_blank" rel="noopener">Impressum</a>
         </div>
 
       </div>
