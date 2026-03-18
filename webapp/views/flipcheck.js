@@ -823,14 +823,14 @@ const FlipcheckView = (() => {
     }
     Toast.info("Scanne Bild…", "Barcode wird analysiert");
     try {
-      const scanner = new Html5Qrcode("__fcImgScan__", /* verbose */ false);
-      // Create a temporary hidden div for the scanner
+      // Create offscreen element (must be in DOM but can be invisible)
       const tmp = document.createElement("div");
       tmp.id = "__fcImgScan__";
-      tmp.style.display = "none";
+      tmp.style.cssText = "position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden";
       document.body.appendChild(tmp);
 
-      const result = await scanner.scanFileV2(file, /* showImage */ false);
+      const scanner = new Html5Qrcode("__fcImgScan__", /* verbose */ false);
+      const result = await scanner.scanFileV2(file, /* showImage */ true);
       const code = result?.decodedText;
       if (code && /^\d{8,14}$/.test(code)) {
         const inp = container.querySelector("#fcEan");
