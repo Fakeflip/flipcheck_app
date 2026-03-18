@@ -328,74 +328,168 @@ const FlipcheckView = (() => {
   function renderResultAmazon(d, ean) {
     if (!d) return "";
     const vc     = FC.VERDICT_COLORS[d.verdict] || FC.VERDICT_COLORS.SKIP;
-    const profit = d.profit ?? null;
+    const profit = d.profit_median ?? d.profit ?? null;
+    const margin = d.margin_pct ?? null;
     const pColor = profit != null ? (profit >= 0 ? "var(--green)" : "var(--red)") : "var(--text-secondary)";
-    const score  = _deriveScore({ verdict: d.verdict, profit_median: profit, margin_pct: d.margin_pct });
+    const mColor = margin != null ? (margin >= 20 ? "var(--green)" : margin >= 10 ? "var(--yellow)" : "var(--red)") : "var(--text-secondary)";
+    const score  = _deriveScore({ verdict: d.verdict, profit_median: profit, margin_pct: margin });
 
-    const fbaFee = d.fba_fee ?? null;
-    const refFee = d.referral_fee ?? null;
-    const buyBox = d.buy_box_price ?? null;
+    const fbaFee  = d.fba_fee ?? null;
+    const refFee  = d.referral_fee ?? null;
+    const buyBox  = d.buy_box ?? d.buy_box_price ?? null;
+    const bbAvg30 = d.buy_box_avg30 ?? null;
+    const roi     = d.roi_pct ?? null;
+    const brkEven = d.break_even ?? null;
+    const netPay  = d.net_payout ?? null;
+    const monthP  = d.monthly_profit_est ?? null;
+    const dtc     = d.days_to_cash ?? null;
+    const sales   = d.sales_30d ?? null;
+    const salesSrc= d.sales_30d_source ?? null;
+    const bsr     = d.sales_rank ?? d.bsr ?? null;
+    const bsrDrops= d.bsr_drops_30d ?? null;
+    const offers  = d.offer_count ?? d.seller_count ?? null;
+    const fbaC    = d.fba_count ?? null;
+    const varC    = d.variation_count ?? null;
+    const catName = d.category_name ?? null;
+    const signals = d.signals ?? {};
+    const intl    = d.intl_prices ?? {};
+    const asin    = d.asin ?? null;
 
-    const sColor = score >= 60 ? "var(--green)" : score >= 30 ? "var(--yellow)" : "var(--red)";
+    const sColor  = score >= 60 ? "var(--green)" : score >= 30 ? "var(--yellow)" : "var(--red)";
+    const roiC    = roi != null ? (roi >= 30 ? "var(--green)" : roi >= 0 ? "var(--yellow)" : "var(--red)") : "";
+
+    // Gated flags
+    const ungated = signals.ungated_markets || {};
+    const FLAGS   = { SE:"🇸🇪", PL:"🇵🇱", BE:"🇧🇪", IT:"🇮🇹", DE:"🇩🇪", ES:"🇪🇸", FR:"🇫🇷", NL:"🇳🇱", GB:"🇬🇧" };
+    const gatedHtml = Object.keys(ungated).length > 0
+      ? Object.entries(ungated).map(([code, st]) => {
+          const open = st === "open";
+          return `<span style="display:inline-flex;align-items:center;gap:1px;font-size:13px;opacity:${open ? 1 : 0.5}" title="${code}: ${open ? "Ungated" : "Gated"}">${FLAGS[code]||code}<span style="font-size:9px;color:${open ? "var(--green)" : "var(--red)"}">${open ? "🔓" : "🔒"}</span></span>`;
+        }).join(" ")
+      : "";
+
+    // Intl prices
+    const INTL_FLAGS = { de:"🇩🇪", fr:"🇫🇷", it:"🇮🇹", es:"🇪🇸", nl:"🇳🇱", be:"🇧🇪", pl:"🇵🇱", se:"🇸🇪", gb:"🇬🇧" };
+    const intlHtml = Object.entries(intl).length > 0
+      ? Object.entries(intl).map(([cc, price]) =>
+          `<span class="badge badge-muted" style="font-size:10px">${INTL_FLAGS[cc]||cc.toUpperCase()} ${fmtEurPlain(price)}</span>`
+        ).join(" ")
+      : "";
+
+    // Signal warnings
+    const warnChips = [];
+    if (signals.buybox_is_amazon) warnChips.push(`<span class="badge" style="background:var(--red-subtle);color:var(--red);font-size:10px;border:1px solid var(--red-border)">⚠ Amazon hält Buy Box</span>`);
+    if (signals.is_hazmat)        warnChips.push(`<span class="badge" style="background:var(--yellow-subtle);color:var(--yellow);font-size:10px;border:1px solid var(--yellow-border)">☢ Gefahrgut</span>`);
+    if (signals.is_meltable)      warnChips.push(`<span class="badge" style="background:var(--yellow-subtle);color:var(--yellow);font-size:10px;border:1px solid var(--yellow-border)">🫠 Schmelzbar</span>`);
+    if (signals.is_oversize)      warnChips.push(`<span class="badge" style="background:var(--yellow-subtle);color:var(--yellow);font-size:10px;border:1px solid var(--yellow-border)">📦 Übergröße</span>`);
+    if (signals.pl_risk === "likely") warnChips.push(`<span class="badge" style="background:var(--red-subtle);color:var(--red);font-size:10px;border:1px solid var(--red-border)">🏷 Private Label</span>`);
+    if (signals.ip_risk === "high")   warnChips.push(`<span class="badge" style="background:var(--red-subtle);color:var(--red);font-size:10px;border:1px solid var(--red-border)">⚖ IP-Risiko</span>`);
 
     return `
-      <div class="result-card ${(d.verdict||"SKIP").toLowerCase()}">
+      <div class="card" style="border-left:3px solid ${vc.text}">
         <!-- Hero -->
-        <div class="fc-hero">
-          <div class="fc-hero-left">
-            <span class="verdict-badge ${(d.verdict||"SKIP").toLowerCase()}">${esc(d.verdict || "SKIP")}</span>
-            ${d.title ? `<div class="fc-product-title">${esc(d.title)}</div>` : ""}
-            ${ean ? `<div class="fc-product-ean">${esc(ean)}</div>` : ""}
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div>
+            <span class="badge" style="background:${vc.bg};color:${vc.text};border:1px solid ${vc.border};font-weight:700;font-size:11px;padding:3px 12px;border-radius:var(--r-full)">${d.verdict || "SKIP"}</span>
+            ${d.product_image ? `<img src="${esc(d.product_image)}" style="width:48px;height:48px;border-radius:var(--r);object-fit:contain;margin-left:10px;vertical-align:middle;background:var(--bg-elevated)"/>` : ""}
           </div>
-          <div class="fc-score-block">
-            <div class="fc-score-bar">
-              <div class="fc-score-fill" style="width:${score}%;background:${sColor}"></div>
-            </div>
-            <div class="fc-score-label" style="color:${sColor}">${score}</div>
-            <div class="fc-score-sub">Score</div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--text-muted)">Score</div>
+            <div style="font-size:22px;font-weight:700;color:${sColor}">${score}</div>
+            <div style="width:60px;height:3px;background:var(--bg-elevated);border-radius:2px;margin-top:2px"><div style="width:${score}%;height:100%;background:${sColor};border-radius:2px"></div></div>
+          </div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--text-primary)">${esc(d.title || ean)}</div>
+        <div style="font-size:11px;color:var(--text-muted);font-family:var(--font-mono);margin-bottom:4px">${asin ? esc(asin) : esc(ean)}</div>
+        ${catName ? `<div style="font-size:10px;color:var(--text-muted);margin-bottom:12px">${esc(catName)}</div>` : ""}
+
+        <!-- Warning Badges -->
+        ${warnChips.length ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">${warnChips.join("")}</div>` : ""}
+
+        <!-- 6-KPI Strip -->
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Buy Box</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary)">${buyBox != null ? fmtEurPlain(buyBox) : "—"}</div>
+            ${bbAvg30 ? `<div style="font-size:9px;color:var(--text-muted)">Ø30T: ${fmtEurPlain(bbAvg30)}</div>` : ""}
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Profit</div>
+            <div style="font-size:16px;font-weight:700;color:${pColor}">${profit != null ? fmtEurPlain(profit) : "—"}</div>
+            ${monthP ? `<div style="font-size:9px;color:var(--text-muted)">~${fmtEurPlain(monthP)}/Mo</div>` : ""}
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Marge</div>
+            <div style="font-size:16px;font-weight:700;color:${mColor}">${margin != null ? fmtPct(margin) : "—"}</div>
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">ROI</div>
+            <div style="font-size:16px;font-weight:700;color:${roiC}">${roi != null ? fmtPct(roi) : "—"}</div>
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">Sales/Mo</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary)">${sales ?? "—"}</div>
+            ${salesSrc ? `<div style="font-size:9px;color:var(--text-muted)">${salesSrc}</div>` : ""}
+          </div>
+          <div class="card" style="padding:10px;text-align:center;background:var(--bg-elevated)">
+            <div style="font-size:10px;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.04em">BSR</div>
+            <div style="font-size:16px;font-weight:700;color:var(--text-primary)">${bsr != null ? `#${bsr.toLocaleString("de")}` : "—"}</div>
+            ${bsrDrops ? `<div style="font-size:9px;color:var(--green)">${bsrDrops} Drops/30T</div>` : ""}
           </div>
         </div>
 
-        <!-- KPI strip -->
-        <div class="fc-kpi-row">
-          <div class="fc-kpi-card">
-            <div class="fc-kpi-value">${buyBox != null ? fmtEurPlain(buyBox) : "—"}</div>
-            <div class="fc-kpi-label">Buy Box</div>
-          </div>
-          <div class="fc-kpi-card ${profit != null && profit >= 0 ? "green" : profit != null ? "red" : ""}">
-            <div class="fc-kpi-value" style="color:${pColor}">${profit != null ? fmtEur(profit) : "—"}</div>
-            <div class="fc-kpi-label">Profit</div>
-          </div>
-          <div class="fc-kpi-card">
-            <div class="fc-kpi-value">${d.margin_pct != null ? fmtPct(d.margin_pct) : "—"}</div>
-            <div class="fc-kpi-label">Marge</div>
-          </div>
-          <div class="fc-kpi-card">
-            <div class="fc-kpi-value">${d.bsr != null ? `#${d.bsr.toLocaleString("de")}` : "—"}</div>
-            <div class="fc-kpi-label">BSR</div>
-          </div>
+        <!-- Fee Breakdown -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+          ${_chip("Referral Fee", refFee, "var(--red)")}
+          ${_chip("FBA Gebühr", fbaFee, "var(--red)")}
+          ${d.prep_fee > 0 ? _chip("PREP", d.prep_fee, "var(--red)") : ""}
+          ${_chip("Seller", offers)}
+          ${fbaC != null ? _chip("FBA Seller", fbaC) : ""}
+          ${varC ? _chip("Varianten", varC, varC > 10 ? "var(--yellow)" : "") : ""}
+          ${brkEven ? _chip("Break Even", brkEven, "var(--accent)") : ""}
+          ${netPay ? _chip("Netto Auszahlung", netPay, "var(--green)") : ""}
+          ${dtc ? _chip("Days to Cash", `${dtc}d`) : ""}
         </div>
 
-        <!-- Amazon metrics -->
-        <div class="fc-amz-metrics">
-          ${_amzMetric("Referral Fee", refFee != null ? fmtEurPlain(refFee) : "—", "var(--red)")}
-          ${_amzMetric("FBA Gebühr",   fbaFee != null ? fmtEurPlain(fbaFee) : "—", "var(--red)")}
-          ${d.prep_fee > 0 ? _amzMetric("PREP",  fmtEurPlain(d.prep_fee), "var(--red)") : ""}
-          ${d.ship_in  > 0 ? _amzMetric("Versand rein", fmtEurPlain(d.ship_in), "var(--red)") : ""}
-          ${_amzMetric("Seller Count", d.seller_count ?? "—")}
-          ${_amzMetric("Review Ø", d.review_score != null ? `${d.review_score.toFixed(1)} ★` : "—")}
-        </div>
+        <!-- Gated Status -->
+        ${gatedHtml ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em">Gated/Ungated Status</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${gatedHtml}</div>
+        </div>` : ""}
+
+        <!-- Signals -->
+        ${signals.pl_text || signals.ip_text || signals.size_tier ? `
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+          ${signals.size_tier ? `<span class="badge badge-muted" style="font-size:10px">📦 ${esc(signals.size_tier)}${signals.weight_kg ? ` · ${signals.weight_kg}kg` : ""}</span>` : ""}
+          ${signals.pl_text ? `<span class="badge badge-muted" style="font-size:10px">🏷 ${esc(signals.pl_text)}</span>` : ""}
+          ${signals.ip_text ? `<span class="badge badge-muted" style="font-size:10px">⚖ ${esc(signals.ip_text)}</span>` : ""}
+        </div>` : ""}
+
+        <!-- Intl Prices -->
+        ${intlHtml ? `
+        <div style="margin-bottom:12px">
+          <div style="font-size:10px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.04em">EU Buy Box Preise</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">${intlHtml}</div>
+        </div>` : ""}
 
         <!-- Chart -->
-        ${d.price_series?.length ? `<canvas id="fcMiniChart" height="60" style="margin-top:14px;border-radius:var(--r);max-height:60px"></canvas>` : ""}
+        ${d.price_series?.length ? `<canvas id="fcMiniChart" height="60" style="margin-top:8px;border-radius:var(--r);max-height:60px"></canvas>` : ""}
 
         <!-- Actions -->
-        <div class="result-actions" style="margin-top:14px">
-          <button class="btn btn-ghost btn-sm" id="fcAddInv">+ Inventar</button>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px">
+          <button class="btn btn-secondary btn-sm" id="fcAddInv">+ Inventar</button>
           <button class="btn btn-ghost btn-sm" id="fcAddAlert">🔔 Alarm</button>
+          ${asin ? `<a class="btn btn-ghost btn-sm" href="https://www.amazon.de/dp/${esc(asin)}" target="_blank" rel="noopener" style="text-decoration:none;font-size:11px">Amazon öffnen ↗</a>` : ""}
         </div>
       </div>
     `;
+  }
+
+  function _chip(label, value, color) {
+    if (value == null) return "";
+    const v = typeof value === "number" ? fmtEurPlain(value) : value;
+    return `<span class="badge badge-muted" style="font-size:11px">${esc(label)} <strong${color ? ` style="color:${color}"` : ""}>${v}</strong></span>`;
   }
 
   /* ── Kaufland Result ─────────────────────────────────────────────── */
