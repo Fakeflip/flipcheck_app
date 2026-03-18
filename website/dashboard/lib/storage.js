@@ -67,6 +67,16 @@ const Storage = (() => {
     } catch { return null; }
   }
 
+  async function savePrice(data) {
+    if (!data?.ean) return null;
+    try {
+      return await API.call("/price-history/point", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    } catch { return null; }
+  }
+
   async function deleteHistory(ean) {
     try { return await API.call(`/price-history/${encodeURIComponent(ean)}`, { method: "DELETE" }); }
     catch { return null; }
@@ -228,7 +238,7 @@ const Storage = (() => {
 
   return {
     listInventory, upsertItem, deleteItem,
-    getHistory, listHistory, savePriceSeries, deleteHistory,
+    getHistory, listHistory, savePrice, savePriceSeries, deleteHistory,
     getSettings, saveSettings,
     listAlerts, addAlert, removeAlert, updateAlert, resetAlert,
     calcInventoryAnalytics,
