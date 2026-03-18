@@ -809,18 +809,19 @@ const FlipcheckView = (() => {
     _container = null;
   }
 
-  /* ── Barcode Scanner (Browser Camera) ────────────────────────────── */
-  let _scannerStream = null;
+  /* ── Barcode Scanner (html5-qrcode — works on Safari, Chrome, Firefox) */
+  let _html5Scanner = null;
 
   async function openBarcodeScanner(container) {
-    // Check if BarcodeDetector is available (Chrome/Edge)
-    const hasBarcodeAPI = typeof BarcodeDetector !== "undefined";
+    if (typeof Html5Qrcode === "undefined") {
+      Toast.error("Scanner nicht verfügbar", "Barcode-Library konnte nicht geladen werden.");
+      return;
+    }
 
     const body = `
       <div style="text-align:center">
-        <video id="scannerVideo" autoplay playsinline muted style="width:100%;max-width:400px;border-radius:var(--r);background:#000;aspect-ratio:4/3"></video>
+        <div id="scannerRegion" style="width:100%;max-width:400px;margin:0 auto;border-radius:var(--r);overflow:hidden"></div>
         <div id="scannerStatus" style="font-size:12px;color:var(--text-muted);margin-top:8px">Kamera wird gestartet…</div>
-        ${!hasBarcodeAPI ? `<div style="font-size:11px;color:var(--yellow);margin-top:8px">⚠ BarcodeDetector nicht verfügbar. Nutze Chrome oder Edge für Kamera-Scanning.</div>` : ""}
       </div>
     `;
 
@@ -830,47 +831,43 @@ const FlipcheckView = (() => {
       buttons: [{ label: "Schließen", variant: "btn-ghost", value: false }],
     });
 
-    // Wait for modal DOM
-    await new Promise(r => setTimeout(r, 100));
-    const video = document.getElementById("scannerVideo");
+    await new Promise(r => setTimeout(r, 200));
+    const region = document.getElementById("scannerRegion");
     const status = document.getElementById("scannerStatus");
-    if (!video) return;
+    if (!region) return;
 
     try {
-      _scannerStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
-      });
-      video.srcObject = _scannerStream;
-      if (status) status.textContent = "Halte einen Barcode vor die Kamera…";
+      _html5Scanner = new Html5Qrcode("scannerRegion");
 
-      if (hasBarcodeAPI) {
-        const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
-        const scanLoop = async () => {
-          if (!_scannerStream || !video.srcObject) return;
-          try {
-            const barcodes = await detector.detect(video);
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue;
-              if (/^\d{8,14}$/.test(code)) {
-                // Found EAN!
-                const inp = container.querySelector("#fcEan");
-                if (inp) inp.value = code;
-                autoDetectMarket(code);
-                Toast.success("Barcode erkannt", code);
-                stopScanner();
-                Modal.close(true);
-                return;
-              }
-            }
-          } catch {}
-          requestAnimationFrame(scanLoop);
-        };
-        requestAnimationFrame(scanLoop);
-      } else {
-        if (status) status.textContent = "BarcodeDetector nicht verfügbar. Bitte EAN manuell eingeben.";
-      }
+      await _html5Scanner.start(
+        { facingMode: "environment" },
+        {
+          fps: 10,
+          qrbox: { width: 280, height: 150 },
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+          ],
+        },
+        (code) => {
+          if (/^\d{8,14}$/.test(code)) {
+            const inp = container.querySelector("#fcEan");
+            if (inp) inp.value = code;
+            autoDetectMarket(code);
+            Toast.success("Barcode erkannt", code);
+            stopScanner();
+            try { Modal.close(true); } catch {}
+          }
+        },
+        () => {} // ignore scan failures
+      );
+
+      if (status) status.textContent = "Halte einen Barcode vor die Kamera…";
     } catch (e) {
-      if (status) status.textContent = `Kamera-Fehler: ${e.message}`;
+      if (status) status.textContent = `Kamera-Fehler: ${e.message || e}`;
     }
 
     // Cleanup on modal close
@@ -887,9 +884,10 @@ const FlipcheckView = (() => {
   }
 
   function stopScanner() {
-    if (_scannerStream) {
-      _scannerStream.getTracks().forEach(t => t.stop());
-      _scannerStream = null;
+    if (_html5Scanner) {
+      _html5Scanner.stop().catch(() => {});
+      _html5Scanner.clear();
+      _html5Scanner = null;
     }
   }
 
