@@ -13,6 +13,21 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
+  <style>
+    /* Promo code */
+    .promo-box { margin-top: 20px; padding: 16px 20px; background: var(--surface2); border: 1px dashed var(--accent-bdr); border-radius: 12px; text-align: center; }
+    .promo-box p { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+    .promo-code { display: inline-flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--border2); border-radius: 8px; padding: 8px 16px; cursor: pointer; transition: all .2s; }
+    .promo-code:hover { border-color: var(--accent-bdr); }
+    .promo-code-text { font-family: 'SF Mono','Fira Code',monospace; font-size: 16px; font-weight: 700; letter-spacing: .08em; color: var(--accent-hover); }
+    .promo-code-copy { font-size: 11px; color: var(--dim); transition: color .2s; }
+    .promo-code.copied .promo-code-copy { color: var(--green); }
+    .promo-save { font-size: 14px; font-weight: 700; color: var(--green); }
+    .promo-price { text-decoration: line-through; color: var(--dim); font-size: 14px; }
+    /* Reveal animation */
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity .6s ease, transform .6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+  </style>
 </head>
 <body>
 
@@ -72,7 +87,7 @@
   <section class="demo">
     <div class="container">
       <div class="demo-cards">
-        <div class="verdict-card buy animate-up animate-up-d1">
+        <div class="verdict-card buy">
           <div class="verdict-badge">BUY</div>
           <div class="verdict-product">Samsung Galaxy Buds2 Pro</div>
           <div class="verdict-kpis">
@@ -82,7 +97,7 @@
             <div class="kpi"><span class="kpi-v">48</span><span class="kpi-l">Verk./30d</span></div>
           </div>
         </div>
-        <div class="verdict-card hold animate-up animate-up-d2">
+        <div class="verdict-card hold">
           <div class="verdict-badge">HOLD</div>
           <div class="verdict-product">Philips Hue Bridge v2</div>
           <div class="verdict-kpis">
@@ -92,7 +107,7 @@
             <div class="kpi"><span class="kpi-v">12</span><span class="kpi-l">Verk./30d</span></div>
           </div>
         </div>
-        <div class="verdict-card skip animate-up animate-up-d3">
+        <div class="verdict-card skip">
           <div class="verdict-badge">SKIP</div>
           <div class="verdict-product">Logitech MX Keys Mini</div>
           <div class="verdict-kpis">
@@ -128,48 +143,48 @@
         <p class="section-sub">Entwickelt von Resellern, für Reseller — auf eBay, Amazon und Kaufland.</p>
       </div>
       <div class="features-grid">
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">⚡</div>
           <h3>Instant Flipcheck</h3>
           <p>EAN eingeben oder scannen — in unter 2 Sekunden bekommst du BUY, HOLD oder SKIP mit echten Verkaufsdaten und Gewinnkalkulation.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🔄</div>
           <div class="feature-tag tag-new">Neu</div>
           <h3>Automatischer Repricer</h3>
           <p>Optimiere deine eBay-Preise automatisch. Der Repricer passt Verkaufspreise nach deinen Regeln an — Mindestmarge, Konkurrenz und Nachfrage.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">📦</div>
           <h3>Inventar</h3>
           <p>Verwalte deinen Bestand mit EK, VK, Status und Notizen. Automatische Gewinnberechnung nach Plattformgebühren. Verkäufe werden automatisch erkannt.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">📈</div>
           <h3>Preisverlauf</h3>
           <p>Verfolge wie sich der Marktpreis über Wochen und Monate entwickelt. Kaufe zum richtigen Zeitpunkt und maximiere deine Marge.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🔍</div>
           <h3>Deal Scanner</h3>
           <p>Scanne Batch-Listen aus Großhandel oder Auktionen. CSV hochladen und sofort für jedes Produkt ein Urteil bekommen.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">📊</div>
           <h3>Analytics Dashboard</h3>
           <p>Gesamtbestand, investiertes Kapital, Marge und monatliche Performance — alles auf einen Blick mit Charts und Statistiken.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🔔</div>
           <h3>Preisalarme &amp; Webhooks</h3>
           <p>Alarme wenn Produkte unter deinen Zielpreis fallen. Discord-Webhook-Benachrichtigungen für Sync-Events und Verkäufe.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">🏷️</div>
           <h3>ASIN-to-EAN</h3>
           <p>Hast du nur eine ASIN? Flipcheck konvertiert automatisch zwischen ASIN und EAN — funktioniert auf allen Plattformen.</p>
         </div>
-        <div class="feature-card">
+        <div class="feature-card reveal">
           <div class="feature-icon">💰</div>
           <h3>Custom VK</h3>
           <p>Eigenen Verkaufspreis eingeben und sofort sehen wie sich Profit und Marge verändern — für eBay, Amazon und Kaufland.</p>
@@ -187,28 +202,28 @@
           <h2>Dein Shop. Automatisch synchronisiert.</h2>
           <p>Verbinde deinen eBay- oder Kaufland-Seller-Account und Flipcheck synchronisiert automatisch deine aktiven Listings, Verkäufe, Retouren und Gutschriften — direkt in dein Inventar.</p>
           <div class="sync-features">
-            <div class="sync-feat">
+            <div class="sync-feat reveal">
               <div class="sync-feat-icon">📋</div>
               <div class="sync-feat-text">
                 <h4>Aktive Listings</h4>
                 <p>Alle Angebote automatisch im Inventar</p>
               </div>
             </div>
-            <div class="sync-feat">
+            <div class="sync-feat reveal">
               <div class="sync-feat-icon">💸</div>
               <div class="sync-feat-text">
                 <h4>Verkäufe erkennen</h4>
                 <p>Verkaufte Artikel werden automatisch markiert</p>
               </div>
             </div>
-            <div class="sync-feat">
+            <div class="sync-feat reveal">
               <div class="sync-feat-icon">↩️</div>
               <div class="sync-feat-text">
                 <h4>Retouren &amp; Gutschriften</h4>
                 <p>Rücksendungen werden automatisch erkannt</p>
               </div>
             </div>
-            <div class="sync-feat">
+            <div class="sync-feat reveal">
               <div class="sync-feat-icon">🔗</div>
               <div class="sync-feat-text">
                 <h4>Multi-Plattform</h4>
@@ -217,7 +232,7 @@
             </div>
           </div>
         </div>
-        <div class="sync-visual">
+        <div class="sync-visual reveal">
           <div class="sync-mockup">
             <div class="sync-mockup-header">
               <span class="sync-mockup-dot"></span> eBay Sync — Letzte Aktualisierung vor 2 Min.
@@ -294,7 +309,7 @@
       <div class="pricing-grid">
         <div class="price-card featured">
           <div class="price-name">Pro</div>
-          <div class="price-amount">€19,99<span> /Monat</span></div>
+          <div class="price-amount" id="priceDisplay">€19,99<span> /Monat</span></div>
           <div class="price-period">7 Tage kostenlos testen · Jederzeit kündbar</div>
           <div class="price-divider"></div>
           <ul class="price-features">
@@ -314,6 +329,16 @@
           <a href="/dashboard" class="btn btn-primary btn-full btn-lg" id="btnTrial">
             7 Tage kostenlos testen
           </a>
+          <div class="promo-box">
+            <p>Hast du einen Gutscheincode? <span class="promo-save">Spare 10%</span></p>
+            <div class="promo-code" id="promoCode" onclick="copyPromo()">
+              <span class="promo-code-text">LIVE</span>
+              <span class="promo-code-copy" id="promoCopyText">Klicken zum Kopieren</span>
+            </div>
+            <p style="margin-top:10px;margin-bottom:0">
+              <span class="promo-price">€19,99</span> → <span class="promo-save">€17,99/Monat</span>
+            </p>
+          </div>
         </div>
       </div>
     </div>
@@ -361,37 +386,37 @@
       });
     });
 
-    // Intersection Observer for scroll animations
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(entry => {
-        if (entry.isIntersecting) {
-          entry.target.style.animationPlayState = 'running';
-          observer.unobserve(entry.target);
-        }
-      });
-    }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
-
-    document.querySelectorAll('.feature-card, .sync-feat, .sync-mockup').forEach(el => {
-      el.style.opacity = '0';
-      el.style.transform = 'translateY(20px)';
-      el.style.transition = 'opacity .5s ease, transform .5s ease';
-      observer.observe(el);
-    });
-
+    // Single clean scroll-reveal observer
     const revealObserver = new IntersectionObserver((entries) => {
       entries.forEach(entry => {
         if (entry.isIntersecting) {
-          entry.target.style.opacity = '1';
-          entry.target.style.transform = 'translateY(0)';
+          entry.target.classList.add('visible');
           revealObserver.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.1, rootMargin: '0px 0px -20px 0px' });
+    }, { threshold: 0.08, rootMargin: '0px 0px -30px 0px' });
 
-    document.querySelectorAll('.feature-card, .sync-feat, .sync-mockup').forEach((el, i) => {
-      el.style.transitionDelay = `${i * 60}ms`;
+    document.querySelectorAll('.reveal').forEach((el, i) => {
+      // Stagger within the same parent section
+      const siblings = Array.from(el.parentElement.querySelectorAll('.reveal'));
+      const idx = siblings.indexOf(el);
+      el.style.transitionDelay = `${idx * 80}ms`;
       revealObserver.observe(el);
     });
+
+    // Promo code copy
+    function copyPromo() {
+      navigator.clipboard.writeText('LIVE').then(() => {
+        const el = document.getElementById('promoCode');
+        const txt = document.getElementById('promoCopyText');
+        el.classList.add('copied');
+        txt.textContent = 'Kopiert!';
+        setTimeout(() => {
+          el.classList.remove('copied');
+          txt.textContent = 'Klicken zum Kopieren';
+        }, 2000);
+      });
+    }
   </script>
 </body>
 </html>
