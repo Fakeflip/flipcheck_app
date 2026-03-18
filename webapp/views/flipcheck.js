@@ -839,11 +839,16 @@ const FlipcheckView = (() => {
     try {
       _html5Scanner = new Html5Qrcode("scannerRegion");
 
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+
       await _html5Scanner.start(
         { facingMode: "environment" },
         {
-          fps: 10,
-          qrbox: { width: 280, height: 150 },
+          fps: isIOS ? 5 : 15,
+          // No qrbox on iOS — scan entire frame for better detection
+          ...(isIOS ? {} : { qrbox: { width: 280, height: 150 } }),
+          aspectRatio: isIOS ? 1.0 : 1.333,
+          disableFlip: false,
           formatsToSupport: [
             Html5QrcodeSupportedFormats.EAN_13,
             Html5QrcodeSupportedFormats.EAN_8,
