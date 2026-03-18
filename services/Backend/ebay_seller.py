@@ -340,6 +340,7 @@ async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60, t
     </Pagination>
     <Sort>EndTime</Sort>
   </SoldList>
+  <DetailLevel>ReturnAll</DetailLevel>
   <ErrorLanguage>de_DE</ErrorLanguage>
   <WarningLevel>High</WarningLevel>
 </GetMyeBaySellingRequest>"""
@@ -400,17 +401,34 @@ async def get_my_sold_list(page: int = 1, per_page: int = 100, days: int = 60, t
         except ValueError:
             price = 0.0
 
-        # Try to get real EAN from ItemSpecifics first, fall back to title guess
+        # Try to get real EAN: 1) ProductListingDetails 2) ItemSpecifics 3) title guess
         ean = None
-        specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics")
-        if specifics_el is not None:
-            for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
-                name = _xml_tag(nv, "Name") or ""
-                if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
-                    val = _xml_tag(nv, "Value") or ""
-                    if val and val.lower() not in ("nicht zutreffend", "does not apply", "n/a", "na"):
-                        ean = val.strip()
-                        break
+        _INVALID_EAN = {"nicht zutreffend", "does not apply", "n/a", "na", "n.a.", ""}
+
+        # 1) ProductListingDetails/EAN (most reliable — structured product data)
+        pld = item_el.find(f"{{{ns}}}Item/{{{ns}}}ProductListingDetails") or \
+              item_el.find(f"{{{ns}}}ProductListingDetails")
+        if pld is not None:
+            for tag in ("EAN", "UPC", "ISBN"):
+                val = (pld.findtext(f"{{{ns}}}{tag}") or "").strip()
+                if val and val.lower() not in _INVALID_EAN:
+                    ean = val
+                    break
+
+        # 2) ItemSpecifics (seller-defined attributes)
+        if not ean:
+            specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics") or \
+                           item_el.find(f"{{{ns}}}Item/{{{ns}}}ItemSpecifics")
+            if specifics_el is not None:
+                for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
+                    name = _xml_tag(nv, "Name") or ""
+                    if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
+                        val = _xml_tag(nv, "Value") or ""
+                        if val and val.lower() not in _INVALID_EAN:
+                            ean = val.strip()
+                            break
+
+        # 3) Fallback: regex guess from title
         if not ean:
             ean = _extract_ean_from_text(title)
 
@@ -453,6 +471,7 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100, token_data:
     </Pagination>
     <Sort>TimeLeft</Sort>
   </ActiveList>
+  <DetailLevel>ReturnAll</DetailLevel>
   <ErrorLanguage>de_DE</ErrorLanguage>
   <WarningLevel>High</WarningLevel>
 </GetMyeBaySellingRequest>"""
@@ -493,17 +512,32 @@ async def get_my_active_listings(page: int = 1, per_page: int = 100, token_data:
             price = float(price_s)
         except ValueError:
             price = 0.0
-        # Try to get real EAN from ItemSpecifics first, fall back to title guess
+        # Try to get real EAN: 1) ProductListingDetails 2) ItemSpecifics 3) title guess
         ean = None
-        specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics")
-        if specifics_el is not None:
-            for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
-                name = _xml_tag(nv, "Name") or ""
-                if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
-                    val = _xml_tag(nv, "Value") or ""
-                    if val and val.lower() not in ("nicht zutreffend", "does not apply", "n/a", "na"):
-                        ean = val.strip()
-                        break
+        _INVALID_EAN = {"nicht zutreffend", "does not apply", "n/a", "na", "n.a.", ""}
+
+        # 1) ProductListingDetails/EAN (most reliable — structured product data)
+        pld = item_el.find(f"{{{ns}}}ProductListingDetails")
+        if pld is not None:
+            for tag in ("EAN", "UPC", "ISBN"):
+                val = (pld.findtext(f"{{{ns}}}{tag}") or "").strip()
+                if val and val.lower() not in _INVALID_EAN:
+                    ean = val
+                    break
+
+        # 2) ItemSpecifics (seller-defined attributes)
+        if not ean:
+            specifics_el = item_el.find(f"{{{ns}}}ItemSpecifics")
+            if specifics_el is not None:
+                for nv in specifics_el.findall(f"{{{ns}}}NameValueList"):
+                    name = _xml_tag(nv, "Name") or ""
+                    if name.upper() in ("EAN", "GTIN", "UPC", "ISBN", "MPN"):
+                        val = _xml_tag(nv, "Value") or ""
+                        if val and val.lower() not in _INVALID_EAN:
+                            ean = val.strip()
+                            break
+
+        # 3) Fallback: regex guess from title
         if not ean:
             ean = _extract_ean_from_text(title)
 
