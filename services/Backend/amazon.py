@@ -90,10 +90,48 @@ HIGH_IP_RISK_BRANDS = [
 
 # Amazon.de category keywords that are typically gated / require approval
 GATED_CAT_KEYWORDS = [
+    # Health & Beauty
     "beauty", "kosmetik", "health", "gesundheit", "nahrungsergänzung",
-    "supplement", "vitamin", "apotheke", "pharmacy", "schmuck", "uhren",
-    "watches", "jewelry", "adult", "erotik", "automotive",
-    "collectible", "sammlerware", "wine", "wein", "spirits", "alkohol",
+    "supplement", "vitamin", "apotheke", "pharmacy", "körperpflege",
+    "personal care", "skin care", "hautpflege", "parfum", "fragrance",
+    # Jewelry & Watches
+    "schmuck", "uhren", "watches", "jewelry", "edelstein",
+    # Adult & Restricted
+    "adult", "erotik", "automotive", "fahrzeugteile",
+    # Collectibles & Wine
+    "collectible", "sammlerware", "wine", "wein", "spirits", "alkohol", "bier",
+    # Grocery & Food
+    "grocery", "lebensmittel", "food", "nahrungsmittel", "getränke", "beverages",
+    # Baby & Toys (partially gated)
+    "baby", "säugling", "infant",
+    # Sports Nutrition
+    "sports nutrition", "sportnahrung", "protein", "kreatin", "creatine",
+    # Medical & Drugstore
+    "drugstore", "drogerie", "medical", "medizin", "first aid", "erste hilfe",
+    # Pet food
+    "pet food", "tierfutter", "hundefutter", "katzenfutter",
+    # Topical (skincare, cosmetics)
+    "topicals", "topische",
+]
+
+# Brands that are typically gated on Amazon.de (require approval / invoices)
+GATED_BRANDS = [
+    "apple", "samsung", "sony", "nike", "adidas", "puma", "new balance",
+    "under armour", "the north face", "patagonia", "canada goose",
+    "lego", "hasbro", "mattel", "ravensburger", "playmobil",
+    "bosch", "makita", "dewalt", "milwaukee", "festool",
+    "dyson", "philips", "braun", "oral-b", "gillette",
+    "l'oréal", "loreal", "nivea", "dove", "garnier", "maybelline",
+    "gucci", "prada", "louis vuitton", "chanel", "dior", "hermès",
+    "burberry", "ralph lauren", "tommy hilfiger", "calvin klein",
+    "rolex", "omega", "tag heuer", "breitling", "cartier",
+    "bose", "jbl", "beats", "sennheiser", "bang & olufsen",
+    "nintendo", "playstation", "xbox", "valve",
+    "gopro", "dji", "canon", "nikon", "fujifilm",
+    "marvel", "dc comics", "disney", "star wars", "pokemon", "pokémon",
+    "crocs", "birkenstock", "dr. martens",
+    "pampers", "huggies", "aptamil", "hipp",
+    "nespresso", "thermomix", "kitchenaid",
 ]
 
 
@@ -189,9 +227,12 @@ def classify_signals(
     # ── 7. Hazmat / Dangerous Goods ──────────────────────────────────────────
     is_hazmat = any(kw in full_text for kw in HAZMAT_KEYWORDS)
 
-    # ── 8. Ungated Status (heuristic by category) ────────────────────────────
-    is_gated = any(gc in cat_text or gc in product_grp or gc in category
-                   for gc in GATED_CAT_KEYWORDS)
+    # ── 8. Ungated Status (heuristic by category + brand) ────────────────────
+    cat_gated = any(gc in cat_text or gc in product_grp or gc in full_text
+                    for gc in GATED_CAT_KEYWORDS)
+    brand_gated = any(gb == brand or (len(gb) >= 4 and gb in brand)
+                      for gb in GATED_BRANDS) if brand else False
+    is_gated = cat_gated or brand_gated
 
     status = "locked" if is_gated else "open"
     ungated_markets = {
