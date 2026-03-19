@@ -849,6 +849,11 @@ async def flipcheck(request: Request):
     m["fees_avg"]      = round(fee_avg_adj, 2)
     m["fees_median"]   = round(fee_med_adj, 2)
 
+    # If sell_custom was given, override the displayed sell prices too
+    if _ebay_sell_custom and _ebay_sell_custom > 0:
+        m["sell_price_median"] = _ebay_sell_custom
+        m["sell_price_avg"]    = _ebay_sell_custom
+
     verdict, reason, text = decide(mode=mode, m=m, custom_th=custom_th)
 
     if is_json:
