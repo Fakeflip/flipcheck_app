@@ -467,6 +467,10 @@ const InventoryView = (() => {
             ${item.status !== "SOLD" ? `<button class="btn btn-ghost btn-icon btn-inv-sold" data-id="${esc(item.id)}" title="Als verkauft markieren">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>` : ""}
+            ${item.status === "SOLD" && !item.shipped ? `<button class="btn btn-ghost btn-icon btn-inv-ship" data-id="${esc(item.id)}" title="Versenden">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M1 3h9v8H1zM10 6h3l2 3v3h-5V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/></svg>
+            </button>` : ""}
+            ${item.shipped && item.tracking_number ? `<span class="badge badge-shipped" title="Versendet: ${esc(item.tracking_number)}">📦</span>` : ""}
             <button class="btn btn-ghost btn-icon btn-inv-edit" data-id="${esc(item.id)}" title="Bearbeiten">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M11 2l3 3-9 9H2v-3L11 2z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>
@@ -610,6 +614,9 @@ const InventoryView = (() => {
 
       const soldBtn = e.target.closest(".btn-inv-sold");
       if (soldBtn) { openSoldModal(soldBtn.dataset.id, container); return; }
+
+      const shipBtn = e.target.closest(".btn-inv-ship");
+      if (shipBtn) { openShipModal(shipBtn.dataset.id, container); return; }
 
       const flipBtn = e.target.closest(".btn-inv-flip");
       if (flipBtn) {
@@ -1348,5 +1355,251 @@ const InventoryView = (() => {
     });
   }
 
-  return { mount, unmount };
+  // ── Versand Modal ─────────────────────────────────────────────────────────
+  async function openShipModal(id, container) {
+    const item = _state.items.find(i => i.id === id);
+    if (!item) return;
+
+    const settings = await Storage.getSettings().catch(() => ({}));
+    const ship = settings.shipping || {};
+    const sender = {
+      name:   ship.sender_name   || "",
+      street: ship.sender_street || "",
+      zip:    ship.sender_zip    || "",
+      city:   ship.sender_city   || "",
+      country: ship.sender_country || "DE",
+    };
+    const defaultWeight = ship.default_weight || 1.0;
+    const defaultProduct = ship.default_product || "V01PAK";
+    const hasSender = sender.name && sender.street && sender.zip && sender.city;
+
+    // Try to extract recipient from eBay order data (if synced)
+    const recipientName   = item.buyer_name   || "";
+    const recipientStreet = item.buyer_street  || "";
+    const recipientZip    = item.buyer_zip     || "";
+    const recipientCity   = item.buyer_city    || "";
+
+    const body = `
+      <div class="col gap-12">
+        ${!hasSender ? `<div class="repr-alert repr-alert--warn"><span class="repr-alert-icon">⚠</span> Bitte Absender-Adresse in Settings → Versand hinterlegen</div>` : ""}
+
+        <div class="st-sub-header"><div class="st-sub-label">Empfänger</div></div>
+        <div class="col gap-8">
+          <input type="text" id="shipRecipName" class="input" placeholder="Name / Firma" value="${esc(recipientName)}" />
+          <input type="text" id="shipRecipStreet" class="input" placeholder="Straße + Nr." value="${esc(recipientStreet)}" />
+          <div class="row gap-8">
+            <input type="text" id="shipRecipZip" class="input" placeholder="PLZ" value="${esc(recipientZip)}" style="width:100px" />
+            <input type="text" id="shipRecipCity" class="input" placeholder="Stadt" value="${esc(recipientCity)}" style="flex:1" />
+          </div>
+        </div>
+
+        <div class="st-sub-header"><div class="st-sub-label">Paket</div></div>
+        <div class="row gap-12">
+          <div class="col gap-4" style="flex:1">
+            <label class="text-xs text-muted">Gewicht (kg)</label>
+            <input type="number" id="shipWeight" class="input" value="${defaultWeight}" min="0.1" step="0.1" />
+          </div>
+          <div class="col gap-4" style="flex:1">
+            <label class="text-xs text-muted">Produkt</label>
+            <select id="shipProduct" class="select">
+              <option value="V01PAK" ${defaultProduct === "V01PAK" ? "selected" : ""}>DHL Paket</option>
+              <option value="V62WP" ${defaultProduct === "V62WP" ? "selected" : ""}>Warenpost</option>
+              <option value="V01PRIO" ${defaultProduct === "V01PRIO" ? "selected" : ""}>Paket Prio</option>
+              <option value="V86PARCEL" ${defaultProduct === "V86PARCEL" ? "selected" : ""}>Kleinpaket</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row gap-8 mt-4">
+          <span class="text-xs text-muted">Artikel: <strong>${esc(item.title || item.ean || "—")}</strong></span>
+        </div>
+      </div>
+    `;
+
+    Modal.open({
+      title: "📦 Versenden",
+      body,
+      buttons: [
+        { label: "Abbrechen", variant: "btn-ghost", action: () => Modal.close() },
+        { label: "Label erstellen & versenden", variant: "btn-primary", action: async () => {
+          const recipName   = document.querySelector("#shipRecipName")?.value?.trim();
+          const recipStreet = document.querySelector("#shipRecipStreet")?.value?.trim();
+          const recipZip    = document.querySelector("#shipRecipZip")?.value?.trim();
+          const recipCity   = document.querySelector("#shipRecipCity")?.value?.trim();
+          const weight      = parseFloat(document.querySelector("#shipWeight")?.value) || defaultWeight;
+          const product     = document.querySelector("#shipProduct")?.value || defaultProduct;
+
+          if (!recipName || !recipStreet || !recipZip || !recipCity) {
+            Toast.error("Fehler", "Bitte alle Empfänger-Felder ausfüllen.");
+            return;
+          }
+          if (!hasSender) {
+            Toast.error("Fehler", "Absender-Adresse fehlt. Bitte in Settings → Versand hinterlegen.");
+            return;
+          }
+
+          Modal.close();
+          Toast.info("Label wird erstellt…", "Bitte warten");
+
+          try {
+            // 1. Create DHL label
+            const labelResult = await window.fc.dhlCreateLabel({
+              sender,
+              recipient: { name: recipName, street: recipStreet, zip: recipZip, city: recipCity, country: "DE" },
+              weight_kg: weight,
+              product,
+              reference: item.ean || item.title || item.id,
+            });
+
+            if (!labelResult?.ok) {
+              Toast.error("Label-Fehler", labelResult?.error || "Label konnte nicht erstellt werden.");
+              return;
+            }
+
+            const trackingNo = labelResult.shipment_no;
+
+            // 2. Mark item as shipped in inventory
+            item.shipped = true;
+            item.tracking_number = trackingNo;
+            item.tracking_carrier = "DHL";
+            await Storage.upsertItem(item);
+
+            // 3. Upload tracking to eBay (if eBay item)
+            if (item.market === "ebay" && (item.ebay_offer_id || item.ebay_order_id)) {
+              try {
+                await window.fc.ebayCompleteSale({
+                  item_id: item.ebay_offer_id || "",
+                  transaction_id: item.ebay_order_id || "0",
+                  tracking_number: trackingNo,
+                  carrier: "DHL",
+                });
+              } catch (e) {
+                console.warn("[Ship] eBay CompleteSale failed:", e);
+                Toast.warning("Hinweis", "Label erstellt, aber eBay-Tracking konnte nicht hochgeladen werden.");
+              }
+            }
+
+            // 4. Open label PDF if available
+            if (labelResult.label_pdf_b64) {
+              const pdfBlob = _b64toBlob(labelResult.label_pdf_b64, "application/pdf");
+              const url = URL.createObjectURL(pdfBlob);
+              window.open(url, "_blank");
+            } else if (labelResult.label_url) {
+              window.open(labelResult.label_url, "_blank");
+            }
+
+            Toast.success("Versendet!", `Sendungsnr.: ${trackingNo}`);
+            await loadItems(container);
+
+          } catch (e) {
+            Toast.error("Versand-Fehler", e.message || "Unbekannter Fehler");
+          }
+        }},
+      ],
+    });
+  }
+
+  // Base64 to Blob helper
+  function _b64toBlob(b64, type) {
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type });
+  }
+
+  // ── Batch Ship (all pending) ─────────────────────────────────────────────
+  async function batchShipAll() {
+    const pending = _state.items.filter(i => i.status === "SOLD" && !i.shipped);
+    if (pending.length === 0) { Toast.info("Alles versendet", "Keine ausstehenden Sendungen."); return; }
+
+    const settings = await Storage.getSettings().catch(() => ({}));
+    const ship = settings.shipping || {};
+    const sender = {
+      name: ship.sender_name || "", street: ship.sender_street || "",
+      zip: ship.sender_zip || "", city: ship.sender_city || "", country: ship.sender_country || "DE",
+    };
+    if (!sender.name || !sender.street || !sender.zip || !sender.city) {
+      Toast.error("Fehler", "Absender-Adresse fehlt. Bitte in Settings → Versand hinterlegen.");
+      return;
+    }
+
+    // Check if all items have recipient data
+    const missingRecipient = pending.filter(i => !i.buyer_name || !i.buyer_street || !i.buyer_zip || !i.buyer_city);
+    if (missingRecipient.length > 0) {
+      Toast.error("Empfänger fehlt", `${missingRecipient.length} Artikel haben keine Empfänger-Adresse. Bitte einzeln versenden.`);
+      return;
+    }
+
+    const ok = await Modal.confirm(
+      "Alle Labels erstellen",
+      `${pending.length} Versandlabel${pending.length > 1 ? "s" : ""} erstellen und an eBay melden?`,
+      { confirmLabel: `${pending.length} Labels erstellen`, danger: false }
+    );
+    if (!ok) return;
+
+    Toast.info("Labels werden erstellt…", `${pending.length} Sendungen`);
+    let success = 0, failed = 0;
+    const pdfParts = [];
+
+    for (const item of pending) {
+      try {
+        const result = await window.fc.dhlCreateLabel({
+          sender,
+          recipient: { name: item.buyer_name, street: item.buyer_street, zip: item.buyer_zip, city: item.buyer_city, country: "DE" },
+          weight_kg: ship.default_weight || 1.0,
+          product: ship.default_product || "V01PAK",
+          reference: item.ean || item.title || item.id,
+        });
+
+        if (result?.ok && result.shipment_no) {
+          item.shipped = true;
+          item.tracking_number = result.shipment_no;
+          item.tracking_carrier = "DHL";
+          await Storage.upsertItem(item);
+
+          if (result.label_pdf_b64) pdfParts.push(result.label_pdf_b64);
+
+          // eBay tracking upload
+          if (item.market === "ebay" && (item.ebay_offer_id || item.ebay_order_id)) {
+            try {
+              await window.fc.ebayCompleteSale({
+                item_id: item.ebay_offer_id || "",
+                transaction_id: item.ebay_order_id || "0",
+                tracking_number: result.shipment_no,
+                carrier: "DHL",
+              });
+            } catch {}
+          }
+          success++;
+        } else {
+          failed++;
+        }
+      } catch {
+        failed++;
+      }
+    }
+
+    // Open first label as PDF (batch PDF merge would need a lib)
+    if (pdfParts.length > 0) {
+      const blob = _b64toBlob(pdfParts[0], "application/pdf");
+      window.open(URL.createObjectURL(blob), "_blank");
+      if (pdfParts.length > 1) {
+        Toast.info("Hinweis", `${pdfParts.length} Labels erstellt — einzelne PDFs werden nacheinander geöffnet.`);
+        for (let i = 1; i < pdfParts.length; i++) {
+          setTimeout(() => {
+            const b = _b64toBlob(pdfParts[i], "application/pdf");
+            window.open(URL.createObjectURL(b), "_blank");
+          }, i * 500);
+        }
+      }
+    }
+
+    if (failed > 0) {
+      Toast.warning("Teilweise erfolgreich", `${success} Labels erstellt, ${failed} fehlgeschlagen.`);
+    } else {
+      Toast.success("Alle Labels erstellt!", `${success} Sendungen versendet.`);
+    }
+  }
+
+  return { mount, unmount, batchShipAll };
 })();

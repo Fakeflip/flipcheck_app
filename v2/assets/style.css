@@ -2075,6 +2075,20 @@ img { display: block; max-width: 100%; }
   font-size: 11px;
 }
 
+/* Shipped badge in inventory */
+.badge-shipped {
+  display: inline-flex;
+  font-size: 11px;
+  cursor: help;
+}
+
+/* Extra small ghost button (for inline actions) */
+.btn-xs {
+  padding: 2px 6px;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 /* Disabled interval wrapper */
 .interval-wrap {
   display: flex;

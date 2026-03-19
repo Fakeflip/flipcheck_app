@@ -93,6 +93,17 @@ const AnalyticsView = (() => {
       destroyCharts();
       await mount(container);
     });
+
+    // Batch ship button (on "Versand ausstehend" KPI card)
+    container.querySelector("#btnBatchShip")?.addEventListener("click", async () => {
+      if (typeof InventoryView !== "undefined" && InventoryView.batchShipAll) {
+        await InventoryView.batchShipAll();
+        destroyCharts();
+        await mount(container);
+      } else {
+        Toast.info("Hinweis", "Bitte zum Inventory wechseln und einzeln versenden.");
+      }
+    });
   }
 
   function unmount() { destroyCharts(); _period = "weekly"; }
@@ -409,7 +420,10 @@ const AnalyticsView = (() => {
             </div>
           </div>
           <div class="kpi-value text-orange">${extra.pendingShipments}</div>
-          <div class="kpi-meta"><span>Artikel warten auf Versand</span></div>
+          <div class="kpi-meta">
+            <span>zu verschicken</span>
+            <button class="btn btn-ghost btn-xs" id="btnBatchShip" style="margin-left:auto;font-size:10px;padding:2px 6px">Alle drucken</button>
+          </div>
         </div>` : ""}
 
         <!-- Return Rate -->
