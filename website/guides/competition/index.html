@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Konkurrenz-Monitoring Guide — FLIPCHECK</title>
+  <meta name="description" content="eBay-Verkäufer beobachten, Listings vergleichen und per Webhook über Preisänderungen informiert werden." />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .guide-layout{display:grid;grid-template-columns:220px 1fr;gap:48px;max-width:1040px;margin:0 auto;padding:56px 24px 100px;align-items:start}
+    @media(max-width:760px){.guide-layout{grid-template-columns:1fr}.guide-toc{display:none}}
+    .guide-toc{position:sticky;top:76px}
+    .guide-toc-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+    .guide-toc ol{list-style:none;display:flex;flex-direction:column;gap:2px}
+    .guide-toc ol li a{font-size:13px;color:var(--text2);padding:4px 8px;border-radius:6px;display:block;transition:color .12s,background .12s;line-height:1.4}
+    .guide-toc ol li a:hover{color:var(--text);background:var(--surface)}
+    .guide-toc ol li a.active{color:var(--accent);background:var(--accent-sub)}
+    .guide-content{min-width:0}
+    .guide-breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);margin-bottom:32px}
+    .guide-breadcrumb a{color:var(--dim);transition:color .12s}
+    .guide-breadcrumb a:hover{color:var(--text2)}
+    .guide-breadcrumb .sep{opacity:.4}
+    .guide-content h1{font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:12px}
+    .guide-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);margin-bottom:40px;flex-wrap:wrap}
+    .guide-meta .tag{background:var(--accent-sub);color:var(--accent);border:1px solid var(--accent-bdr);padding:2px 8px;border-radius:var(--r-full);font-weight:600}
+    .guide-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--dim)}
+    .guide-section{margin-bottom:56px;scroll-margin-top:80px}
+    .guide-section h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .guide-section h2 .num{width:26px;height:26px;border-radius:6px;flex-shrink:0;background:var(--accent-sub);border:1px solid var(--accent-bdr);font-size:12px;font-weight:700;color:var(--accent);display:flex;align-items:center;justify-content:center}
+    .guide-section p{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:12px}
+    .guide-section p:last-child{margin-bottom:0}
+    .guide-section strong{color:var(--text);font-weight:600}
+    .steps{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+    .step{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+    .step-num{width:22px;height:22px;border-radius:50%;flex-shrink:0;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+    .step-body{font-size:13px;color:var(--text2);line-height:1.65}
+    .step-body strong{color:var(--text)}
+    .callout{border-radius:var(--r);padding:14px 16px;display:flex;gap:10px;align-items:flex-start;margin:16px 0;font-size:13px;line-height:1.65}
+    .callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+    .callout-body{color:var(--text2)}
+    .callout-body strong{color:var(--text)}
+    .callout.tip{background:var(--accent-sub);border:1px solid var(--accent-bdr)}
+    .callout.warn{background:var(--yellow-sub);border:1px solid var(--yellow-bdr)}
+    .callout.info{background:var(--surface);border:1px solid var(--border2)}
+    .status-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+    .status-table th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);padding:0 12px 10px 0}
+    .status-table td{padding:10px 12px 10px 0;border-top:1px solid var(--border);color:var(--text2);vertical-align:top;line-height:1.6}
+    .status-table td:first-child{white-space:nowrap}
+    .guide-footer-nav{display:flex;align-items:center;justify-content:space-between;padding-top:32px;border-top:1px solid var(--border);margin-top:16px}
+    .guide-footer-nav a{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px;transition:color .12s}
+    .guide-footer-nav a:hover{color:var(--text2)}
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a href="/" class="logo">▲ FLIPCHECK</a>
+      <nav class="nav">
+        <a href="/#features">Features</a>
+        <a href="/#extension">Extension</a>
+        <a href="/#pricing">Preise</a>
+        <a href="/guides" style="color:var(--text)">Guides</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
+      </nav>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)">Mein Konto</a>
+        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="guide-layout">
+
+    <aside class="guide-toc">
+      <div class="guide-toc-label">Inhalt</div>
+      <ol>
+        <li><a href="#uebersicht">Übersicht</a></li>
+        <li><a href="#seller-hinzufuegen">1. Seller hinzufügen</a></li>
+        <li><a href="#seller-detail">2. Seller-Detail</a></li>
+        <li><a href="#inventar-tab">3. Inventar-Abgleich</a></li>
+        <li><a href="#webhooks">4. Webhooks</a></li>
+        <li><a href="#stats">5. Stats-Leiste</a></li>
+        <li><a href="#tipps">6. Tipps</a></li>
+      </ol>
+    </aside>
+
+    <main class="guide-content">
+
+      <div class="guide-breadcrumb">
+        <a href="/guides">Guides</a>
+        <span class="sep">›</span>
+        <span style="color:var(--text2)">Konkurrenz-Monitoring</span>
+      </div>
+
+      <h1>Konkurrenz-Monitoring</h1>
+      <div class="guide-meta">
+        <span class="tag">👁️ Feature-Guide</span>
+        <div class="dot"></div>
+        <span>~4 Min. Lesezeit</span>
+        <div class="dot"></div>
+        <span>Stand: März 2026</span>
+      </div>
+
+      <!-- 0 -->
+      <div class="guide-section" id="uebersicht">
+        <h2>Übersicht</h2>
+        <p>Das Konkurrenz-Monitoring lässt dich <strong>andere eBay-Verkäufer beobachten</strong>: welche Produkte sie listen, zu welchen Preisen sie verkaufen und ob sie deine Artikel unterbieten.</p>
+        <p>Du kannst <strong>Webhooks</strong> einrichten, um automatisch benachrichtigt zu werden, wenn ein Konkurrent seinen Preis senkt oder ein neues Produkt listet.</p>
+      </div>
+
+      <!-- 1 -->
+      <div class="guide-section" id="seller-hinzufuegen">
+        <h2><span class="num">1</span> Seller hinzufügen</h2>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Öffne <strong>Konkurrenz</strong> in der Seitenleiste und wechsle zum Tab <strong>„Sellers"</strong>.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Gib den <strong>eBay-Nutzernamen</strong> des Verkäufers in das Feld „Add Seller" ein.</div>
+          </div>
+          <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-body">Klicke <strong>„Hinzufügen"</strong> — der Seller erscheint in der Liste mit Feedback-Score und Listing-Anzahl.</div>
+          </div>
+        </div>
+
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">Den eBay-Nutzernamen findest du auf der Verkäuferseite oder direkt in der URL eines Listings unter dem Verkäufernamen.</div>
+        </div>
+      </div>
+
+      <!-- 2 -->
+      <div class="guide-section" id="seller-detail">
+        <h2><span class="num">2</span> Seller-Detail ansehen</h2>
+        <p>Klicke auf einen Seller in der Liste, um sein Detail-Panel zu öffnen:</p>
+
+        <table class="status-table">
+          <thead><tr><th>Element</th><th>Beschreibung</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Feedback-Score</strong></td><td>Gesamtbewertungen und positiver Prozentsatz.</td></tr>
+            <tr><td><strong>Listings-Tabelle</strong></td><td>Alle aktiven Produkte des Sellers mit Bild, Titel, EAN und Preis.</td></tr>
+            <tr><td><strong>Dein Preis</strong></td><td>Dein aktueller Preis zum Vergleich (aus deinem Inventar).</td></tr>
+            <tr><td><strong>Gewinn</strong></td><td>Was du verdienen würdest, wenn du zum Preis des Sellers kaufst.</td></tr>
+            <tr><td><strong>Status</strong></td><td>Undercut (billiger als du), On-Par (gleich) oder Below (teurer als du).</td></tr>
+          </tbody>
+        </table>
+
+        <p>Klicke <strong>„Check now"</strong> um die Daten des Sellers sofort zu aktualisieren.</p>
+      </div>
+
+      <!-- 3 -->
+      <div class="guide-section" id="inventar-tab">
+        <h2><span class="num">3</span> Inventar-Abgleich</h2>
+        <p>Wechsle zum Tab <strong>„Inventar"</strong>, um deine eigenen Artikel mit den Konkurrenten abzugleichen:</p>
+        <p>Hier siehst du für jedes deiner Inventar-Produkte, <strong>welche Konkurrenten dasselbe Produkt listen</strong> und zu welchem Preis. So erkennst du sofort, wo du unterboten wirst und wo du Spielraum hast.</p>
+      </div>
+
+      <!-- 4 -->
+      <div class="guide-section" id="webhooks">
+        <h2><span class="num">4</span> Webhooks einrichten</h2>
+        <p>Im Tab <strong>„Webhooks"</strong> kannst du automatische Benachrichtigungen konfigurieren:</p>
+
+        <div class="steps">
+          <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-body">Trage deine <strong>Webhook-URL</strong> ein (z.B. ein Discord-Webhook).</div>
+          </div>
+          <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-body">Aktiviere die gewünschten <strong>Events</strong>:</div>
+          </div>
+        </div>
+
+        <table class="status-table">
+          <thead><tr><th>Event</th><th>Beschreibung</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Undercut</strong></td><td>Ein Konkurrent listet unter deinem Floor-Preis.</td></tr>
+            <tr><td><strong>New Listing</strong></td><td>Ein beobachteter Seller listet ein neues Produkt.</td></tr>
+            <tr><td><strong>Price Drop</strong></td><td>Ein Konkurrent senkt seinen Preis.</td></tr>
+            <tr><td><strong>Verdict Change</strong></td><td>Die Profitabilität eines Produkts ändert sich (z.B. von BUY zu HOLD).</td></tr>
+            <tr><td><strong>New Seller</strong></td><td>Ein neuer Seller wurde hinzugefügt.</td></tr>
+          </tbody>
+        </table>
+
+        <p>Klicke <strong>„Test"</strong>, um eine Test-Benachrichtigung zu senden und die Verbindung zu prüfen.</p>
+      </div>
+
+      <!-- 5 -->
+      <div class="guide-section" id="stats">
+        <h2><span class="num">5</span> Stats-Leiste</h2>
+        <p>Oben siehst du eine Zusammenfassung:</p>
+        <p><strong>Beobachtete Seller</strong> — Anzahl der aktiven Seller im Monitoring.</p>
+        <p><strong>Getrackte Listings</strong> — Gesamtanzahl aller Listings deiner Konkurrenten.</p>
+        <p><strong>Letzter Check</strong> — Wann die Daten zuletzt aktualisiert wurden.</p>
+        <p><strong>Webhook-Status</strong> — Grün wenn konfiguriert, grau wenn nicht.</p>
+      </div>
+
+      <!-- 6 -->
+      <div class="guide-section" id="tipps">
+        <h2><span class="num">6</span> Tipps</h2>
+        <p><strong>Top-Konkurrenten zuerst:</strong> Füge deine 3–5 wichtigsten Konkurrenten hinzu — also Seller die regelmäßig dieselben Produkte wie du verkaufen.</p>
+        <p><strong>Webhooks + Repricer:</strong> Kombiniere Konkurrenz-Webhooks mit dem Auto-Repricer. So wirst du benachrichtigt wenn ein neuer Konkurrent auftaucht und der Repricer passt deine Preise automatisch an.</p>
+        <p><strong>Regelmäßig aktualisieren:</strong> Nutze „Check now" nach großen Preisaktionen (z.B. nach Black Friday), um zu sehen wie die Konkurrenz reagiert hat.</p>
+      </div>
+
+      <div class="guide-footer-nav">
+        <a href="/guides">← Zurück zur Guide-Übersicht</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Fragen? Discord →</a>
+      </div>
+
+    </main>
+  </div>
+
+  <footer style="border-top:1px solid var(--border);padding:32px 24px;text-align:center">
+    <p style="font-size:13px;color:var(--dim)">
+      © 2025 Flipcheck ·
+      <a href="/privacy" style="color:var(--dim);margin:0 8px">Datenschutz</a>·
+      <a href="/terms"   style="color:var(--dim);margin:0 8px">AGB</a>·
+      <a href="/imprint" style="color:var(--dim);margin:0 8px">Impressum</a>
+    </p>
+  </footer>
+
+  <script>
+    const sections=document.querySelectorAll('.guide-section');const links=document.querySelectorAll('.guide-toc a');
+    const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=document.querySelector(`.guide-toc a[href="#${e.target.id}"]`);if(a)a.classList.add('active')}})},{rootMargin:'-20% 0px -60% 0px'});
+    sections.forEach(s=>obs.observe(s));
+  </script>
+
+</body>
+</html>

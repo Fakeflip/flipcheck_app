@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Analytics Dashboard Guide — FLIPCHECK</title>
+  <meta name="description" content="Dein Flipcheck Analytics Dashboard verstehen — KPIs, Gewinnkurve, Marktportfolio und Best/Worst Flips auf einen Blick." />
+  <link rel="icon" href="/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/style.css" />
+  <style>
+    .guide-layout{display:grid;grid-template-columns:220px 1fr;gap:48px;max-width:1040px;margin:0 auto;padding:56px 24px 100px;align-items:start}
+    @media(max-width:760px){.guide-layout{grid-template-columns:1fr}.guide-toc{display:none}}
+    .guide-toc{position:sticky;top:76px}
+    .guide-toc-label{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);margin-bottom:12px}
+    .guide-toc ol{list-style:none;display:flex;flex-direction:column;gap:2px}
+    .guide-toc ol li a{font-size:13px;color:var(--text2);padding:4px 8px;border-radius:6px;display:block;transition:color .12s,background .12s;line-height:1.4}
+    .guide-toc ol li a:hover{color:var(--text);background:var(--surface)}
+    .guide-toc ol li a.active{color:var(--accent);background:var(--accent-sub)}
+    .guide-content{min-width:0}
+    .guide-breadcrumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--dim);margin-bottom:32px}
+    .guide-breadcrumb a{color:var(--dim);transition:color .12s}
+    .guide-breadcrumb a:hover{color:var(--text2)}
+    .guide-breadcrumb .sep{opacity:.4}
+    .guide-content h1{font-size:36px;font-weight:800;letter-spacing:-.03em;line-height:1.15;margin-bottom:12px}
+    .guide-meta{display:flex;align-items:center;gap:10px;font-size:12px;color:var(--dim);margin-bottom:40px;flex-wrap:wrap}
+    .guide-meta .tag{background:var(--accent-sub);color:var(--accent);border:1px solid var(--accent-bdr);padding:2px 8px;border-radius:var(--r-full);font-weight:600}
+    .guide-meta .dot{width:3px;height:3px;border-radius:50%;background:var(--dim)}
+    .guide-section{margin-bottom:56px;scroll-margin-top:80px}
+    .guide-section h2{font-size:20px;font-weight:700;letter-spacing:-.02em;margin-bottom:16px;padding-bottom:10px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px}
+    .guide-section h2 .num{width:26px;height:26px;border-radius:6px;flex-shrink:0;background:var(--accent-sub);border:1px solid var(--accent-bdr);font-size:12px;font-weight:700;color:var(--accent);display:flex;align-items:center;justify-content:center}
+    .guide-section p{font-size:14px;color:var(--text2);line-height:1.8;margin-bottom:12px}
+    .guide-section p:last-child{margin-bottom:0}
+    .guide-section strong{color:var(--text);font-weight:600}
+    .steps{display:flex;flex-direction:column;gap:10px;margin:16px 0}
+    .step{display:flex;gap:14px;align-items:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px}
+    .step-num{width:22px;height:22px;border-radius:50%;flex-shrink:0;background:var(--accent);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+    .step-body{font-size:13px;color:var(--text2);line-height:1.65}
+    .step-body strong{color:var(--text)}
+    .callout{border-radius:var(--r);padding:14px 16px;display:flex;gap:10px;align-items:flex-start;margin:16px 0;font-size:13px;line-height:1.65}
+    .callout-icon{font-size:16px;flex-shrink:0;margin-top:1px}
+    .callout-body{color:var(--text2)}
+    .callout-body strong{color:var(--text)}
+    .callout.tip{background:var(--accent-sub);border:1px solid var(--accent-bdr)}
+    .callout.warn{background:var(--yellow-sub);border:1px solid var(--yellow-bdr)}
+    .callout.info{background:var(--surface);border:1px solid var(--border2)}
+    .status-table{width:100%;border-collapse:collapse;margin:16px 0;font-size:13px}
+    .status-table th{text-align:left;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);padding:0 12px 10px 0}
+    .status-table td{padding:10px 12px 10px 0;border-top:1px solid var(--border);color:var(--text2);vertical-align:top;line-height:1.6}
+    .status-table td:first-child{white-space:nowrap}
+    .guide-footer-nav{display:flex;align-items:center;justify-content:space-between;padding-top:32px;border-top:1px solid var(--border);margin-top:16px}
+    .guide-footer-nav a{font-size:13px;color:var(--dim);display:flex;align-items:center;gap:6px;transition:color .12s}
+    .guide-footer-nav a:hover{color:var(--text2)}
+  </style>
+</head>
+<body>
+
+  <header class="header">
+    <div class="container header-inner">
+      <a href="/" class="logo">▲ FLIPCHECK</a>
+      <nav class="nav">
+        <a href="/#features">Features</a>
+        <a href="/#extension">Extension</a>
+        <a href="/#pricing">Preise</a>
+        <a href="/guides" style="color:var(--text)">Guides</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
+      </nav>
+      <div style="display:flex;align-items:center;gap:8px">
+        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7)">Mein Konto</a>
+        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
+      </div>
+    </div>
+  </header>
+
+  <div class="guide-layout">
+
+    <aside class="guide-toc">
+      <div class="guide-toc-label">Inhalt</div>
+      <ol>
+        <li><a href="#uebersicht">Übersicht</a></li>
+        <li><a href="#kpi">1. KPI-Karten</a></li>
+        <li><a href="#gewinnkurve">2. Gewinnkurve</a></li>
+        <li><a href="#umsatz-kosten">3. Umsatz vs. Kosten</a></li>
+        <li><a href="#marktportfolio">4. Marktportfolio</a></li>
+        <li><a href="#best-worst">5. Best & Worst Flips</a></li>
+        <li><a href="#zeitraum">6. Zeitraum wählen</a></li>
+        <li><a href="#tipps">7. Tipps</a></li>
+      </ol>
+    </aside>
+
+    <main class="guide-content">
+
+      <div class="guide-breadcrumb">
+        <a href="/guides">Guides</a>
+        <span class="sep">›</span>
+        <span style="color:var(--text2)">Analytics Dashboard</span>
+      </div>
+
+      <h1>Analytics Dashboard</h1>
+      <div class="guide-meta">
+        <span class="tag">📊 Feature-Guide</span>
+        <div class="dot"></div>
+        <span>~4 Min. Lesezeit</span>
+        <div class="dot"></div>
+        <span>Stand: März 2026</span>
+      </div>
+
+      <!-- 0 -->
+      <div class="guide-section" id="uebersicht">
+        <h2>Übersicht</h2>
+        <p>Das Analytics Dashboard ist dein <strong>Cockpit für alle Kennzahlen</strong>. Es fasst Daten aus Inventar, Verkäufe und Marktplätzen zusammen und zeigt dir auf einen Blick, wie dein Reselling-Geschäft performt.</p>
+        <p>Alle Daten werden automatisch aus deinem Inventar berechnet — je besser du dein Inventar pflegst, desto genauer sind die Analytics.</p>
+      </div>
+
+      <!-- 1 -->
+      <div class="guide-section" id="kpi">
+        <h2><span class="num">1</span> KPI-Karten</h2>
+        <p>Oben siehst du 5–6 Karten mit den wichtigsten Kennzahlen:</p>
+
+        <table class="status-table">
+          <thead><tr><th>KPI</th><th>Beschreibung</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Gesamtgewinn</strong></td>
+              <td>Netto-Gewinn aller verkauften Artikel. Farbcodiert (grün/rot) mit Trend-Badge (↑/↓ % gegenüber Vormonat).</td>
+            </tr>
+            <tr>
+              <td><strong>Win Rate</strong></td>
+              <td>Prozentsatz profitabler Verkäufe. Kreisring-Anzeige: grün ≥ 70%, gelb ≥ 50%, rot &lt; 50%. Qualitätslabel: Stark / Gut / Verbesserbar.</td>
+            </tr>
+            <tr>
+              <td><strong>Ø Marge</strong></td>
+              <td>Durchschnittliche Gewinnmarge aller Verkäufe. Grün ≥ 20%, gelb ≥ 10%, rot &lt; 10%.</td>
+            </tr>
+            <tr>
+              <td><strong>Aktives Kapital</strong></td>
+              <td>Summe aller EKs deiner IN_STOCK Artikel — zeigt wie viel Kapital gebunden ist.</td>
+            </tr>
+            <tr>
+              <td><strong>Ø Tage bis Cash</strong></td>
+              <td>Durchschnittliche Tage vom Einkauf bis zum Verkauf. Je kürzer, desto besser deine Kapitalumschlagshäufigkeit.</td>
+            </tr>
+            <tr>
+              <td><strong>Retouren-Quote</strong></td>
+              <td>Nur sichtbar bei Retouren. Farbcodiert: rot &gt; 10%, gelb &gt; 5%, grün ≤ 5%.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- 2 -->
+      <div class="guide-section" id="gewinnkurve">
+        <h2><span class="num">2</span> Gewinnkurve</h2>
+        <p>Das Linienchart links zeigt deinen <strong>Gewinn über Zeit</strong>:</p>
+        <p>Toggle oben zwischen <strong>Wöchentlich</strong> (letzte 12 Wochen) und <strong>Monatlich</strong> (letzte 12 Monate). Hover über einen Punkt für den exakten Gewinn pro Periode.</p>
+
+        <div class="callout tip">
+          <div class="callout-icon">💡</div>
+          <div class="callout-body">Ein <strong>stetig steigender Trend</strong> zeigt, dass deine Strategie funktioniert. Flache oder fallende Kurven sind ein Signal, deine Sourcing-Strategie oder Pricing zu überdenken.</div>
+        </div>
+      </div>
+
+      <!-- 3 -->
+      <div class="guide-section" id="umsatz-kosten">
+        <h2><span class="num">3</span> Umsatz vs. Kosten</h2>
+        <p>Das Balkenchart rechts zeigt <strong>Einnahmen und Wareneinsatz</strong> nebeneinander:</p>
+        <p>Die Lücke zwischen den Balken ist dein Rohgewinn. Werden die Balken gleichgroß, schrumpft deine Marge — Zeit für bessere Deals oder niedrigere EKs.</p>
+      </div>
+
+      <!-- 4 -->
+      <div class="guide-section" id="marktportfolio">
+        <h2><span class="num">4</span> Marktportfolio</h2>
+        <p>Zwei Charts zeigen deine <strong>Marktplatz-Verteilung</strong>:</p>
+
+        <p><strong>Donut-Chart (links):</strong> Wie viele deiner Inventar-Artikel auf welchem Marktplatz gelistet sind. Zeigt deine Diversifikation.</p>
+
+        <p><strong>Balken-Chart (rechts):</strong> Gewinn pro Marktplatz als horizontale Balken. So siehst du sofort, welche Plattform am profitabelsten ist.</p>
+
+        <div class="callout info">
+          <div class="callout-icon">📌</div>
+          <div class="callout-body">Wenn ein Marktplatz deutlich profitabler ist, überlege ob du dort stärker listen solltest — aber diversifiziere, um nicht von einer Plattform abhängig zu sein.</div>
+        </div>
+      </div>
+
+      <!-- 5 -->
+      <div class="guide-section" id="best-worst">
+        <h2><span class="num">5</span> Best & Worst Flips</h2>
+        <p>Zwei Tabellen zeigen deine <strong>erfolgreichsten und schlechtesten Deals</strong>:</p>
+
+        <table class="status-table">
+          <thead><tr><th>Spalte</th><th>Beschreibung</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Produkt + EAN</strong></td><td>Was du gekauft/verkauft hast.</td></tr>
+            <tr><td><strong>EK</strong></td><td>Dein Einkaufspreis.</td></tr>
+            <tr><td><strong>VK</strong></td><td>Dein Verkaufspreis.</td></tr>
+            <tr><td><strong>Gewinn</strong></td><td>Farbcodiert: grün = Gewinn, rot = Verlust.</td></tr>
+            <tr><td><strong>ROI %</strong></td><td>Rendite bezogen auf den EK.</td></tr>
+          </tbody>
+        </table>
+
+        <p><strong>Best Flips</strong> zeigen dir, welche Produkte besonders gut laufen — mehr davon sourchen. <strong>Worst Flips</strong> zeigen Verlust-Deals — analysiere warum und vermeide ähnliche Käufe.</p>
+      </div>
+
+      <!-- 6 -->
+      <div class="guide-section" id="zeitraum">
+        <h2><span class="num">6</span> Zeitraum wählen</h2>
+        <p>Mit den Buttons <strong>Wöchentlich / Monatlich</strong> oben wechselst du den Betrachtungszeitraum. Alle Charts und die Perioden-Labels aktualisieren sich automatisch.</p>
+        <p>Klicke den <strong>Refresh-Button</strong> (↻) um alle Daten neu aus dem Inventar zu berechnen — nützlich nach dem Eintragen neuer Verkäufe.</p>
+      </div>
+
+      <!-- 7 -->
+      <div class="guide-section" id="tipps">
+        <h2><span class="num">7</span> Tipps</h2>
+        <p><strong>Win Rate als Nordstern:</strong> Eine Win Rate über 70% bedeutet, dass du gut sourcest. Unter 50% solltest du deine Einkaufsstrategie hinterfragen.</p>
+        <p><strong>Tage bis Cash minimieren:</strong> Je schneller du Ware umsetzt, desto öfter kannst du dein Kapital reinvestieren. Ziel: unter 14 Tage.</p>
+        <p><strong>Aktives Kapital beobachten:</strong> Wenn dieser Wert steigt ohne dass dein Gewinn mitwächst, hast du zu viel Ware auf Lager die nicht verkauft wird.</p>
+        <p><strong>Inventar pflegen:</strong> Analytics sind nur so gut wie deine Daten. Vergiss nicht, Verkäufe im Inventar als SOLD zu markieren und den korrekten VK einzutragen.</p>
+      </div>
+
+      <div class="guide-footer-nav">
+        <a href="/guides">← Zurück zur Guide-Übersicht</a>
+        <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Fragen? Discord →</a>
+      </div>
+
+    </main>
+  </div>
+
+  <footer style="border-top:1px solid var(--border);padding:32px 24px;text-align:center">
+    <p style="font-size:13px;color:var(--dim)">
+      © 2025 Flipcheck ·
+      <a href="/privacy" style="color:var(--dim);margin:0 8px">Datenschutz</a>·
+      <a href="/terms"   style="color:var(--dim);margin:0 8px">AGB</a>·
+      <a href="/imprint" style="color:var(--dim);margin:0 8px">Impressum</a>
+    </p>
+  </footer>
+
+  <script>
+    const sections=document.querySelectorAll('.guide-section');const links=document.querySelectorAll('.guide-toc a');
+    const obs=new IntersectionObserver(entries=>{entries.forEach(e=>{if(e.isIntersecting){links.forEach(l=>l.classList.remove('active'));const a=document.querySelector(`.guide-toc a[href="#${e.target.id}"]`);if(a)a.classList.add('active')}})},{rootMargin:'-20% 0px -60% 0px'});
+    sections.forEach(s=>obs.observe(s));
+  </script>
+
+</body>
+</html>

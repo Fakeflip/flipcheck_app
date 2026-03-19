@@ -4,8 +4,16 @@
   "rewrites": [
     { "source": "/dashboard/(.*)", "destination": "/dashboard/index.html" },
     { "source": "/account",        "destination": "/account/index.html" },
-    { "source": "/guides",         "destination": "/guides/index.html" },
-    { "source": "/guides/repricer","destination": "/guides/repricer/index.html" }
+    { "source": "/guides",            "destination": "/guides/index.html" },
+    { "source": "/guides/repricer",   "destination": "/guides/repricer/index.html" },
+    { "source": "/guides/flipcheck",  "destination": "/guides/flipcheck/index.html" },
+    { "source": "/guides/inventory",  "destination": "/guides/inventory/index.html" },
+    { "source": "/guides/history",    "destination": "/guides/history/index.html" },
+    { "source": "/guides/competition","destination": "/guides/competition/index.html" },
+    { "source": "/guides/alerts",     "destination": "/guides/alerts/index.html" },
+    { "source": "/guides/marketplace","destination": "/guides/marketplace/index.html" },
+    { "source": "/guides/sales",      "destination": "/guides/sales/index.html" },
+    { "source": "/guides/analytics",  "destination": "/guides/analytics/index.html" }
   ],
   "headers": [
     {
