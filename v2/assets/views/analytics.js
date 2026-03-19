@@ -137,11 +137,14 @@ const AnalyticsView = (() => {
       marketProfit[mkt] = (marketProfit[mkt] || 0) + _rp(item);
     }
 
+    // Total revenue (Umsatz)
+    const totalRevenue = soldItems.reduce((sum, i) => sum + ((Number(i.sell_price) || 0) * Math.max(1, i.qty || 1)), 0);
+
     // Return rate
     const returnCount = soldItems.filter(i => i.status === "RETURN").length;
     const returnRate  = soldItems.length > 0 ? Math.round(returnCount / soldItems.length * 100) : 0;
 
-    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit, returnCount, returnRate };
+    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit, totalRevenue, returnCount, returnRate };
   }
 
   // ── Period data builders ──────────────────────────────────────────────────
@@ -303,6 +306,20 @@ const AnalyticsView = (() => {
             ${trendBadge}
             <span>${s.soldCount} ${I18N.t('an.kpi.sales')}</span>
           </div>
+        </div>
+
+        <!-- Umsatz -->
+        <div class="kpi-card an-kpi-card">
+          <div class="an-kpi-top">
+            <div class="kpi-label">Umsatz</div>
+            <div class="an-kpi-ico">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1v14M5 3.5C5 2.67 6.34 2 8 2s3 .67 3 1.5S9.66 5 8 5 5 5.67 5 6.5 6.34 8 8 8s3 .67 3 1.5S9.66 11 8 11s-3-.67-3-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value">${fmtEur(extra.totalRevenue)}</div>
+          <div class="kpi-meta"><span>${s.soldCount} Verkäufe</span></div>
         </div>
 
         <!-- Win Rate -->

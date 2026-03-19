@@ -69,10 +69,10 @@ const InventoryView = (() => {
 
     let html = "";
     if (topH > 0)
-      html += `<tr class="inv-vs-spacer"><td colspan="10" style="height:${topH}px"></td></tr>`;
+      html += `<tr class="inv-vs-spacer"><td colspan="13" style="height:${topH}px"></td></tr>`;
     html += _state.vs.data.slice(start, end).map(renderRow).join("");
     if (botH > 0)
-      html += `<tr class="inv-vs-spacer"><td colspan="10" style="height:${botH}px"></td></tr>`;
+      html += `<tr class="inv-vs-spacer"><td colspan="13" style="height:${botH}px"></td></tr>`;
 
     tbody.innerHTML = html;
   }
@@ -344,6 +344,7 @@ const InventoryView = (() => {
               <th class="inv-sort-th col-right${_state.sort.col==="vk"     ?" inv-sort-active":""}" data-sort="vk"    >VK ${_sortIcon("vk")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="profit" ?" inv-sort-active":""}" data-sort="profit">Profit ${_sortIcon("profit")}</th>
               <th class="inv-sort-th${_state.sort.col==="status" ?" inv-sort-active":""}" data-sort="status">Status ${_sortIcon("status")}</th>
+              <th class="inv-sort-th col-right${_state.sort.col==="sold_at" ?" inv-sort-active":""}" data-sort="sold_at">Verkauft ${_sortIcon("sold_at")}</th>
               <th class="inv-sort-th${_state.sort.col==="condition"?" inv-sort-active":""}" data-sort="condition">${I18N.t('inv.th.condition')} ${_sortIcon("condition")}</th>
               <th class="inv-sort-th col-right${_state.sort.col==="age"    ?" inv-sort-active":""}" data-sort="age"   >${I18N.t('inv.col.age')} ${_sortIcon("age")}</th>
               <th style="width:100px"></th>
@@ -455,6 +456,7 @@ const InventoryView = (() => {
         <td class="col-right col-num" style="font-size:12px">${item.sell_price != null ? fmtEur(item.sell_price) : "—"}</td>
         <td class="col-right">${profitHtml}</td>
         <td><span class="badge status-${item.status||"IN_STOCK"}">${esc(STATUS_LABELS[item.status] || item.status || "—")}</span></td>
+        <td class="col-right text-sm" style="color:var(--text-muted)">${item.sold_at ? new Date(item.sold_at).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "2-digit" }) : "—"}</td>
         <td><span class="badge badge-muted" style="font-size:10px">${esc(FC.CONDITION_LABELS[item.condition] || item.condition || "Neu")}</span></td>
         <td class="col-right text-sm">${ageHtml}</td>
         <td>

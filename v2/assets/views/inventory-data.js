@@ -162,6 +162,11 @@ const InventoryData = (() => {
             const av = a.condition || "new"; const bv = b.condition || "new";
             return av < bv ? -d : av > bv ? d : 0;
           }
+          case "sold_at": {
+            const av = a.sold_at ? new Date(a.sold_at).getTime() : 0;
+            const bv = b.sold_at ? new Date(b.sold_at).getTime() : 0;
+            return (bv - av) * d;
+          }
           case "age": {
             // asc = youngest (largest created_at timestamp) first
             const av = a.created_at ? new Date(a.created_at).getTime() : 0;
