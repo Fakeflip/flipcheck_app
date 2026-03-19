@@ -188,6 +188,15 @@ const FlipcheckView = (() => {
           </div>
         </div>
 
+        <!-- VK Custom (optional — overrides API median price) -->
+        <div class="field" style="margin-bottom:10px">
+          <label class="input-label">VK Custom <span style="font-size:10px;color:var(--text-muted)">(optional — eigener Verkaufspreis)</span></label>
+          <div class="input-prefix-wrap">
+            <span class="prefix">€</span>
+            <input id="fcVkCustom" class="input" type="number" step="0.01" min="0" placeholder="leer = Median-VK"/>
+          </div>
+        </div>
+
         <button class="btn btn-primary" id="fcCheck" style="width:100%;margin-top:4px;min-height:44px">
           <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M5 8l3 3 3-3M8 3v8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
           Prüfen
@@ -615,8 +624,9 @@ const FlipcheckView = (() => {
     const cat  = _container.querySelector("#fcCat")?.value || "sonstiges";
     const shipIn  = parseFloat(_container.querySelector(_market === "ebay" ? "#fcShipIn"  : "#fcShipInAmz")?.value) || 0;
     const shipOut = parseFloat(_container.querySelector("#fcShipOut")?.value) || 0;
-    const prep    = parseFloat(_container.querySelector("#fcPrep")?.value)    || 0;
-    const method  = _container.querySelector(".seg-btn.active[data-method]")?.dataset.method || "fba";
+    const prep      = parseFloat(_container.querySelector("#fcPrep")?.value)    || 0;
+    const method    = _container.querySelector(".seg-btn.active[data-method]")?.dataset.method || "fba";
+    const vkCustom  = parseFloat(_container.querySelector("#fcVkCustom")?.value) || 0;
 
     if (!ean) { Toast.error("EAN fehlt", "Bitte EAN oder ASIN eingeben"); return; }
 
@@ -630,25 +640,33 @@ const FlipcheckView = (() => {
     try {
       let d;
       if (_market === "amazon") {
-        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, ship_in: shipIn });
+        d = await API.amazonCheck(ean, ean, ek, mode, method, { prep_fee: prep, ship_in: shipIn, ...(vkCustom > 0 ? { sell_custom: vkCustom } : {}) });
       } else if (_market === "kaufland") {
-        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut, market: "kaufland" });
-        if (d && d.sell_price_median != null) {
-          d.ek = ek; d.ship_in = shipIn; d.ship_out = shipOut; d.category = cat;
-          const klFee = d.sell_price_median * 0.105;
-          d.profit_median = +(d.sell_price_median - ek - shipIn - shipOut - klFee).toFixed(2);
-          d.margin_pct = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut, market: "kaufland", ...(vkCustom > 0 ? { sell_custom: vkCustom } : {}) });
+        if (d) {
+          const vk = vkCustom > 0 ? vkCustom : (d.sell_price_median ?? d.sell_price_avg ?? null);
+          if (vk != null) {
+            if (vkCustom > 0) d.sell_price_median = vkCustom;
+            d.ek = ek; d.ship_in = shipIn; d.ship_out = shipOut; d.category = cat;
+            const klFee = vk * 0.105;
+            d.profit_median = +(vk - ek - shipIn - shipOut - klFee).toFixed(2);
+            d.margin_pct = vk > 0 ? +(d.profit_median / vk * 100).toFixed(1) : 0;
+          }
         }
       } else {
-        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut });
+        d = await API.flipcheck(ean, ek, mode, { category: cat, shipping_in: shipIn, shipping_out: shipOut, ...(vkCustom > 0 ? { sell_custom: vkCustom } : {}) });
         // Local profit recalc (server doesn't include shipping + VAT)
-        if (d && d.sell_price_median != null) {
-          d.ek       = ek;
-          d.ship_in  = shipIn;
-          d.ship_out = shipOut;
-          d.category = cat;
-          d.profit_median = +calcProfit(d.sell_price_median, ek, cat, shipIn, shipOut).toFixed(2);
-          d.margin_pct    = d.sell_price_median > 0 ? +(d.profit_median / d.sell_price_median * 100).toFixed(1) : 0;
+        if (d) {
+          const vk = vkCustom > 0 ? vkCustom : (d.sell_price_median ?? null);
+          if (vk != null) {
+            if (vkCustom > 0) d.sell_price_median = vkCustom; // override display
+            d.ek       = ek;
+            d.ship_in  = shipIn;
+            d.ship_out = shipOut;
+            d.category = cat;
+            d.profit_median = +calcProfit(vk, ek, cat, shipIn, shipOut).toFixed(2);
+            d.margin_pct    = vk > 0 ? +(d.profit_median / vk * 100).toFixed(1) : 0;
+          }
         }
       }
 
