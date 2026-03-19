@@ -2032,15 +2032,19 @@ def _get_kaufland_creds_from_request(request) -> tuple | None:
 async def kaufland_auth_status(request: Request):
     """Verify Kaufland API credentials."""
     if not _KAUFLAND_SELLER_AVAILABLE:
-        return {"ok": True, "connected": False}
+        return {"ok": False, "connected": False, "reason": "module_unavailable"}
     creds = _get_kaufland_creds_from_request(request)
     if not creds:
-        return {"ok": True, "connected": False}
+        return {"ok": True, "connected": False, "reason": "no_credentials"}
     try:
         result = await kl_verify_credentials(creds[0], creds[1])
-        return {"ok": True, "connected": result.get("connected", False)}
+        connected = result.get("connected", False)
+        resp = {"ok": True, "connected": connected}
+        if not connected and result.get("error"):
+            resp["error"] = result["error"]
+        return resp
     except Exception as e:
-        return {"ok": True, "connected": False, "error": str(e)}
+        return {"ok": False, "connected": False, "error": str(e)}
 
 
 @app.get("/kaufland/listings/active")

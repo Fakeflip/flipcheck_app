@@ -2786,14 +2786,21 @@ ipcMain.handle("kaufland:saveCreds", async (_e, { client_key, secret_key }) => {
   try {
     const base  = apiBaseBackend();
     const token = await getToken().catch(() => null);
+    console.log("[KauflandCreds] Verifying against", base);
     const res   = await kauflandApiCall(`${base}/kaufland/auth/status`, token);
+    console.log("[KauflandCreds] Response:", JSON.stringify(res.data));
     if (res.data?.connected) {
       startKauflandSyncMonitor();
       return { ok: true };
     }
     deleteKauflandCreds();
-    return { ok: false, error: res.data?.error || "Credentials ungueltig" };
+    const reason = res.data?.reason || "";
+    const error  = res.data?.error  || "";
+    if (reason === "module_unavailable") return { ok: false, error: "Kaufland-Modul auf dem Server nicht verfügbar. Bitte Backend neu deployen." };
+    if (reason === "no_credentials")    return { ok: false, error: "Credentials wurden nicht übertragen. Bitte erneut versuchen." };
+    return { ok: false, error: error || "Client Key oder Secret Key ungültig." };
   } catch (e) {
+    console.error("[KauflandCreds] Error:", e);
     deleteKauflandCreds();
     return { ok: false, error: e.message };
   }

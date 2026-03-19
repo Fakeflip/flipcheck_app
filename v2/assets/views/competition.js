@@ -174,8 +174,8 @@ const CompetitionView = (() => {
     return `
       <div class="comp-left" id="sellerLeft">
         <div class="comp-add-wrap">
-          <input class="input" id="sellerInput" placeholder="eBay Username…" class="flex-1"/>
-          <button class="btn btn-primary btn-sm" id="btnAddSeller" class="nowrap">${I18N.t('comp.seller.add')}</button>
+          <input class="input flex-1" id="sellerInput" placeholder="eBay Username…"/>
+          <button class="btn btn-primary btn-sm nowrap" id="btnAddSeller">${I18N.t('comp.seller.add')}</button>
         </div>
         <div id="sellerList" class="comp-list"></div>
       </div>
@@ -746,8 +746,8 @@ const CompetitionView = (() => {
               <input class="input" id="whUrlInput" type="text"
                 placeholder="https://discord.com/api/webhooks/…"
                 value="${urlVal}" autocomplete="off" spellcheck="false"/>
-              <button class="btn btn-primary btn-sm" id="btnSaveWh" class="nowrap">${I18N.t('comp.wh.save_btn')}</button>
-              <button class="btn btn-secondary btn-sm" id="btnTestWh" class="nowrap" ${hasUrl ? "" : "disabled"}>
+              <button class="btn btn-primary btn-sm nowrap" id="btnSaveWh">${I18N.t('comp.wh.save_btn')}</button>
+              <button class="btn btn-secondary btn-sm nowrap" id="btnTestWh" ${hasUrl ? "" : "disabled"}>
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>

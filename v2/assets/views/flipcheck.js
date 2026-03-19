@@ -666,13 +666,13 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener">
             🛒 ${I18N.t('fc.action.ebay_sales')} ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener">
             💰 Geizhals ↗
           </a>
         </div>
@@ -846,10 +846,10 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener">
             💰 Geizhals ↗
           </a>
         </div>
@@ -1011,13 +1011,13 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener">
             🛒 eBay Verkäufe ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" class="fc-ext-link">
+          <a class="btn btn-ghost btn-sm fc-ext-link" href="https://geizhals.de/?fs=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener">
             💰 Geizhals ↗
           </a>
         </div>
