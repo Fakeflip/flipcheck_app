@@ -163,7 +163,7 @@ const BatchView = (() => {
           </div>
 
           <!-- Manual Input -->
-          <div class="input-group" style="margin-bottom:12px">
+          <div class="input-group mb-12">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
               <label class="input-label" style="margin:0">${I18N.t('bt.form.ean_list')}</label>
               <button class="btn btn-ghost btn-sm" id="batchScanBtn" title="${I18N.t('bt.form.scanner_hint')}" style="font-size:14px;padding:2px 8px">📷 ${I18N.t('bt.form.scanner')}</button>
@@ -171,7 +171,7 @@ const BatchView = (() => {
             <textarea id="batchEanList" class="textarea" rows="5" placeholder="4010355360205&#10;4006381333955&#10;4250538302777…"></textarea>
           </div>
 
-          <div class="input-group" style="margin-bottom:12px">
+          <div class="input-group mb-12">
             <label class="input-label">${I18N.t('bt.form.default_ek')}${isVat ? " <span style='color:var(--accent);font-weight:500'>("+I18N.t('bt.form.gross')+")</span>" : " (€)"}</label>
             <div class="input-prefix-wrap">
               <span class="prefix">€</span>
@@ -180,7 +180,7 @@ const BatchView = (() => {
             <span class="input-hint">${isVat ? I18N.t('bt.form.vat_hint') : I18N.t('bt.form.ek_hint')}</span>
           </div>
 
-          <div class="input-group" style="margin-bottom:12px">
+          <div class="input-group mb-12">
             <label class="input-label">Marktplatz</label>
             <div class="seg" id="batchMarketSeg" style="display:flex;gap:0">
               <button class="seg-btn active" data-val="ebay">eBay</button>
@@ -190,7 +190,7 @@ const BatchView = (() => {
             </div>
           </div>
 
-          <div class="input-group" style="margin-bottom:12px">
+          <div class="input-group mb-12">
             <label class="input-label">${I18N.t('bt.form.category')}</label>
             <select id="batchCategory" class="select">
               ${buildCatOptions("sonstiges")}

@@ -52,6 +52,14 @@ const SettingsView = (() => {
         ad_rate:   !!container.querySelector("#sFcAdRate")?.checked,
       },
       theme: container.querySelector("#sThemeSeg .seg-btn.active")?.dataset.val || "dark",
+      marketplace: {
+        ebay_keep_in_stock:            !!container.querySelector("#sEbayKeepInStock")?.checked,
+        ebay_auto_relist:              !!container.querySelector("#sEbayAutoRelist")?.checked,
+        ebay_relist_interval_days:     parseInt(container.querySelector("#sEbayRelistInterval")?.value || "14"),
+        kaufland_keep_in_stock:        !!container.querySelector("#sKlKeepInStock")?.checked,
+        kaufland_auto_relist:          !!container.querySelector("#sKlAutoRelist")?.checked,
+        kaufland_relist_interval_days: parseInt(container.querySelector("#sKlRelistInterval")?.value || "14"),
+      },
     };
   }
 
@@ -85,13 +93,13 @@ const SettingsView = (() => {
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.account'), icoUser(), I18N.t('st.section.account.desc'))}
           <div class="panel st-panel" id="profileSection">
-            <div class="settings-row" style="border:none;gap:14px;padding:2px 0">
-              <div class="skeleton" style="width:52px;height:52px;border-radius:50%;flex-shrink:0"></div>
-              <div style="display:flex;flex-direction:column;gap:7px;flex:1">
+            <div class="settings-row settings-row--last st-profile-row">
+              <div class="skeleton st-avatar-skel"></div>
+              <div class="col gap-8" style="flex:1">
                 <div class="skeleton" style="width:150px;height:14px"></div>
                 <div class="skeleton" style="width:110px;height:11px"></div>
               </div>
-              <div class="skeleton" style="width:56px;height:22px;border-radius:20px"></div>
+              <div class="skeleton st-badge-skel"></div>
             </div>
           </div>
         </div>
@@ -100,7 +108,7 @@ const SettingsView = (() => {
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.lang'), icoGlobe(), I18N.t('st.section.lang.desc'))}
           <div class="panel st-panel">
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.section.lang')}</h4>
                 <p>${I18N.t('st.section.lang.desc')}</p>
@@ -116,7 +124,7 @@ const SettingsView = (() => {
         <div class="st-section">
           ${sectionHeader("Design", icoPalette(), "Farbschema der App")}
           <div class="panel st-panel">
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>Theme</h4>
                 <p>Dark oder Light Mode</p>
@@ -139,7 +147,7 @@ const SettingsView = (() => {
                 <h4>${I18N.t('st.vat.title')}</h4>
                 <p>${I18N.t('st.vat.desc')}</p>
               </div>
-              <select id="sVatMode" class="select" style="width:200px">
+              <select id="sVatMode" class="select select--xl">
                 <option value="no_vat" ${vat === "no_vat" ? "selected" : ""}>${I18N.t('st.vat.small')}</option>
                 <option value="ust_19" ${vat === "ust_19" ? "selected" : ""}>${I18N.t('st.vat.regular')}</option>
               </select>
@@ -159,13 +167,13 @@ const SettingsView = (() => {
                 <h4>${I18N.t('st.market.title')}</h4>
                 <p>${I18N.t('st.market.desc')}</p>
               </div>
-              <select id="sDefaultMarket" class="select" style="width:160px">
+              <select id="sDefaultMarket" class="select select--lg">
                 <option value="ebay"     ${defaultMarket === "ebay"     ? "selected" : ""}>eBay</option>
                 <option value="amazon"   ${defaultMarket === "amazon"   ? "selected" : ""}>Amazon</option>
                 <option value="kaufland" ${defaultMarket === "kaufland" ? "selected" : ""}>Kaufland</option>
               </select>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.mode.title')}</h4>
                 <p>${I18N.t('st.mode.desc')}</p>
@@ -201,7 +209,7 @@ const SettingsView = (() => {
               </div>
               <label class="toggle"><input type="checkbox" id="sFcPackaging" ${fcPackaging ? "checked" : ""} /><span class="toggle-slider"></span></label>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.fc_field.ad_rate')}</h4>
               </div>
@@ -214,16 +222,15 @@ const SettingsView = (() => {
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.analytics'), icoChart(), I18N.t('st.section.analytics.desc'))}
           <div class="panel st-panel">
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.profit.title')}</h4>
                 <p>${I18N.t('st.profit.desc')}</p>
               </div>
-              <div class="input-prefix-wrap" style="width:120px">
+              <div class="input-prefix-wrap input--sm">
                 <span class="prefix">€</span>
-                <input id="sWeeklyTarget" class="input" type="number" min="0" step="10"
-                  value="${esc(String(profit))}"
-                  style="text-align:right;padding-right:12px;padding-left:26px" />
+                <input id="sWeeklyTarget" class="input st-input-currency" type="number" min="0" step="10"
+                  value="${esc(String(profit))}" />
               </div>
             </div>
           </div>
@@ -252,7 +259,7 @@ const SettingsView = (() => {
                 <h4>Sync-Intervall</h4>
                 <p>Wie oft neue Daten von eBay geholt werden</p>
               </div>
-              <select id="sEbaySyncInterval" class="select" style="width:140px">
+              <select id="sEbaySyncInterval" class="select select--md">
                 <option value="15">Alle 15 Min</option>
                 <option value="30" selected>Alle 30 Min</option>
                 <option value="60">Stündlich</option>
@@ -266,7 +273,7 @@ const SettingsView = (() => {
               </div>
               <label class="toggle"><input type="checkbox" id="sEbaySyncAutoCreate" checked /><span class="toggle-slider"></span></label>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>Letzter Sync</h4>
                 <p id="ebaySyncLastInfo" style="margin-top:2px">—</p>
@@ -293,16 +300,16 @@ const SettingsView = (() => {
                   <h4>Client Key</h4>
                   <p>Aus dem Kaufland Seller Portal</p>
                 </div>
-                <input type="text" id="sKlClientKey" class="input" placeholder="Client Key" style="width:240px" />
+                <input type="text" id="sKlClientKey" class="input input--md" placeholder="Client Key" />
               </div>
               <div class="settings-row">
                 <div class="settings-row-left">
                   <h4>Secret Key</h4>
                   <p>Geheimer API-Schlüssel</p>
                 </div>
-                <input type="password" id="sKlSecretKey" class="input" placeholder="Secret Key" style="width:240px" />
+                <input type="password" id="sKlSecretKey" class="input input--md" placeholder="Secret Key" />
               </div>
-              <div class="settings-row" style="border:none">
+              <div class="settings-row settings-row--last">
                 <div class="settings-row-left"></div>
                 <button class="btn btn-primary btn-sm" id="btnKlConnect">Verbinden</button>
               </div>
@@ -319,7 +326,7 @@ const SettingsView = (() => {
                 <h4>Sync-Intervall</h4>
                 <p>Wie oft neue Daten von Kaufland geholt werden</p>
               </div>
-              <select id="sKlSyncInterval" class="select" style="width:140px">
+              <select id="sKlSyncInterval" class="select select--md">
                 <option value="15">Alle 15 Min</option>
                 <option value="30" selected>Alle 30 Min</option>
                 <option value="60">Stündlich</option>
@@ -333,13 +340,81 @@ const SettingsView = (() => {
               </div>
               <label class="toggle"><input type="checkbox" id="sKlSyncAutoCreate" checked /><span class="toggle-slider"></span></label>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>Letzter Sync</h4>
                 <p id="klSyncLastInfo" style="margin-top:2px">—</p>
               </div>
               <button class="btn btn-secondary btn-sm" id="btnKlSyncNow">Jetzt synchronisieren</button>
             </div>
+          </div>
+        </div>
+
+        <!-- ── Marktplatz-Optionen ────────────────────────────────────────── -->
+        <div class="st-section">
+          ${sectionHeader("Marktplatz-Optionen", icoMarket(), "Listing-Verhalten für eBay & Kaufland steuern")}
+          <div class="panel st-panel">
+
+            <div class="st-sub-header">
+              <div class="st-sub-label">eBay</div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Immer auf Lager (Out-of-Stock)</h4>
+                <p>Listings bleiben aktiv, auch wenn Bestand = 0. eBay zeigt "Vorübergehend nicht verfügbar" statt das Angebot zu beenden.</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sEbayKeepInStock" ${(s?.marketplace?.ebay_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row settings-row--last">
+              <div class="settings-row-left">
+                <h4>Auto-Wiedereinstellen</h4>
+                <p>Beendete/abgelaufene Listings automatisch neu einstellen</p>
+              </div>
+              <div class="row gap-12">
+                <label class="toggle"><input type="checkbox" id="sEbayAutoRelist" ${(s?.marketplace?.ebay_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+                <div id="sEbayRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.ebay_auto_relist) ? "" : " interval-wrap--disabled"}">
+                  <span class="text-xs text-muted">alle</span>
+                  <select id="sEbayRelistInterval" class="select select--sm">
+                    <option value="7" ${(s?.marketplace?.ebay_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
+                    <option value="14" ${(s?.marketplace?.ebay_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
+                    <option value="21" ${(s?.marketplace?.ebay_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
+                    <option value="30" ${(s?.marketplace?.ebay_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <div class="st-sub-header">
+              <div class="st-sub-label">Kaufland</div>
+            </div>
+
+            <div class="settings-row">
+              <div class="settings-row-left">
+                <h4>Immer auf Lager (Out-of-Stock)</h4>
+                <p>Units bleiben aktiv, auch wenn Bestand = 0. Kaufland zeigt das Angebot weiterhin an.</p>
+              </div>
+              <label class="toggle"><input type="checkbox" id="sKlKeepInStock" ${(s?.marketplace?.kaufland_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+            </div>
+            <div class="settings-row settings-row--last">
+              <div class="settings-row-left">
+                <h4>Auto-Wiedereinstellen</h4>
+                <p>Inaktive Units automatisch reaktivieren</p>
+              </div>
+              <div class="row gap-12">
+                <label class="toggle"><input type="checkbox" id="sKlAutoRelist" ${(s?.marketplace?.kaufland_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+                <div id="sKlRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.kaufland_auto_relist) ? "" : " interval-wrap--disabled"}">
+                  <span class="text-xs text-muted">alle</span>
+                  <select id="sKlRelistInterval" class="select select--sm">
+                    <option value="7" ${(s?.marketplace?.kaufland_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
+                    <option value="14" ${(s?.marketplace?.kaufland_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
+                    <option value="21" ${(s?.marketplace?.kaufland_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
+                    <option value="30" ${(s?.marketplace?.kaufland_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -362,12 +437,12 @@ const SettingsView = (() => {
               </div>
               <div id="updaterStatus" style="font-size:11px;color:var(--text-muted);text-align:right"></div>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.update.title')}</h4>
                 <p>${I18N.t('st.update.desc')}</p>
               </div>
-              <div style="display:flex;gap:8px;align-items:center">
+              <div class="row gap-8">
                 <button class="btn btn-secondary btn-sm" id="btnCheckUpdates">${I18N.t('st.update.check')}</button>
                 <button class="btn btn-primary btn-sm" id="btnInstallUpdate" style="display:none">${I18N.t('st.update.install')}</button>
               </div>
@@ -378,13 +453,13 @@ const SettingsView = (() => {
         <!-- ── Gefahrenzone ───────────────────────────────────────────────── -->
         <div class="st-section">
           ${sectionHeader(I18N.t('st.section.danger'), icoDanger(), I18N.t('st.section.danger.desc'), true)}
-          <div class="panel st-panel" style="border-color:var(--red-border)">
+          <div class="panel st-panel st-panel--danger">
             <div class="settings-row">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.danger.history.title')}</h4>
                 <p>${I18N.t('st.danger.history.desc')}</p>
               </div>
-              <button class="btn btn-sm" id="btnVacuumHistory" style="border-color:var(--red-border);color:var(--red)">${I18N.t('st.danger.history.btn')}</button>
+              <button class="btn btn-sm st-btn-danger-outline" id="btnVacuumHistory">${I18N.t('st.danger.history.btn')}</button>
             </div>
             <div class="settings-row">
               <div class="settings-row-left">
@@ -393,7 +468,7 @@ const SettingsView = (() => {
               </div>
               <button class="btn btn-danger btn-sm" id="btnClearInventory">${I18N.t('st.danger.inventory.btn')}</button>
             </div>
-            <div class="settings-row" style="border:none">
+            <div class="settings-row settings-row--last">
               <div class="settings-row-left">
                 <h4>${I18N.t('st.danger.logout.title')}</h4>
                 <p>${I18N.t('st.danger.logout.desc')}</p>
@@ -429,9 +504,9 @@ const SettingsView = (() => {
       { keys: ["Alt", "F"], desc: I18N.t('st.sc.panel') },
     ];
     return rows.map((r, i) => `
-      <div class="settings-row${i === rows.length - 1 ? ' style="border:none"' : ''}">
+      <div class="settings-row${i === rows.length - 1 ? ' settings-row--last' : ''}">
         <div class="settings-row-left">
-          <h4 style="font-weight:500">${r.desc}</h4>
+          <h4>${r.desc}</h4>
         </div>
         <div class="st-kbd-group">
           ${r.keys.map(k => `<kbd class="st-kbd">${k}</kbd>`).join('<span class="st-kbd-sep">+</span>')}
@@ -496,6 +571,13 @@ const SettingsView = (() => {
       <path d="M5 6h6M5 8.5h4M5 11h2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
     </svg>`;
   }
+  function icoMarket() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <path d="M1 6l2-4h10l2 4M1 6h14M1 6v8h14V6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M6 10v4M10 10v4M6 6v4M10 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>`;
+  }
+
   function icoSync() {
     return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <path d="M2.5 8a5.5 5.5 0 019.5-3.5M13.5 8a5.5 5.5 0 01-9.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
@@ -542,6 +624,22 @@ const SettingsView = (() => {
     // Flipcheck field toggles → auto-save
     ["#sFcShipIn", "#sFcShipOut", "#sFcPackaging", "#sFcAdRate"].forEach(sel => {
       container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+    });
+
+    // Marketplace options → auto-save + toggle interval visibility
+    ["#sEbayKeepInStock", "#sKlKeepInStock"].forEach(sel => {
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+    });
+    ["#sEbayRelistInterval", "#sKlRelistInterval"].forEach(sel => {
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+    });
+    container.querySelector("#sEbayAutoRelist")?.addEventListener("change", (e) => {
+      container.querySelector("#sEbayRelistIntervalWrap")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
+      scheduleSave(container);
+    });
+    container.querySelector("#sKlAutoRelist")?.addEventListener("change", (e) => {
+      container.querySelector("#sKlRelistIntervalWrap")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
+      scheduleSave(container);
     });
 
     // Price history vacuum
@@ -611,7 +709,7 @@ const SettingsView = (() => {
         }
         if (connBtn) {
           if (syncStatus.connected) {
-            connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>`;
+            connBtn.innerHTML = `<span class="badge badge-connected">● Verbunden</span>`;
           } else {
             connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnEbayConnect">Verbinden</button>`;
             connBtn.querySelector("#btnEbayConnect")?.addEventListener("click", async () => {
@@ -689,8 +787,8 @@ const SettingsView = (() => {
         }
         if (connBtn) {
           if (klStatus.connected) {
-            connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>
-              <button class="btn btn-secondary btn-sm" id="btnKlDisconnect" style="margin-left:8px;font-size:11px">Trennen</button>`;
+            connBtn.innerHTML = `<span class="badge badge-connected">● Verbunden</span>
+              <button class="btn btn-secondary btn-sm ml-8 text-xs" id="btnKlDisconnect">Trennen</button>`;
             if (credsForm) credsForm.style.display = "none";
             connBtn.querySelector("#btnKlDisconnect")?.addEventListener("click", async () => {
               await window.fc.kauflandDeleteCreds();
@@ -745,7 +843,7 @@ const SettingsView = (() => {
           const connBtn    = container.querySelector("#klSyncConnBtn");
           const credsForm  = container.querySelector("#klCredsForm");
           if (connStatus) { connStatus.textContent = "Verbunden mit Kaufland Seller API"; connStatus.style.color = "var(--green)"; }
-          if (connBtn) connBtn.innerHTML = `<span class="badge" style="background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3);padding:4px 10px;border-radius:20px;font-size:11px">● Verbunden</span>`;
+          if (connBtn) connBtn.innerHTML = `<span class="badge badge-connected">● Verbunden</span>`;
           if (credsForm) credsForm.style.display = "none";
         } else {
           Toast.error("Verbindung fehlgeschlagen", result?.error || "Client Key oder Secret Key ungültig.");
@@ -923,7 +1021,7 @@ const SettingsView = (() => {
       const name = claims.discord_username || claims.sub || "";
       if (!name) {
         profileSection.innerHTML = `
-          <div class="settings-row" style="border:none">
+          <div class="settings-row settings-row--last">
             <div class="settings-row-left">
               <h4>${I18N.t('st.profile.not_logged.title')}</h4>
               <p>${I18N.t('st.profile.not_logged.sub')}</p>

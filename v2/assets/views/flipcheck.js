@@ -666,13 +666,13 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" class="fc-ext-link">
             🛒 ${I18N.t('fc.action.ebay_sales')} ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
             💰 Geizhals ↗
           </a>
         </div>
@@ -846,10 +846,10 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(ean)}" target="_blank" rel="noopener" class="fc-ext-link">
             💰 Geizhals ↗
           </a>
         </div>
@@ -956,11 +956,11 @@ const FlipcheckView = (() => {
 
         <!-- ── Break-Even + Net Payout ── -->
         <div class="grid-2-md mb-16">
-          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
+          <div class="fc-detail-tile">
             <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">${I18N.t('fc.kpi.break_even')}</div>
             <div class="font-semibold" style="font-size:15px;font-variant-numeric:tabular-nums">${breakEven != null ? fmtEur(breakEven) : "—"}</div>
           </div>
-          <div style="background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--r);padding:10px 14px">
+          <div class="fc-detail-tile">
             <div class="text-xs text-muted mb-4" style="text-transform:uppercase;letter-spacing:.05em;font-weight:600">${I18N.t('fc.kpi.net_payout')}</div>
             <div class="font-semibold ${netPayout != null && netPayout > 0 ? "text-green" : ""}" style="font-size:15px;font-variant-numeric:tabular-nums">${netPayout != null ? fmtEur(netPayout) : "—"}</div>
           </div>
@@ -972,10 +972,10 @@ const FlipcheckView = (() => {
         <!-- ── Kostenstruktur Accordion ── -->
         <details class="fc-accordion">
           <summary>
-            <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.cost_structure.amz')}</span>
+            <span class="text-xs text-muted font-semibold uppercase">${I18N.t('fc.cost_structure.amz')}</span>
             ${_CHEV}
           </summary>
-          <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+          <div class="fc-result-card">
             ${_brkRow("Buy Box (brutto)", buyBox != null ? fmtEur(buyBox) : "—", "")}
             ${isVatAmz && sellNet != null ? _brkRow("Netto Erlös (÷1.19)", fmtEur(sellNet), "text-muted") : ""}
             ${buyBox30 ? _brkRow("Ø 30T Buy Box", fmtEur(buyBox30), "text-muted") : ""}
@@ -1011,13 +1011,13 @@ const FlipcheckView = (() => {
           <button class="btn btn-ghost btn-sm" id="btnReset">${I18N.t('fc.action.reset')}</button>
         </div>
         <div class="row mt-8" style="gap:6px;flex-wrap:wrap">
-          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.ebay.de/sch/i.html?_nkw=${encodeURIComponent(data.title || ean)}&LH_Sold=1&LH_Complete=1" target="_blank" rel="noopener" class="fc-ext-link">
             🛒 eBay Verkäufe ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://www.idealo.de/preisvergleich/MainSearchProductCategory.html?q=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" class="fc-ext-link">
             🏷 Idealo ↗
           </a>
-          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" style="font-size:11px;opacity:0.75">
+          <a class="btn btn-ghost btn-sm" href="https://geizhals.de/?fs=${encodeURIComponent(data.ean||identifier)}" target="_blank" rel="noopener" class="fc-ext-link">
             💰 Geizhals ↗
           </a>
         </div>
@@ -1100,10 +1100,10 @@ const FlipcheckView = (() => {
     return `
     <details class="fc-accordion" open>
       <summary>
-        <span class="text-xs text-muted font-semibold" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.signals.title')}${warnBadge}</span>
+        <span class="text-xs text-muted font-semibold uppercase">${I18N.t('fc.signals.title')}${warnBadge}</span>
         ${_CHEV}
       </summary>
-      <div style="background:var(--bg-base);border:1px solid var(--border);border-radius:var(--r);overflow:hidden">
+      <div class="fc-result-card">
         ${_sigRow(I18N.t('fc.signals.buybox'),
             signals.buybox_is_amazon ? I18N.t('fc.signals.buybox_amazon') : I18N.t('fc.signals.buybox_third'),
             signals.buybox_is_amazon ? "red" : "green",
@@ -1281,7 +1281,7 @@ const FlipcheckView = (() => {
         <div class="row-between mb-12">
           <div class="row gap-8" style="align-items:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 9,10 15,3" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.price_history')} — ${periodLabel}</span>
+            <span class="text-xs font-semibold text-secondary uppercase">${I18N.t('fc.chart.price_history')} — ${periodLabel}</span>
           </div>
           <div class="row gap-12" style="align-items:center">
             <span class="text-xs text-muted">Min: <strong style="color:var(--green)">${fmtEur(minPrice)}</strong></span>
@@ -1414,7 +1414,7 @@ const FlipcheckView = (() => {
         <div class="row-between mb-12">
           <div class="row gap-8" style="align-items:center">
             <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,5 9,9 15,2" stroke="#F59E0B" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            <span class="text-xs font-semibold text-secondary" style="text-transform:uppercase;letter-spacing:.06em">${I18N.t('fc.chart.bsr_history')} — Letzte ${bsrDays} Tage (Keepa)</span>
+            <span class="text-xs font-semibold text-secondary uppercase">${I18N.t('fc.chart.bsr_history')} — Letzte ${bsrDays} Tage (Keepa)</span>
           </div>
           <div class="row gap-12" style="align-items:center">
             <span class="text-xs text-muted">Best: <strong style="color:var(--green)">#${Number(minR).toLocaleString("de-DE")}</strong></span>

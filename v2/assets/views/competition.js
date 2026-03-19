@@ -174,8 +174,8 @@ const CompetitionView = (() => {
     return `
       <div class="comp-left" id="sellerLeft">
         <div class="comp-add-wrap">
-          <input class="input" id="sellerInput" placeholder="eBay Username…" style="flex:1;min-width:0"/>
-          <button class="btn btn-primary btn-sm" id="btnAddSeller" style="white-space:nowrap">${I18N.t('comp.seller.add')}</button>
+          <input class="input" id="sellerInput" placeholder="eBay Username…" class="flex-1"/>
+          <button class="btn btn-primary btn-sm" id="btnAddSeller" class="nowrap">${I18N.t('comp.seller.add')}</button>
         </div>
         <div id="sellerList" class="comp-list"></div>
       </div>
@@ -195,7 +195,7 @@ const CompetitionView = (() => {
       return `
         <div class="comp-list-item ${_sellerSelected === s.username ? "active" : ""}" data-seller="${esc(s.username)}">
           <div class="comp-avatar ${avatarCls}">${(s.username[0] || "?").toUpperCase()}</div>
-          <div style="flex:1;min-width:0">
+          <div class="flex-1">
             <div class="comp-item-name">@${esc(s.username)}</div>
             <div class="text-xs text-muted">
               ${sub}${s.last_checked ? ` · vor ${timeSince(s.last_checked)}` : ""}
@@ -316,9 +316,9 @@ const CompetitionView = (() => {
           </div>
         </td>
         <td class="text-right font-bold" style="font-variant-numeric:tabular-nums;white-space:nowrap">${fmtEur(it.price)}</td>
-        <td class="text-muted text-sm text-right" style="white-space:nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : "—"}</td>
+        <td class="text-muted text-sm text-right nowrap">${it.shipping != null ? `+${fmtEur(it.shipping)}` : "—"}</td>
         <td><span class="badge badge-muted" style="font-size:10px;white-space:nowrap">${esc(it.condition || "—")}</span></td>
-        <td style="text-align:right">${it.item_url ? `<a href="${esc(it.item_url)}" class="btn btn-ghost btn-sm" target="_blank" style="padding:2px 8px;font-size:10px">eBay →</a>` : ""}</td>
+        <td class="text-right">${it.item_url ? `<a href="${esc(it.item_url)}" class="btn btn-ghost btn-sm" target="_blank" style="padding:2px 8px;font-size:10px">eBay →</a>` : ""}</td>
       </tr>`;
     }).join("");
 
@@ -385,7 +385,7 @@ const CompetitionView = (() => {
           const statusHtml = cache ? renderInvStatusChip(item, cache) : "";
           return `
             <div class="comp-list-item ${_invSelected?.id === item.id ? "active" : ""}" data-inv="${esc(item.id)}">
-              <div style="flex:1;min-width:0">
+              <div class="flex-1">
                 <div class="comp-item-name" style="font-size:12px">${esc((item.title || item.ean || "—").slice(0, 38))}</div>
                 <div class="text-xs text-muted">${esc(item.ean || I18N.t('comp.inv.no_ean'))}</div>
                 ${statusHtml}
@@ -493,7 +493,7 @@ const CompetitionView = (() => {
           const statusHtml = cache ? renderInvStatusChip(item, cache) : "";
           return `
             <div class="comp-list-item ${_invSelected?.id === item.id ? "active" : ""}" data-inv="${esc(item.id)}">
-              <div style="flex:1;min-width:0">
+              <div class="flex-1">
                 <div class="comp-item-name" style="font-size:12px">${esc((item.title || item.ean || "—").slice(0, 38))}</div>
                 <div class="text-xs text-muted">${esc(item.ean || I18N.t('comp.inv.no_ean'))}</div>
                 ${statusHtml}
@@ -638,7 +638,7 @@ const CompetitionView = (() => {
               ? `<span class="text-muted"> ${parseFloat(it.seller_pct).toFixed(1)}%</span>`
               : it.seller_feedback == null ? `<span class="text-muted">—</span>` : ""}
           </td>
-          <td style="text-align:right">${it.item_url ? `<a href="${esc(it.item_url)}" class="btn btn-ghost btn-sm" target="_blank" style="padding:2px 8px;font-size:10px">eBay →</a>` : ""}</td>
+          <td class="text-right">${it.item_url ? `<a href="${esc(it.item_url)}" class="btn btn-ghost btn-sm" target="_blank" style="padding:2px 8px;font-size:10px">eBay →</a>` : ""}</td>
         </tr>
       `;
     }).join("");
@@ -746,8 +746,8 @@ const CompetitionView = (() => {
               <input class="input" id="whUrlInput" type="text"
                 placeholder="https://discord.com/api/webhooks/…"
                 value="${urlVal}" autocomplete="off" spellcheck="false"/>
-              <button class="btn btn-primary btn-sm" id="btnSaveWh" style="white-space:nowrap">${I18N.t('comp.wh.save_btn')}</button>
-              <button class="btn btn-secondary btn-sm" id="btnTestWh" style="white-space:nowrap" ${hasUrl ? "" : "disabled"}>
+              <button class="btn btn-primary btn-sm" id="btnSaveWh" class="nowrap">${I18N.t('comp.wh.save_btn')}</button>
+              <button class="btn btn-secondary btn-sm" id="btnTestWh" class="nowrap" ${hasUrl ? "" : "disabled"}>
                 <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
                   <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                 </svg>

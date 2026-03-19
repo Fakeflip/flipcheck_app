@@ -203,7 +203,7 @@ const RepricerView = (() => {
     const updated = _items.filter(i => i.status === "UPDATED" || i.status === "RAISED").length;
     const lastRun = _status?.lastRun ? fmtAgo(_status.lastRun) : "—";
     const statsBar = `
-      <div style="padding:8px 12px;display:flex;gap:16px;border-bottom:1px solid var(--border);background:var(--bg-panel)">
+      <div class="repr-stat-bar">
         <span class="text-xs text-muted"><span class="font-semibold text-primary">${_items.length}</span> Gesamt</span>
         <span class="text-xs text-muted"><span class="font-semibold" style="color:var(--green)">${active}</span> Aktiv</span>
         <span class="text-xs text-muted"><span class="font-semibold" style="color:#818cf8">${updated}</span> Angepasst</span>
@@ -254,20 +254,20 @@ const RepricerView = (() => {
 
   function _renderStatusChip(item) {
     const s = item.status;
-    if (!s || s === "PENDING") return `<span class="badge badge-muted" style="font-size:10px">—</span>`;
+    if (!s || s === "PENDING") return `<span class="badge badge-muted badge--xs">—</span>`;
     if (s === "UPDATED") {
       const diff = item.last_price != null && item.old_price != null ? item.last_price - item.old_price : null;
-      return `<span class="badge badge-success" style="font-size:10px">↓ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
+      return `<span class="badge badge-success badge--xs">↓ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
     }
     if (s === "RAISED") {
       const diff = item.last_price != null && item.old_price != null ? item.last_price - item.old_price : null;
-      return `<span class="badge" style="font-size:10px;background:rgba(99,102,241,.18);color:#818cf8">↑ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
+      return `<span class="badge badge-raised">↑ ${diff != null ? Math.abs(diff).toFixed(2)+"€" : "OK"}</span>`;
     }
-    if (s === "AT_FLOOR") return `<span class="badge badge-warning" style="font-size:10px">🔒 Floor</span>`;
-    if (s === "HOLD")     return `<span class="badge badge-muted"    style="font-size:10px">= Halten</span>`;
-    if (s === "EBAY_FAILED") return `<span class="badge badge-danger" style="font-size:10px">✗ Fehler</span>`;
-    if (s === "NO_EBAY_ID")  return `<span class="badge badge-warning" style="font-size:10px">⚠ Keine ID</span>`;
-    return `<span class="badge badge-muted" style="font-size:10px">${s}</span>`;
+    if (s === "AT_FLOOR") return `<span class="badge badge-warning badge--xs">🔒 Floor</span>`;
+    if (s === "HOLD")     return `<span class="badge badge-muted badge--xs">= Halten</span>`;
+    if (s === "EBAY_FAILED") return `<span class="badge badge-danger badge--xs">✗ Fehler</span>`;
+    if (s === "NO_EBAY_ID")  return `<span class="badge badge-warning badge--xs">⚠ Keine ID</span>`;
+    return `<span class="badge badge-muted badge--xs">${s}</span>`;
   }
 
   function _renderDetail(item) {
@@ -293,6 +293,9 @@ const RepricerView = (() => {
     const commercialOnly    = rule.commercial_only          ?? repricer.global_commercial_only          ?? false;
     const commercialMinFb   = rule.commercial_min_feedback  ?? repricer.global_commercial_min_feedback  ?? 10;
     const ebayCategory      = rule.ebay_category            ?? repricer.global_ebay_category            ?? "sonstiges";
+    const keepInStock       = rule.keep_in_stock            ?? repricer.global_keep_in_stock            ?? false;
+    const autoRelist        = rule.auto_relist              ?? repricer.global_auto_relist              ?? false;
+    const relistInterval    = rule.relist_interval_days     ?? repricer.global_relist_interval_days     ?? 14;
     const isEnabled         = item.enabled !== false;
     const itemLog           = _log.filter(e => e.ean === item.ean || e.sku === item.sku).slice(0, 15);
     const invMatch          = _inventory.find(i => (item.ean && i.ean === item.ean) || (item.sku && i.sku === item.sku));
@@ -311,19 +314,19 @@ const RepricerView = (() => {
 
     // Banners
     const noEanBanner = !item.ean ? `
-      <div style="padding:8px 16px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);display:flex;gap:8px;align-items:flex-start">
-        <span style="font-size:12px;flex-shrink:0;margin-top:1px">⚠️</span>
-        <span class="text-xs" style="color:#fbbf24;line-height:1.4">Keine EAN — Konkurrenzsuche nicht möglich. EAN im Inventar ergänzen.</span>
+      <div class="repr-alert repr-alert--warn">
+        <span class="repr-alert-icon">⚠️</span>
+        <span class="text-xs repr-alert-text">Keine EAN — Konkurrenzsuche nicht möglich. EAN im Inventar ergänzen.</span>
       </div>` : "";
     const errorBanner = item.status === "EBAY_FAILED" && item.ebay_error ? `
-      <div style="padding:8px 16px;background:rgba(239,68,68,.08);border-bottom:1px solid rgba(239,68,68,.2);display:flex;gap:8px;align-items:flex-start">
-        <span style="font-size:12px;flex-shrink:0;margin-top:1px">❌</span>
-        <span class="text-xs" style="color:#f87171;line-height:1.4">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 160))}</span>
+      <div class="repr-alert repr-alert--error">
+        <span class="repr-alert-icon">❌</span>
+        <span class="text-xs repr-alert-text">eBay-Fehler: ${_esc(String(item.ebay_error).slice(0, 160))}</span>
       </div>` :
       item.status === "NO_EBAY_ID" ? `
-      <div style="padding:8px 16px;background:rgba(245,158,11,.08);border-bottom:1px solid rgba(245,158,11,.2);display:flex;gap:8px;align-items:flex-start">
-        <span style="font-size:12px;flex-shrink:0;margin-top:1px">⚠️</span>
-        <span class="text-xs" style="color:#fbbf24;line-height:1.4">Keine eBay-Item-ID — klicke <strong>Listings sync</strong> oder trage die eBay-ID manuell ein.</span>
+      <div class="repr-alert repr-alert--warn">
+        <span class="repr-alert-icon">⚠️</span>
+        <span class="text-xs repr-alert-text">Keine eBay-Item-ID — klicke <strong>Listings sync</strong> oder trage die eBay-ID manuell ein.</span>
       </div>` : "";
 
     // Price comparison color
@@ -446,6 +449,35 @@ const RepricerView = (() => {
             <label class="text-xs text-muted">eBay-Kategorie</label>
             <select id="ruleEbayCategory" class="input-sm">${categoryOpts}</select>
           </div>
+
+          <div style="height:1px;background:var(--border);margin:0 -12px"></div>
+
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">Auf Lager halten</label>
+            <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input type="checkbox" id="ruleKeepInStock" ${keepInStock ? "checked" : ""}>
+              <span class="text-xs">Listing aktiv halten bei Bestand 0</span>
+            </label>
+          </div>
+
+          <div style="display:grid;grid-template-columns:100px 1fr;gap:8px;align-items:center">
+            <label class="text-xs text-muted">Wiedereinstellen</label>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+              <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                <input type="checkbox" id="ruleAutoRelist" ${autoRelist ? "checked" : ""}>
+                <span class="text-xs">Auto-Relist</span>
+              </label>
+              <div id="ruleRelistIntervalRow" style="${autoRelist ? "" : "opacity:.35;pointer-events:none;"}display:flex;align-items:center;gap:4px">
+                <span class="text-xs text-muted">alle</span>
+                <select id="ruleRelistInterval" class="input-sm" style="width:72px">
+                  <option value="7" ${relistInterval==7 ? "selected" : ""}>7 T.</option>
+                  <option value="14" ${relistInterval==14 ? "selected" : ""}>14 T.</option>
+                  <option value="21" ${relistInterval==21 ? "selected" : ""}>21 T.</option>
+                  <option value="30" ${relistInterval==30 ? "selected" : ""}>30 T.</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div style="display:flex;gap:8px;margin-top:10px">
@@ -529,6 +561,11 @@ const RepricerView = (() => {
     });
     marginInp?.addEventListener("input", updateFloor);
     catSel?.addEventListener("change", updateFloor);
+    const relistCheck = el.querySelector("#ruleAutoRelist");
+    const relistRow   = el.querySelector("#ruleRelistIntervalRow");
+    relistCheck?.addEventListener("change", () => {
+      if (relistRow) { relistRow.style.opacity = relistCheck.checked ? "1" : ".35"; relistRow.style.pointerEvents = relistCheck.checked ? "" : "none"; }
+    });
 
     el.querySelector("#btnSaveRule")?.addEventListener("click", () => _saveRule(item));
     el.querySelector("#btnRemoveItem")?.addEventListener("click", () => _removeItem(item));
@@ -633,6 +670,9 @@ const RepricerView = (() => {
     const commFb         = parseInt(el.querySelector("#ruleCommFb")?.value     || "10");
     const minMargin      = parseFloat(el.querySelector("#ruleMinMargin")?.value || "15");
     const ebayCategory   = el.querySelector("#ruleEbayCategory")?.value        || "sonstiges";
+    const keepInStock    = el.querySelector("#ruleKeepInStock")?.checked       ?? false;
+    const autoRelist     = el.querySelector("#ruleAutoRelist")?.checked        ?? false;
+    const relistInterval = parseInt(el.querySelector("#ruleRelistInterval")?.value || "14");
     await Storage.repricerUpdate(item.sku, {
       rule: {
         price_strategy:          strategy,
@@ -641,6 +681,9 @@ const RepricerView = (() => {
         commercial_min_feedback: commFb,
         min_margin_pct:          minMargin,
         ebay_category:           ebayCategory,
+        keep_in_stock:           keepInStock,
+        auto_relist:             autoRelist,
+        relist_interval_days:    relistInterval,
       }
     });
     await _refreshData();
@@ -773,68 +816,68 @@ const RepricerView = (() => {
     const commOnly = repricer.global_commercial_only ?? false;
 
     const bodyHtml = `
-      <div style="display:flex;flex-direction:column;gap:16px">
+      <div class="repr-settings">
 
         <div>
-          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Ausführung</label>
-          <div class="row gap-8" style="align-items:center">
+          <label class="text-xs font-semibold text-secondary repr-settings-label">Ausführung</label>
+          <div class="row gap-8">
             <label class="text-xs text-muted">Intervall</label>
             <input type="number" id="reprIntervalMin" class="input-sm" value="${repricer.interval_min || 30}" min="10" max="1440" style="width:80px">
             <span class="text-xs text-muted">Minuten (min. 10)</span>
           </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--border)">
+        <hr>
 
         <div>
-          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Repricing-Strategie (Global)</label>
-          <div style="display:flex;flex-direction:column;gap:12px">
+          <label class="text-xs font-semibold text-secondary repr-settings-label repr-settings-label--lg">Repricing-Strategie (Global)</label>
+          <div class="col gap-12">
 
-            <div class="row gap-12" style="align-items:center">
-              <label class="text-xs text-muted" style="min-width:110px">Preis-Strategie</label>
+            <div class="row gap-12">
+              <label class="text-xs text-muted repr-field-label">Preis-Strategie</label>
               <select id="reprGlobalStrategy" class="input-sm" style="min-width:200px">${strategyOpts}</select>
             </div>
 
-            <div id="settRaiseRow" style="padding:10px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
-              <div class="text-xs font-semibold text-secondary" style="margin-bottom:6px">Wenn du der günstigste bist (nur bei Rang 1):</div>
-              <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-                <input type="checkbox" id="reprGlobalRaiseWhenCheapest" ${repricer.global_raise_when_cheapest !== false ? "checked" : ""} style="margin-top:2px">
+            <div id="settRaiseRow" class="repr-settings-card">
+              <div class="text-xs font-semibold text-secondary mb-8">Wenn du der günstigste bist (nur bei Rang 1):</div>
+              <label class="repr-check-label">
+                <input type="checkbox" id="reprGlobalRaiseWhenCheapest" ${repricer.global_raise_when_cheapest !== false ? "checked" : ""}>
                 <div>
                   <div class="text-xs">Preis auf 2. Günstigsten anheben</div>
-                  <div class="text-xs text-muted" style="margin-top:2px">Verhindert, dass du den Marktpreis nach unten ziehst.</div>
+                  <div class="text-xs text-muted mt-2">Verhindert, dass du den Marktpreis nach unten ziehst.</div>
                 </div>
               </label>
             </div>
 
-            <div class="row gap-12" style="align-items:center">
-              <label class="text-xs text-muted" style="min-width:110px">Mindest-Marge</label>
-              <div style="display:flex;align-items:center;gap:4px">
+            <div class="row gap-12">
+              <label class="text-xs text-muted repr-field-label">Mindest-Marge</label>
+              <div class="row gap-4">
                 <input type="number" id="reprGlobalMargin" class="input-sm" value="${repricer.global_min_margin_pct ?? 15}" min="0" max="200" step="1" style="width:64px">
                 <span class="text-xs text-muted">%  (Floor = (EK × (1+Marge%) + Versand) ÷ (1 − eBay-Fee%)</span>
               </div>
             </div>
 
-            <div class="row gap-12" style="align-items:center">
-              <label class="text-xs text-muted" style="min-width:110px">eBay-Kategorie</label>
+            <div class="row gap-12">
+              <label class="text-xs text-muted repr-field-label">eBay-Kategorie</label>
               <select id="reprGlobalCategory" class="input-sm" style="min-width:200px">${globalCatOpts}</select>
             </div>
 
           </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--border)">
+        <hr>
 
         <div>
-          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:10px;text-transform:uppercase;letter-spacing:.06em">Gewerblich-Filter (Global)</label>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer">
-              <input type="checkbox" id="reprGlobalCommOnly" ${commOnly ? "checked" : ""} style="margin-top:2px">
+          <label class="text-xs font-semibold text-secondary repr-settings-label repr-settings-label--lg">Gewerblich-Filter (Global)</label>
+          <div class="col gap-8">
+            <label class="repr-check-label">
+              <input type="checkbox" id="reprGlobalCommOnly" ${commOnly ? "checked" : ""}>
               <div>
                 <div class="text-xs">Nur gewerbliche Verkäufer berücksichtigen</div>
-                <div class="text-xs text-muted" style="margin-top:2px">Filtert Privatverkäufer mit wenig Feedback heraus.</div>
+                <div class="text-xs text-muted mt-2">Filtert Privatverkäufer mit wenig Feedback heraus.</div>
               </div>
             </label>
-            <div id="settCommFbRow" style="${commOnly ? "" : "opacity:.4;pointer-events:none"}display:flex;align-items:center;gap:8px;padding-left:24px">
+            <div id="settCommFbRow" class="interval-wrap${commOnly ? "" : " interval-wrap--disabled"}" style="padding-left:24px">
               <label class="text-xs text-muted">Min. Feedback-Punkte</label>
               <input type="number" id="reprGlobalCommFb" class="input-sm" value="${repricer.global_commercial_min_feedback ?? 10}" min="1" max="9999" style="width:72px">
               <span class="text-xs text-muted">(Verkäufer darunter werden ignoriert)</span>
@@ -842,56 +885,89 @@ const RepricerView = (() => {
           </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--border)">
+        <hr>
 
         <div>
-          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:8px;text-transform:uppercase;letter-spacing:.06em">Discord-Benachrichtigungen</label>
-          <div style="display:flex;flex-direction:column;gap:8px">
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <label class="text-xs font-semibold text-secondary repr-settings-label repr-settings-label--lg">Listing-Verhalten (Global)</label>
+          <div class="col gap-8">
+            <label class="repr-check-label">
+              <input type="checkbox" id="reprGlobalKeepInStock" ${(repricer.global_keep_in_stock) ? "checked" : ""}>
+              <div>
+                <div class="text-xs">Immer auf Lager (Out-of-Stock)</div>
+                <div class="text-xs text-muted mt-2">Listings bleiben aktiv, auch wenn Bestand = 0.</div>
+              </div>
+            </label>
+            <div class="row gap-8">
+              <label class="repr-check-label">
+                <input type="checkbox" id="reprGlobalAutoRelist" ${(repricer.global_auto_relist) ? "checked" : ""}>
+                <div>
+                  <div class="text-xs">Auto-Wiedereinstellen</div>
+                  <div class="text-xs text-muted mt-2">Beendete Listings automatisch neu einstellen.</div>
+                </div>
+              </label>
+              <div id="settRelistIntervalRow" class="interval-wrap ml-8${(repricer.global_auto_relist) ? "" : " interval-wrap--disabled"}">
+                <span class="text-xs text-muted">alle</span>
+                <select id="reprGlobalRelistInterval" class="input-sm" style="width:80px">
+                  <option value="7" ${(repricer.global_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
+                  <option value="14" ${(repricer.global_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
+                  <option value="21" ${(repricer.global_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
+                  <option value="30" ${(repricer.global_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr>
+
+        <div>
+          <label class="text-xs font-semibold text-secondary repr-settings-label">Discord-Benachrichtigungen</label>
+          <div class="col gap-8">
+            <label class="repr-check-label repr-check-label--inline">
               <input type="checkbox" id="reprWebhookRepriced" ${repricer.webhook_repriced !== false ? "checked" : ""}>
               <span class="text-xs">Bei Preisanpassung (gesenkt oder angehoben)</span>
             </label>
-            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <label class="repr-check-label repr-check-label--inline">
               <input type="checkbox" id="reprWebhookFloor" ${repricer.webhook_floor !== false ? "checked" : ""}>
               <span class="text-xs">Wenn Mindestpreis erreicht (🔒 Floor)</span>
             </label>
           </div>
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--border)">
+        <hr>
 
-        <div style="padding:12px;background:var(--bg-panel);border:1px solid var(--border);border-radius:6px">
+        <div class="repr-settings-card repr-settings-card--lg">
           ${_connected
-            ? `<div style="display:flex;justify-content:space-between;align-items:center">
-                 <p class="text-xs" style="color:var(--green)">● eBay-Konto verbunden${_status?.is_legacy ? " <span style=\"color:#818cf8\">(Team-Token)</span>" : ""}</p>
-                 <button class="btn btn-ghost btn-xs" id="btnConnectEbaySettings" style="color:var(--text-muted)">Neu verbinden</button>
+            ? `<div class="row-between">
+                 <p class="text-xs text-green">● eBay-Konto verbunden${_status?.is_legacy ? ' <span class="text-accent">(Team-Token)</span>' : ""}</p>
+                 <button class="btn btn-ghost btn-xs text-muted" id="btnConnectEbaySettings">Neu verbinden</button>
                </div>`
-            : `<p class="text-xs text-muted" style="margin-bottom:8px">eBay-Konto nicht verbunden — Preisaktualisierungen + Listing-Sync nicht möglich.</p>
+            : `<p class="text-xs text-muted mb-8">eBay-Konto nicht verbunden — Preisaktualisierungen + Listing-Sync nicht möglich.</p>
                <button class="btn btn-primary btn-sm" id="btnConnectEbaySettings">Mit eBay verbinden →</button>`
           }
         </div>
 
-        <hr style="border:none;border-top:1px solid var(--border)">
+        <hr>
 
         <div>
-          <label class="text-xs font-semibold text-secondary" style="display:block;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em">
+          <label class="text-xs font-semibold text-secondary repr-settings-label">
             Team-Zugang / Sub-Account
           </label>
-          <p class="text-xs text-muted" style="margin-bottom:10px;line-height:1.5">
+          <p class="text-xs text-muted mb-8" style="line-height:1.5">
             Falls du als Mitverkäufer arbeitest: Legacy Auth'n'Auth Token des <strong>Hauptkontos</strong> eingeben.<br>
             Zu finden unter: <em>Mein eBay → Konto → API-Zugriff → Auth'n'Auth Token</em>
           </p>
           ${_status?.is_legacy
-            ? `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-                 <span class="badge" style="background:rgba(99,102,241,.18);color:#818cf8;font-size:10px">● Team-Token aktiv</span>
-                 <button class="btn btn-ghost btn-xs" id="btnRemoveLegacyToken" style="color:#f87171">Token entfernen</button>
+            ? `<div class="row gap-8 mb-8">
+                 <span class="badge badge-raised badge--xs">● Team-Token aktiv</span>
+                 <button class="btn btn-ghost btn-xs text-red" id="btnRemoveLegacyToken">Token entfernen</button>
                </div>`
             : ""
           }
-          <div style="display:flex;gap:8px;align-items:flex-start">
+          <div class="row gap-8" style="align-items:flex-start">
             <textarea id="reprLegacyToken" class="input-sm" placeholder="AgAAAA... (optional)" rows="2"
               style="flex:1;font-size:10px;font-family:monospace;resize:vertical;min-height:36px"></textarea>
-            <button class="btn btn-secondary btn-sm" id="btnSaveLegacyToken" style="flex-shrink:0;margin-top:1px">Speichern</button>
+            <button class="btn btn-secondary btn-sm" id="btnSaveLegacyToken" style="flex-shrink:0">Speichern</button>
           </div>
         </div>
 
@@ -914,6 +990,9 @@ const RepricerView = (() => {
             global_min_margin_pct:           parseFloat(document.getElementById("reprGlobalMargin")?.value   || "15"),
             global_commercial_only:          document.getElementById("reprGlobalCommOnly")?.checked           ?? false,
             global_commercial_min_feedback:  parseInt(document.getElementById("reprGlobalCommFb")?.value      || "10"),
+            global_keep_in_stock:            document.getElementById("reprGlobalKeepInStock")?.checked          ?? false,
+            global_auto_relist:              document.getElementById("reprGlobalAutoRelist")?.checked           ?? false,
+            global_relist_interval_days:     parseInt(document.getElementById("reprGlobalRelistInterval")?.value || "14"),
             webhook_repriced:                document.getElementById("reprWebhookRepriced")?.checked           ?? true,
             webhook_floor:                   document.getElementById("reprWebhookFloor")?.checked              ?? true,
           };
@@ -937,7 +1016,10 @@ const RepricerView = (() => {
       if (raiseRowEl) { raiseRowEl.style.opacity = dim ? ".4" : "1"; raiseRowEl.style.pointerEvents = dim ? "none" : ""; }
     });
     commOnlyEl?.addEventListener("change", () => {
-      if (commFbRowEl) { commFbRowEl.style.opacity = commOnlyEl.checked ? "1" : ".4"; commFbRowEl.style.pointerEvents = commOnlyEl.checked ? "" : "none"; }
+      commFbRowEl?.classList.toggle("interval-wrap--disabled", !commOnlyEl.checked);
+    });
+    document.getElementById("reprGlobalAutoRelist")?.addEventListener("change", (e) => {
+      document.getElementById("settRelistIntervalRow")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
     });
     document.getElementById("btnConnectEbaySettings")?.addEventListener("click", () => {
       Modal.close();
