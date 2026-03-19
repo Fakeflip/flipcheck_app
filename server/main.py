@@ -5,9 +5,10 @@ import time
 import hmac
 import hashlib
 import secrets
+import base64
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import json
 import httpx
@@ -1495,3 +1496,165 @@ async def settings_patch(body: SettingsPatch, user=Depends(require_auth)):
         if r.status_code >= 400:
             raise HTTPException(status_code=r.status_code, detail=r.text)
     return {"data": merged}
+
+
+# =========================================================
+# KAUFLAND SELLER API PROXY
+# =========================================================
+KAUFLAND_API_BASE = "https://sellerapi.kaufland.com/v2"
+KAUFLAND_STOREFRONT = "de"
+
+
+def _parse_kaufland_creds(request: Request) -> dict:
+    """Decode base64-encoded Kaufland credentials from X-Kaufland-Credentials header."""
+    raw = request.headers.get("X-Kaufland-Credentials", "")
+    if not raw:
+        return {}
+    try:
+        return json.loads(base64.b64decode(raw).decode("utf-8"))
+    except Exception:
+        return {}
+
+
+def _kaufland_sign(method: str, url: str, body: str, timestamp: int, secret_key: str) -> str:
+    """Generate HMAC-SHA256 signature for Kaufland Seller API."""
+    plain = "\n".join([method, url, body, str(timestamp)])
+    return hmac.new(secret_key.encode("utf-8"), plain.encode("utf-8"), hashlib.sha256).hexdigest()
+
+
+def _kaufland_headers(method: str, url: str, body: str, client_key: str, secret_key: str) -> dict:
+    """Build all required Kaufland API headers."""
+    ts = int(time.time())
+    sig = _kaufland_sign(method, url, body, ts, secret_key)
+    return {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Shop-Client-Key": client_key,
+        "Shop-Timestamp": str(ts),
+        "Shop-Signature": sig,
+        "User-Agent": "Flipcheck/1.0",
+    }
+
+
+@app.get("/kaufland/auth/status")
+async def kaufland_auth_status(request: Request, _user=Depends(require_auth)):
+    """Verify Kaufland credentials by calling the info endpoint."""
+    creds = _parse_kaufland_creds(request)
+    ck = creds.get("client_key", "")
+    sk = creds.get("secret_key", "")
+    if not ck or not sk:
+        return {"connected": False, "error": "No credentials provided"}
+    url = f"{KAUFLAND_API_BASE}/info"
+    headers = _kaufland_headers("GET", url, "", ck, sk)
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            r = await client.get(url, headers=headers)
+        if r.status_code == 200:
+            return {"connected": True}
+        return {"connected": False, "error": f"Kaufland API returned {r.status_code}"}
+    except Exception as e:
+        return {"connected": False, "error": str(e)}
+
+
+@app.get("/kaufland/listings/active")
+async def kaufland_listings_active(
+    request: Request,
+    page: int = 1,
+    per_page: int = 200,
+    _user=Depends(require_auth),
+):
+    """Fetch active units from Kaufland Seller API."""
+    creds = _parse_kaufland_creds(request)
+    ck, sk = creds.get("client_key", ""), creds.get("secret_key", "")
+    if not ck or not sk:
+        return {"ok": False, "error": "No credentials"}
+
+    limit = min(per_page, 200)
+    offset = (page - 1) * limit
+    url = f"{KAUFLAND_API_BASE}/units?storefront={KAUFLAND_STOREFRONT}&status=active&limit={limit}&offset={offset}&embedded=product"
+    headers = _kaufland_headers("GET", url, "", ck, sk)
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(url, headers=headers)
+        if r.status_code != 200:
+            return {"ok": False, "error": f"Kaufland API {r.status_code}", "items": []}
+        data = r.json()
+        pagination = data.get("pagination", {})
+        raw_items = data.get("data", [])
+        items = []
+        for u in raw_items:
+            product = u.get("product") or {}
+            eans = product.get("eans", [])
+            items.append({
+                "item_id": str(u.get("id_unit", "")),
+                "ean": eans[0] if eans else product.get("ean", ""),
+                "title": product.get("title", ""),
+                "price": (u.get("price", 0) or 0) / 100,  # cents → EUR
+                "quantity": u.get("amount", 1),
+                "kaufland_product_id": str(product.get("id_product", "")),
+                "condition": u.get("condition", ""),
+            })
+        total = pagination.get("total", len(items))
+        total_pages = max(1, -(-total // limit))  # ceil div
+        return {"ok": True, "items": items, "total": total, "total_pages": total_pages, "page": page}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "items": []}
+
+
+@app.get("/kaufland/listings/sold")
+async def kaufland_listings_sold(
+    request: Request,
+    page: int = 1,
+    per_page: int = 200,
+    days: int = 30,
+    _user=Depends(require_auth),
+):
+    """Fetch sold order units from Kaufland Seller API."""
+    creds = _parse_kaufland_creds(request)
+    ck, sk = creds.get("client_key", ""), creds.get("secret_key", "")
+    if not ck or not sk:
+        return {"ok": False, "error": "No credentials"}
+
+    limit = min(per_page, 100)  # Kaufland order-units max 100
+    offset = (page - 1) * limit
+    since = (datetime.utcnow() - timedelta(days=days)).strftime("%Y-%m-%dT00:00:00Z")
+    url = (
+        f"{KAUFLAND_API_BASE}/order-units"
+        f"?storefront={KAUFLAND_STOREFRONT}"
+        f"&status=sent,received,returned"
+        f"&ts_created_from_iso={since}"
+        f"&sort=ts_created:desc"
+        f"&limit={limit}&offset={offset}"
+    )
+    headers = _kaufland_headers("GET", url, "", ck, sk)
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as client:
+            r = await client.get(url, headers=headers)
+        if r.status_code != 200:
+            return {"ok": False, "error": f"Kaufland API {r.status_code}", "items": []}
+        data = r.json()
+        pagination = data.get("pagination", {})
+        raw_items = data.get("data", [])
+        items = []
+        for ou in raw_items:
+            product = ou.get("product") or {}
+            eans = product.get("eans", [])
+            items.append({
+                "order_id": str(ou.get("id_order", "")),
+                "order_unit_id": str(ou.get("id_order_unit", "")),
+                "item_id": str(ou.get("id_unit", "")),
+                "ean": eans[0] if eans else product.get("ean", ""),
+                "title": product.get("title", ""),
+                "price": (ou.get("price", 0) or 0) / 100,
+                "quantity": ou.get("quantity", 1),
+                "status": ou.get("status", ""),
+                "sold_at": ou.get("ts_created", ""),
+                "kaufland_product_id": str(product.get("id_product", "")),
+            })
+        total = pagination.get("total", len(items))
+        total_pages = max(1, -(-total // limit))
+        return {"ok": True, "items": items, "total": total, "total_pages": total_pages, "page": page}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "items": []}
