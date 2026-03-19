@@ -82,7 +82,7 @@ const AnalyticsView = (() => {
 
     const stats     = Storage.calcInventoryAnalytics(items);
     const soldItems = items.filter(i => (i.status === "SOLD" || i.status === "RETURN") && i.sell_price && i.ek);
-    const extra     = calcExtra(soldItems, stats);
+    const extra     = calcExtra(soldItems, items);
 
     container.innerHTML = renderView(stats, extra, items.length);
 
@@ -98,7 +98,7 @@ const AnalyticsView = (() => {
   function unmount() { destroyCharts(); _period = "weekly"; }
 
   // ── Extra metrics (win rate, avg margin, MoM trend, market profit) ────────
-  function calcExtra(soldItems) {
+  function calcExtra(soldItems, allItems) {
     const _rp = i => calcRealProfit(i) ?? 0;
 
     const winCount  = soldItems.filter(i => _rp(i) > 0).length;
@@ -144,7 +144,10 @@ const AnalyticsView = (() => {
     const returnCount = soldItems.filter(i => i.status === "RETURN").length;
     const returnRate  = soldItems.length > 0 ? Math.round(returnCount / soldItems.length * 100) : 0;
 
-    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit, totalRevenue, returnCount, returnRate };
+    // Pending shipments (sold but not yet shipped)
+    const pendingShipments = (allItems || []).filter(i => i.status === "SOLD" && !i.shipped).length;
+
+    return { winCount, winRate, avgMargin, profitTrend, thisProfit, prevProfit, marketProfit, totalRevenue, returnCount, returnRate, pendingShipments };
   }
 
   // ── Period data builders ──────────────────────────────────────────────────
@@ -391,6 +394,23 @@ const AnalyticsView = (() => {
           <div class="kpi-value">${s.avgDaysToCash > 0 ? fmtDays(s.avgDaysToCash) : "—"}</div>
           <div class="kpi-meta"><span>${I18N.t('an.kpi.purchase_sale')}</span></div>
         </div>
+
+        <!-- Versand ausstehend -->
+        ${extra.pendingShipments > 0 ? `
+        <div class="kpi-card an-kpi-card${extra.pendingShipments > 3 ? " an-kpi-orange" : ""}">
+          <div class="an-kpi-top">
+            <div class="kpi-label">Versand ausstehend</div>
+            <div class="an-kpi-ico an-kpi-ico--orange">
+              <svg width="10" height="10" viewBox="0 0 16 16" fill="none">
+                <path d="M1 3h9v8H1zM10 6h3l2 3v3h-5V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+                <circle cx="4" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/>
+                <circle cx="12.5" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/>
+              </svg>
+            </div>
+          </div>
+          <div class="kpi-value text-orange">${extra.pendingShipments}</div>
+          <div class="kpi-meta"><span>Artikel warten auf Versand</span></div>
+        </div>` : ""}
 
         <!-- Return Rate -->
         ${extra.returnCount > 0 ? `

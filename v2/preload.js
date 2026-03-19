@@ -381,6 +381,15 @@ contextBridge.exposeInMainWorld("fc", {
   kauflandDeleteCreds: () => ipcRenderer.invoke("kaufland:deleteCreds"),
   kauflandCredsStatus: () => ipcRenderer.invoke("kaufland:credsStatus"),
 
+  // ── DHL Shipping ───────────────────────────────────────────────────────
+  dhlSaveCreds:    (creds) => ipcRenderer.invoke("dhl:saveCreds", creds),
+  dhlDeleteCreds:  () => ipcRenderer.invoke("dhl:deleteCreds"),
+  dhlStatus:       () => ipcRenderer.invoke("dhl:status"),
+  dhlCreateLabel:  (data) => ipcRenderer.invoke("dhl:createLabel", data),
+
+  // ── eBay Shipment ─────────────────────────────────────────────────────
+  ebayCompleteSale: (data) => ipcRenderer.invoke("ebay:completeSale", data),
+
   // Error reporter webhook URL (loaded from env, not hardcoded)
   errorWebhookUrl: () => ipcRenderer.invoke("errorWebhookUrl"),
 });

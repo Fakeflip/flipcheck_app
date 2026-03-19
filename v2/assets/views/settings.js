@@ -1,11 +1,13 @@
-/* Flipcheck v2 — Settings View (SaaS) */
+/* Flipcheck v2 — Settings View (SaaS) — Tabbed Layout */
 const SettingsView = (() => {
   let _container = null;
   let _saveTimer = null;
+  let _activeTab = "general";
 
   async function mount(container) {
     _container = container;
     const settings = await Storage.getSettings().catch(() => ({}));
+    _activeTab = settings._lastSettingsTab || "general";
     container.innerHTML = renderView(settings);
     attachEvents(container, settings);
     loadProfile(container);
@@ -33,6 +35,7 @@ const SettingsView = (() => {
 
   function collectSettings(container) {
     return {
+      _lastSettingsTab: _activeTab,
       analytics: {
         weekly_profit_target: parseFloat(container.querySelector("#sWeeklyTarget")?.value) || 0,
       },
@@ -60,7 +63,28 @@ const SettingsView = (() => {
         kaufland_auto_relist:          !!container.querySelector("#sKlAutoRelist")?.checked,
         kaufland_relist_interval_days: parseInt(container.querySelector("#sKlRelistInterval")?.value || "14"),
       },
+      shipping: {
+        carrier:        container.querySelector("#sShipCarrier")?.value || "dhl",
+        sender_name:    container.querySelector("#sShipSenderName")?.value?.trim() || "",
+        sender_street:  container.querySelector("#sShipSenderStreet")?.value?.trim() || "",
+        sender_zip:     container.querySelector("#sShipSenderZip")?.value?.trim() || "",
+        sender_city:    container.querySelector("#sShipSenderCity")?.value?.trim() || "",
+        sender_country: container.querySelector("#sShipSenderCountry")?.value || "DE",
+        default_weight: parseFloat(container.querySelector("#sShipDefaultWeight")?.value) || 1.0,
+        default_product: container.querySelector("#sShipProduct")?.value || "V01PAK",
+      },
     };
+  }
+
+  // ─── Tab switching ────────────────────────────────────────────────────────
+  function switchTab(container, tabId) {
+    _activeTab = tabId;
+    container.querySelectorAll(".st-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabId));
+    container.querySelectorAll(".st-tab-panel").forEach(p => {
+      p.style.display = p.dataset.tab === tabId ? "" : "none";
+    });
+    // Persist last tab
+    Storage.saveSettings({ _lastSettingsTab: tabId }).catch(() => {});
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -75,6 +99,15 @@ const SettingsView = (() => {
     const fcShipOut     = ff.ship_out  !== false;
     const fcPackaging   = ff.packaging === true;
     const fcAdRate      = ff.ad_rate   === true;
+    const ship          = s?.shipping || {};
+
+    const tabs = [
+      { id: "general",      label: "Allgemein",    icon: icoUser() },
+      { id: "calculation",  label: "Berechnung",   icon: icoCalc() },
+      { id: "marketplaces", label: "Marktplätze",  icon: icoMarket() },
+      { id: "shipping",     label: "Versand",      icon: icoTruck() },
+      { id: "system",       label: "System",       icon: icoApp() },
+    ];
 
     return `
       <div class="page-header">
@@ -87,395 +120,558 @@ const SettingsView = (() => {
         </div>
       </div>
 
+      <div class="st-tabs" id="stTabs">
+        ${tabs.map(t => `
+          <button class="st-tab${t.id === _activeTab ? ' active' : ''}" data-tab="${t.id}">
+            ${t.icon}
+            <span>${t.label}</span>
+          </button>
+        `).join("")}
+      </div>
+
       <div class="st-wrapper">
 
-        <!-- ── Konto ──────────────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.account'), icoUser(), I18N.t('st.section.account.desc'))}
-          <div class="panel st-panel" id="profileSection">
-            <div class="settings-row settings-row--last st-profile-row">
-              <div class="skeleton st-avatar-skel"></div>
-              <div class="col gap-8" style="flex:1">
-                <div class="skeleton" style="width:150px;height:14px"></div>
-                <div class="skeleton" style="width:110px;height:11px"></div>
-              </div>
-              <div class="skeleton st-badge-skel"></div>
-            </div>
-          </div>
-        </div>
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <!-- TAB: Allgemein                                                      -->
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <div class="st-tab-panel" data-tab="general" style="${_activeTab !== 'general' ? 'display:none' : ''}">
 
-        <!-- ── Sprache ────────────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.lang'), icoGlobe(), I18N.t('st.section.lang.desc'))}
-          <div class="panel st-panel">
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.section.lang')}</h4>
-                <p>${I18N.t('st.section.lang.desc')}</p>
-              </div>
-              <div id="stLangSelector">
-                ${I18N.renderSelector(I18N.getLang())}
+          <!-- Konto -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.account'), icoUser(), I18N.t('st.section.account.desc'))}
+            <div class="panel st-panel" id="profileSection">
+              <div class="settings-row settings-row--last st-profile-row">
+                <div class="skeleton st-avatar-skel"></div>
+                <div class="col gap-8" style="flex:1">
+                  <div class="skeleton" style="width:150px;height:14px"></div>
+                  <div class="skeleton" style="width:110px;height:11px"></div>
+                </div>
+                <div class="skeleton st-badge-skel"></div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- ── Design ────────────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader("Design", icoPalette(), "Farbschema der App")}
-          <div class="panel st-panel">
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>Theme</h4>
-                <p>Dark oder Light Mode</p>
-              </div>
-              <div class="seg" id="sThemeSeg">
-                <button class="seg-btn ${(s?.theme || "dark") === "dark"   ? "active" : ""}" data-val="dark">Dark</button>
-                <button class="seg-btn ${(s?.theme || "dark") === "light"  ? "active" : ""}" data-val="light">Light</button>
-                <button class="seg-btn ${(s?.theme || "dark") === "system" ? "active" : ""}" data-val="system">System</button>
+          <!-- Sprache -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.lang'), icoGlobe(), I18N.t('st.section.lang.desc'))}
+            <div class="panel st-panel">
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.section.lang')}</h4>
+                  <p>${I18N.t('st.section.lang.desc')}</p>
+                </div>
+                <div id="stLangSelector">
+                  ${I18N.renderSelector(I18N.getLang())}
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        <!-- ── Berechnungen ───────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.calc'), icoCalc(), I18N.t('st.section.calc.desc'))}
-          <div class="panel st-panel">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.vat.title')}</h4>
-                <p>${I18N.t('st.vat.desc')}</p>
-              </div>
-              <select id="sVatMode" class="select select--xl">
-                <option value="no_vat" ${vat === "no_vat" ? "selected" : ""}>${I18N.t('st.vat.small')}</option>
-                <option value="ust_19" ${vat === "ust_19" ? "selected" : ""}>${I18N.t('st.vat.regular')}</option>
-              </select>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.ek.title')}</h4>
-                <p>${I18N.t('st.ek.desc')}</p>
-              </div>
-              <div class="seg" id="sEkModeSeg">
-                <button class="seg-btn ${ekMode === "gross" ? "active" : ""}" data-val="gross">${I18N.t('st.ek.gross')}</button>
-                <button class="seg-btn ${ekMode === "net"   ? "active" : ""}" data-val="net">${I18N.t('st.ek.net')}</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.market.title')}</h4>
-                <p>${I18N.t('st.market.desc')}</p>
-              </div>
-              <select id="sDefaultMarket" class="select select--lg">
-                <option value="ebay"     ${defaultMarket === "ebay"     ? "selected" : ""}>eBay</option>
-                <option value="amazon"   ${defaultMarket === "amazon"   ? "selected" : ""}>Amazon</option>
-                <option value="kaufland" ${defaultMarket === "kaufland" ? "selected" : ""}>Kaufland</option>
-              </select>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.mode.title')}</h4>
-                <p>${I18N.t('st.mode.desc')}</p>
-              </div>
-              <div class="seg" id="sModeSeg">
-                <button class="seg-btn ${defaultMode === "low"  ? "active" : ""}" data-val="low">LOW</button>
-                <button class="seg-btn ${defaultMode === "mid"  ? "active" : ""}" data-val="mid">MID</button>
-                <button class="seg-btn ${defaultMode === "high" ? "active" : ""}" data-val="high">HIGH</button>
+          <!-- Design -->
+          <div class="st-section">
+            ${sectionHeader("Design", icoPalette(), "Farbschema der App")}
+            <div class="panel st-panel">
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Theme</h4>
+                  <p>Dark oder Light Mode</p>
+                </div>
+                <div class="seg" id="sThemeSeg">
+                  <button class="seg-btn ${(s?.theme || "dark") === "dark"   ? "active" : ""}" data-val="dark">Dark</button>
+                  <button class="seg-btn ${(s?.theme || "dark") === "light"  ? "active" : ""}" data-val="light">Light</button>
+                  <button class="seg-btn ${(s?.theme || "dark") === "system" ? "active" : ""}" data-val="system">System</button>
+                </div>
               </div>
             </div>
           </div>
+
         </div>
 
-        <!-- ── Flipcheck Felder ─────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.fc_fields'), icoForm(), I18N.t('st.section.fc_fields.desc'))}
-          <div class="panel st-panel">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.fc_field.ship_in')}</h4>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sFcShipIn" ${fcShipIn ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.fc_field.ship_out')}</h4>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sFcShipOut" ${fcShipOut ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.fc_field.packaging')}</h4>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sFcPackaging" ${fcPackaging ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.fc_field.ad_rate')}</h4>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sFcAdRate" ${fcAdRate ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-          </div>
-        </div>
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <!-- TAB: Berechnung                                                     -->
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <div class="st-tab-panel" data-tab="calculation" style="${_activeTab !== 'calculation' ? 'display:none' : ''}">
 
-        <!-- ── Analytics ──────────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.analytics'), icoChart(), I18N.t('st.section.analytics.desc'))}
-          <div class="panel st-panel">
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.profit.title')}</h4>
-                <p>${I18N.t('st.profit.desc')}</p>
-              </div>
-              <div class="input-prefix-wrap input--sm">
-                <span class="prefix">€</span>
-                <input id="sWeeklyTarget" class="input st-input-currency" type="number" min="0" step="10"
-                  value="${esc(String(profit))}" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── eBay Seller Sync ─────────────────────────────────────────── -->
-        <div class="st-section" id="ebaySyncSection">
-          ${sectionHeader("eBay Seller Sync", icoSync(), "Automatischer Import von Listings & Verkäufen")}
-          <div class="panel st-panel" id="ebaySyncPanel">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>eBay-Konto</h4>
-                <p id="ebaySyncConnStatus" style="margin-top:2px">Lade…</p>
-              </div>
-              <div id="ebaySyncConnBtn"></div>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Auto-Sync</h4>
-                <p>Inventar automatisch mit eBay synchronisieren</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sEbaySyncEnabled" checked /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Sync-Intervall</h4>
-                <p>Wie oft neue Daten von eBay geholt werden</p>
-              </div>
-              <select id="sEbaySyncInterval" class="select select--md">
-                <option value="15">Alle 15 Min</option>
-                <option value="30" selected>Alle 30 Min</option>
-                <option value="60">Stündlich</option>
-                <option value="360">Alle 6 Std</option>
-              </select>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Neue Listings importieren</h4>
-                <p>eBay-Listings ohne Inventar-Eintrag automatisch anlegen</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sEbaySyncAutoCreate" checked /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>Letzter Sync</h4>
-                <p id="ebaySyncLastInfo" style="margin-top:2px">—</p>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="btnEbaySyncNow">Jetzt synchronisieren</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Kaufland Seller Sync ────────────────────────────────────────── -->
-        <div class="st-section" id="kauflandSyncSection">
-          ${sectionHeader("Kaufland Seller Sync", icoSync(), "Automatischer Import von Kaufland-Listings & Bestellungen")}
-          <div class="panel st-panel" id="kauflandSyncPanel">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Kaufland-Konto</h4>
-                <p id="klSyncConnStatus" style="margin-top:2px">Lade…</p>
-              </div>
-              <div id="klSyncConnBtn"></div>
-            </div>
-            <div id="klCredsForm" style="display:none">
+          <!-- Berechnungen -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.calc'), icoCalc(), I18N.t('st.section.calc.desc'))}
+            <div class="panel st-panel">
               <div class="settings-row">
                 <div class="settings-row-left">
-                  <h4>Client Key</h4>
-                  <p>Aus dem Kaufland Seller Portal</p>
+                  <h4>${I18N.t('st.vat.title')}</h4>
+                  <p>${I18N.t('st.vat.desc')}</p>
                 </div>
-                <input type="text" id="sKlClientKey" class="input input--md" placeholder="Client Key" />
+                <select id="sVatMode" class="select select--xl">
+                  <option value="no_vat" ${vat === "no_vat" ? "selected" : ""}>${I18N.t('st.vat.small')}</option>
+                  <option value="ust_19" ${vat === "ust_19" ? "selected" : ""}>${I18N.t('st.vat.regular')}</option>
+                </select>
               </div>
               <div class="settings-row">
                 <div class="settings-row-left">
-                  <h4>Secret Key</h4>
-                  <p>Geheimer API-Schlüssel</p>
+                  <h4>${I18N.t('st.ek.title')}</h4>
+                  <p>${I18N.t('st.ek.desc')}</p>
                 </div>
-                <input type="password" id="sKlSecretKey" class="input input--md" placeholder="Secret Key" />
+                <div class="seg" id="sEkModeSeg">
+                  <button class="seg-btn ${ekMode === "gross" ? "active" : ""}" data-val="gross">${I18N.t('st.ek.gross')}</button>
+                  <button class="seg-btn ${ekMode === "net"   ? "active" : ""}" data-val="net">${I18N.t('st.ek.net')}</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.market.title')}</h4>
+                  <p>${I18N.t('st.market.desc')}</p>
+                </div>
+                <select id="sDefaultMarket" class="select select--lg">
+                  <option value="ebay"     ${defaultMarket === "ebay"     ? "selected" : ""}>eBay</option>
+                  <option value="amazon"   ${defaultMarket === "amazon"   ? "selected" : ""}>Amazon</option>
+                  <option value="kaufland" ${defaultMarket === "kaufland" ? "selected" : ""}>Kaufland</option>
+                </select>
               </div>
               <div class="settings-row settings-row--last">
-                <div class="settings-row-left"></div>
-                <button class="btn btn-primary btn-sm" id="btnKlConnect">Verbinden</button>
-              </div>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Auto-Sync</h4>
-                <p>Inventar automatisch mit Kaufland synchronisieren</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sKlSyncEnabled" checked /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Sync-Intervall</h4>
-                <p>Wie oft neue Daten von Kaufland geholt werden</p>
-              </div>
-              <select id="sKlSyncInterval" class="select select--md">
-                <option value="15">Alle 15 Min</option>
-                <option value="30" selected>Alle 30 Min</option>
-                <option value="60">Stündlich</option>
-                <option value="360">Alle 6 Std</option>
-              </select>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Neue Listings importieren</h4>
-                <p>Kaufland-Units ohne Inventar-Eintrag automatisch anlegen</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sKlSyncAutoCreate" checked /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>Letzter Sync</h4>
-                <p id="klSyncLastInfo" style="margin-top:2px">—</p>
-              </div>
-              <button class="btn btn-secondary btn-sm" id="btnKlSyncNow">Jetzt synchronisieren</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- ── Marktplatz-Optionen ────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader("Marktplatz-Optionen", icoMarket(), "Listing-Verhalten für eBay & Kaufland steuern")}
-          <div class="panel st-panel">
-
-            <div class="st-sub-header">
-              <div class="st-sub-label">eBay</div>
-            </div>
-
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Immer auf Lager (Out-of-Stock)</h4>
-                <p>Listings bleiben aktiv, auch wenn Bestand = 0. eBay zeigt "Vorübergehend nicht verfügbar" statt das Angebot zu beenden.</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sEbayKeepInStock" ${(s?.marketplace?.ebay_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>Auto-Wiedereinstellen</h4>
-                <p>Beendete/abgelaufene Listings automatisch neu einstellen</p>
-              </div>
-              <div class="row gap-12">
-                <label class="toggle"><input type="checkbox" id="sEbayAutoRelist" ${(s?.marketplace?.ebay_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
-                <div id="sEbayRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.ebay_auto_relist) ? "" : " interval-wrap--disabled"}">
-                  <span class="text-xs text-muted">alle</span>
-                  <select id="sEbayRelistInterval" class="select select--sm">
-                    <option value="7" ${(s?.marketplace?.ebay_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
-                    <option value="14" ${(s?.marketplace?.ebay_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
-                    <option value="21" ${(s?.marketplace?.ebay_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
-                    <option value="30" ${(s?.marketplace?.ebay_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
-                  </select>
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.mode.title')}</h4>
+                  <p>${I18N.t('st.mode.desc')}</p>
+                </div>
+                <div class="seg" id="sModeSeg">
+                  <button class="seg-btn ${defaultMode === "low"  ? "active" : ""}" data-val="low">LOW</button>
+                  <button class="seg-btn ${defaultMode === "mid"  ? "active" : ""}" data-val="mid">MID</button>
+                  <button class="seg-btn ${defaultMode === "high" ? "active" : ""}" data-val="high">HIGH</button>
                 </div>
               </div>
             </div>
+          </div>
 
-            <div class="st-sub-header">
-              <div class="st-sub-label">Kaufland</div>
+          <!-- Flipcheck Felder -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.fc_fields'), icoForm(), I18N.t('st.section.fc_fields.desc'))}
+            <div class="panel st-panel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.fc_field.ship_in')}</h4>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sFcShipIn" ${fcShipIn ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.fc_field.ship_out')}</h4>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sFcShipOut" ${fcShipOut ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.fc_field.packaging')}</h4>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sFcPackaging" ${fcPackaging ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.fc_field.ad_rate')}</h4>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sFcAdRate" ${fcAdRate ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
             </div>
+          </div>
 
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>Immer auf Lager (Out-of-Stock)</h4>
-                <p>Units bleiben aktiv, auch wenn Bestand = 0. Kaufland zeigt das Angebot weiterhin an.</p>
-              </div>
-              <label class="toggle"><input type="checkbox" id="sKlKeepInStock" ${(s?.marketplace?.kaufland_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>Auto-Wiedereinstellen</h4>
-                <p>Inaktive Units automatisch reaktivieren</p>
-              </div>
-              <div class="row gap-12">
-                <label class="toggle"><input type="checkbox" id="sKlAutoRelist" ${(s?.marketplace?.kaufland_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
-                <div id="sKlRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.kaufland_auto_relist) ? "" : " interval-wrap--disabled"}">
-                  <span class="text-xs text-muted">alle</span>
-                  <select id="sKlRelistInterval" class="select select--sm">
-                    <option value="7" ${(s?.marketplace?.kaufland_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
-                    <option value="14" ${(s?.marketplace?.kaufland_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
-                    <option value="21" ${(s?.marketplace?.kaufland_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
-                    <option value="30" ${(s?.marketplace?.kaufland_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
-                  </select>
+          <!-- Analytics -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.analytics'), icoChart(), I18N.t('st.section.analytics.desc'))}
+            <div class="panel st-panel">
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.profit.title')}</h4>
+                  <p>${I18N.t('st.profit.desc')}</p>
+                </div>
+                <div class="input-prefix-wrap input--sm">
+                  <span class="prefix">€</span>
+                  <input id="sWeeklyTarget" class="input st-input-currency" type="number" min="0" step="10"
+                    value="${esc(String(profit))}" />
                 </div>
               </div>
             </div>
-
           </div>
+
         </div>
 
-        <!-- ── Shortcuts ──────────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.shortcuts'), icoKeyboard(), I18N.t('st.section.shortcuts.desc'))}
-          <div class="panel st-panel">
-            ${renderShortcuts()}
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <!-- TAB: Marktplätze                                                    -->
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <div class="st-tab-panel" data-tab="marketplaces" style="${_activeTab !== 'marketplaces' ? 'display:none' : ''}">
+
+          <!-- eBay Seller Sync -->
+          <div class="st-section" id="ebaySyncSection">
+            ${sectionHeader("eBay Seller Sync", icoSync(), "Automatischer Import von Listings & Verkäufen")}
+            <div class="panel st-panel" id="ebaySyncPanel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>eBay-Konto</h4>
+                  <p id="ebaySyncConnStatus" style="margin-top:2px">Lade…</p>
+                </div>
+                <div id="ebaySyncConnBtn"></div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Auto-Sync</h4>
+                  <p>Inventar automatisch mit eBay synchronisieren</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sEbaySyncEnabled" checked /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Sync-Intervall</h4>
+                  <p>Wie oft neue Daten von eBay geholt werden</p>
+                </div>
+                <select id="sEbaySyncInterval" class="select select--md">
+                  <option value="15">Alle 15 Min</option>
+                  <option value="30" selected>Alle 30 Min</option>
+                  <option value="60">Stündlich</option>
+                  <option value="360">Alle 6 Std</option>
+                </select>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Neue Listings importieren</h4>
+                  <p>eBay-Listings ohne Inventar-Eintrag automatisch anlegen</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sEbaySyncAutoCreate" checked /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Letzter Sync</h4>
+                  <p id="ebaySyncLastInfo" style="margin-top:2px">—</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btnEbaySyncNow">Jetzt synchronisieren</button>
+              </div>
+            </div>
           </div>
+
+          <!-- Kaufland Seller Sync -->
+          <div class="st-section" id="kauflandSyncSection">
+            ${sectionHeader("Kaufland Seller Sync", icoSync(), "Automatischer Import von Kaufland-Listings & Bestellungen")}
+            <div class="panel st-panel" id="kauflandSyncPanel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Kaufland-Konto</h4>
+                  <p id="klSyncConnStatus" style="margin-top:2px">Lade…</p>
+                </div>
+                <div id="klSyncConnBtn"></div>
+              </div>
+              <div id="klCredsForm" style="display:none">
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>Client Key</h4>
+                    <p>Aus dem Kaufland Seller Portal</p>
+                  </div>
+                  <input type="text" id="sKlClientKey" class="input input--md" placeholder="Client Key" />
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>Secret Key</h4>
+                    <p>Geheimer API-Schlüssel</p>
+                  </div>
+                  <input type="password" id="sKlSecretKey" class="input input--md" placeholder="Secret Key" />
+                </div>
+                <div class="settings-row settings-row--last">
+                  <div class="settings-row-left"></div>
+                  <button class="btn btn-primary btn-sm" id="btnKlConnect">Verbinden</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Auto-Sync</h4>
+                  <p>Inventar automatisch mit Kaufland synchronisieren</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sKlSyncEnabled" checked /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Sync-Intervall</h4>
+                  <p>Wie oft neue Daten von Kaufland geholt werden</p>
+                </div>
+                <select id="sKlSyncInterval" class="select select--md">
+                  <option value="15">Alle 15 Min</option>
+                  <option value="30" selected>Alle 30 Min</option>
+                  <option value="60">Stündlich</option>
+                  <option value="360">Alle 6 Std</option>
+                </select>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Neue Listings importieren</h4>
+                  <p>Kaufland-Units ohne Inventar-Eintrag automatisch anlegen</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sKlSyncAutoCreate" checked /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Letzter Sync</h4>
+                  <p id="klSyncLastInfo" style="margin-top:2px">—</p>
+                </div>
+                <button class="btn btn-secondary btn-sm" id="btnKlSyncNow">Jetzt synchronisieren</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Marktplatz-Optionen -->
+          <div class="st-section">
+            ${sectionHeader("Marktplatz-Optionen", icoMarket(), "Listing-Verhalten für eBay & Kaufland steuern")}
+            <div class="panel st-panel">
+
+              <div class="st-sub-header">
+                <div class="st-sub-label">eBay</div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Immer auf Lager (Out-of-Stock)</h4>
+                  <p>Listings bleiben aktiv, auch wenn Bestand = 0. eBay zeigt "Vorübergehend nicht verfügbar" statt das Angebot zu beenden.</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sEbayKeepInStock" ${(s?.marketplace?.ebay_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Auto-Wiedereinstellen</h4>
+                  <p>Beendete/abgelaufene Listings automatisch neu einstellen</p>
+                </div>
+                <div class="row gap-12">
+                  <label class="toggle"><input type="checkbox" id="sEbayAutoRelist" ${(s?.marketplace?.ebay_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+                  <div id="sEbayRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.ebay_auto_relist) ? "" : " interval-wrap--disabled"}">
+                    <span class="text-xs text-muted">alle</span>
+                    <select id="sEbayRelistInterval" class="select select--sm">
+                      <option value="7" ${(s?.marketplace?.ebay_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
+                      <option value="14" ${(s?.marketplace?.ebay_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
+                      <option value="21" ${(s?.marketplace?.ebay_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
+                      <option value="30" ${(s?.marketplace?.ebay_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              <div class="st-sub-header">
+                <div class="st-sub-label">Kaufland</div>
+              </div>
+
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Immer auf Lager (Out-of-Stock)</h4>
+                  <p>Units bleiben aktiv, auch wenn Bestand = 0. Kaufland zeigt das Angebot weiterhin an.</p>
+                </div>
+                <label class="toggle"><input type="checkbox" id="sKlKeepInStock" ${(s?.marketplace?.kaufland_keep_in_stock) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Auto-Wiedereinstellen</h4>
+                  <p>Inaktive Units automatisch reaktivieren</p>
+                </div>
+                <div class="row gap-12">
+                  <label class="toggle"><input type="checkbox" id="sKlAutoRelist" ${(s?.marketplace?.kaufland_auto_relist) ? "checked" : ""} /><span class="toggle-slider"></span></label>
+                  <div id="sKlRelistIntervalWrap" class="interval-wrap${(s?.marketplace?.kaufland_auto_relist) ? "" : " interval-wrap--disabled"}">
+                    <span class="text-xs text-muted">alle</span>
+                    <select id="sKlRelistInterval" class="select select--sm">
+                      <option value="7" ${(s?.marketplace?.kaufland_relist_interval_days||14)==7 ? "selected" : ""}>7 Tage</option>
+                      <option value="14" ${(s?.marketplace?.kaufland_relist_interval_days||14)==14 ? "selected" : ""}>14 Tage</option>
+                      <option value="21" ${(s?.marketplace?.kaufland_relist_interval_days||14)==21 ? "selected" : ""}>21 Tage</option>
+                      <option value="30" ${(s?.marketplace?.kaufland_relist_interval_days||14)==30 ? "selected" : ""}>30 Tage</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </div>
+
         </div>
 
-        <!-- ── App & Updates ──────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.app'), icoApp(), I18N.t('st.section.app.desc'))}
-          <div class="panel st-panel">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.version.title')}</h4>
-                <p id="settingsVersion" style="font-family:var(--font-mono,monospace);font-size:11px;margin-top:2px">Lade…</p>
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <!-- TAB: Versand                                                        -->
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <div class="st-tab-panel" data-tab="shipping" style="${_activeTab !== 'shipping' ? 'display:none' : ''}">
+
+          <!-- DHL API-Verbindung -->
+          <div class="st-section" id="shippingSection">
+            ${sectionHeader("DHL Versand", icoTruck(), "Versandlabels direkt aus dem Inventory erstellen")}
+            <div class="panel st-panel" id="shippingPanel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>DHL-Konto</h4>
+                  <p id="dhlConnStatus" style="margin-top:2px">Lade…</p>
+                </div>
+                <div id="dhlConnBtn"></div>
               </div>
-              <div id="updaterStatus" style="font-size:11px;color:var(--text-muted);text-align:right"></div>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.update.title')}</h4>
-                <p>${I18N.t('st.update.desc')}</p>
-              </div>
-              <div class="row gap-8">
-                <button class="btn btn-secondary btn-sm" id="btnCheckUpdates">${I18N.t('st.update.check')}</button>
-                <button class="btn btn-primary btn-sm" id="btnInstallUpdate" style="display:none">${I18N.t('st.update.install')}</button>
+              <div id="dhlCredsForm" style="display:none">
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>API Key</h4>
+                    <p>Aus dem <a href="https://developer.dhl.com" target="_blank" rel="noopener" class="text-accent">DHL Developer Portal</a></p>
+                  </div>
+                  <input type="text" id="sDhlApiKey" class="input input--md" placeholder="dhl-api-key" />
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>Geschäftskunden-Nr.</h4>
+                    <p>EKP-Nummer (10-stellig)</p>
+                  </div>
+                  <input type="text" id="sDhlEkp" class="input input--sm" placeholder="2222222222" maxlength="10" />
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>Benutzername</h4>
+                    <p>GKP Web-Service Benutzername</p>
+                  </div>
+                  <input type="text" id="sDhlUser" class="input input--md" placeholder="user-123" />
+                </div>
+                <div class="settings-row">
+                  <div class="settings-row-left">
+                    <h4>Passwort</h4>
+                    <p>GKP Web-Service Passwort</p>
+                  </div>
+                  <input type="password" id="sDhlPass" class="input input--md" placeholder="Passwort" />
+                </div>
+                <div class="settings-row settings-row--last">
+                  <div class="settings-row-left"></div>
+                  <button class="btn btn-primary btn-sm" id="btnDhlConnect">Verbinden</button>
+                </div>
               </div>
             </div>
           </div>
+
+          <!-- Absender-Adresse -->
+          <div class="st-section">
+            ${sectionHeader("Absender-Adresse", icoHome(), "Standard-Absender für alle Sendungen")}
+            <div class="panel st-panel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Name / Firma</h4>
+                </div>
+                <input type="text" id="sShipSenderName" class="input input--md" value="${esc(ship.sender_name || "")}" placeholder="Max Mustermann" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Straße + Nr.</h4>
+                </div>
+                <input type="text" id="sShipSenderStreet" class="input input--md" value="${esc(ship.sender_street || "")}" placeholder="Musterstr. 1" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>PLZ</h4>
+                </div>
+                <input type="text" id="sShipSenderZip" class="input input--sm" value="${esc(ship.sender_zip || "")}" placeholder="12345" maxlength="5" />
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Stadt</h4>
+                </div>
+                <input type="text" id="sShipSenderCity" class="input input--md" value="${esc(ship.sender_city || "")}" placeholder="Berlin" />
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Land</h4>
+                </div>
+                <select id="sShipSenderCountry" class="select select--sm">
+                  <option value="DE" ${(ship.sender_country||"DE")==="DE" ? "selected" : ""}>Deutschland</option>
+                  <option value="AT" ${(ship.sender_country)==="AT" ? "selected" : ""}>Österreich</option>
+                  <option value="CH" ${(ship.sender_country)==="CH" ? "selected" : ""}>Schweiz</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- Versand-Defaults -->
+          <div class="st-section">
+            ${sectionHeader("Versand-Optionen", icoPackage(), "Standard-Einstellungen für neue Sendungen")}
+            <div class="panel st-panel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Standard-Gewicht</h4>
+                  <p>Gewicht in kg, wenn nicht am Artikel hinterlegt</p>
+                </div>
+                <div class="input-prefix-wrap input--sm">
+                  <span class="prefix">kg</span>
+                  <input id="sShipDefaultWeight" class="input st-input-currency" type="number" min="0.1" step="0.1"
+                    value="${ship.default_weight || 1.0}" />
+                </div>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Produkt</h4>
+                  <p>DHL-Versandprodukt</p>
+                </div>
+                <select id="sShipProduct" class="select select--xl">
+                  <option value="V01PAK" ${(ship.default_product||"V01PAK")==="V01PAK" ? "selected" : ""}>DHL Paket</option>
+                  <option value="V62WP"  ${(ship.default_product)==="V62WP"  ? "selected" : ""}>DHL Warenpost</option>
+                  <option value="V01PRIO" ${(ship.default_product)==="V01PRIO" ? "selected" : ""}>DHL Paket Prio</option>
+                  <option value="V86PARCEL" ${(ship.default_product)==="V86PARCEL" ? "selected" : ""}>DHL Kleinpaket</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <!-- ── Gefahrenzone ───────────────────────────────────────────────── -->
-        <div class="st-section">
-          ${sectionHeader(I18N.t('st.section.danger'), icoDanger(), I18N.t('st.section.danger.desc'), true)}
-          <div class="panel st-panel st-panel--danger">
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.danger.history.title')}</h4>
-                <p>${I18N.t('st.danger.history.desc')}</p>
-              </div>
-              <button class="btn btn-sm st-btn-danger-outline" id="btnVacuumHistory">${I18N.t('st.danger.history.btn')}</button>
-            </div>
-            <div class="settings-row">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.danger.inventory.title')}</h4>
-                <p>${I18N.t('st.danger.inventory.desc')}</p>
-              </div>
-              <button class="btn btn-danger btn-sm" id="btnClearInventory">${I18N.t('st.danger.inventory.btn')}</button>
-            </div>
-            <div class="settings-row settings-row--last">
-              <div class="settings-row-left">
-                <h4>${I18N.t('st.danger.logout.title')}</h4>
-                <p>${I18N.t('st.danger.logout.desc')}</p>
-              </div>
-              <button class="btn btn-danger btn-sm" id="btnSettingsLogout">${I18N.t('st.danger.logout.btn')}</button>
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <!-- TAB: System                                                         -->
+        <!-- ════════════════════════════════════════════════════════════════════ -->
+        <div class="st-tab-panel" data-tab="system" style="${_activeTab !== 'system' ? 'display:none' : ''}">
+
+          <!-- Shortcuts -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.shortcuts'), icoKeyboard(), I18N.t('st.section.shortcuts.desc'))}
+            <div class="panel st-panel">
+              ${renderShortcuts()}
             </div>
           </div>
+
+          <!-- App & Updates -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.app'), icoApp(), I18N.t('st.section.app.desc'))}
+            <div class="panel st-panel">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.version.title')}</h4>
+                  <p id="settingsVersion" style="font-family:var(--font-mono,monospace);font-size:11px;margin-top:2px">Lade…</p>
+                </div>
+                <div id="updaterStatus" style="font-size:11px;color:var(--text-muted);text-align:right"></div>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.update.title')}</h4>
+                  <p>${I18N.t('st.update.desc')}</p>
+                </div>
+                <div class="row gap-8">
+                  <button class="btn btn-secondary btn-sm" id="btnCheckUpdates">${I18N.t('st.update.check')}</button>
+                  <button class="btn btn-primary btn-sm" id="btnInstallUpdate" style="display:none">${I18N.t('st.update.install')}</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gefahrenzone -->
+          <div class="st-section">
+            ${sectionHeader(I18N.t('st.section.danger'), icoDanger(), I18N.t('st.section.danger.desc'), true)}
+            <div class="panel st-panel st-panel--danger">
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.danger.history.title')}</h4>
+                  <p>${I18N.t('st.danger.history.desc')}</p>
+                </div>
+                <button class="btn btn-sm st-btn-danger-outline" id="btnVacuumHistory">${I18N.t('st.danger.history.btn')}</button>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.danger.inventory.title')}</h4>
+                  <p>${I18N.t('st.danger.inventory.desc')}</p>
+                </div>
+                <button class="btn btn-danger btn-sm" id="btnClearInventory">${I18N.t('st.danger.inventory.btn')}</button>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>${I18N.t('st.danger.logout.title')}</h4>
+                  <p>${I18N.t('st.danger.logout.desc')}</p>
+                </div>
+                <button class="btn btn-danger btn-sm" id="btnSettingsLogout">${I18N.t('st.danger.logout.btn')}</button>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </div>
@@ -577,22 +773,44 @@ const SettingsView = (() => {
       <path d="M6 10v4M10 10v4M6 6v4M10 6v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
     </svg>`;
   }
-
   function icoSync() {
     return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
       <path d="M2.5 8a5.5 5.5 0 019.5-3.5M13.5 8a5.5 5.5 0 01-9.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
       <path d="M12 2v3h-3M4 11v3h3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
   }
+  function icoTruck() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <path d="M1 3h9v8H1zM10 6h3l2 3v3h-5V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      <circle cx="4" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/>
+      <circle cx="12.5" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/>
+    </svg>`;
+  }
+  function icoHome() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <path d="M2 7.5L8 2l6 5.5V14H2V7.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M6 14V9h4v5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>`;
+  }
+  function icoPackage() {
+    return `<svg width="13" height="13" viewBox="0 0 16 16" fill="none">
+      <path d="M2 5l6-3 6 3v6l-6 3-6-3V5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      <path d="M2 5l6 3 6-3M8 8v6.5" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+    </svg>`;
+  }
 
   // ─── Events ────────────────────────────────────────────────────────────────
   function attachEvents(container, settings) {
 
+    // Tab switching
+    container.querySelectorAll(".st-tab").forEach(tab => {
+      tab.addEventListener("click", () => switchTab(container, tab.dataset.tab));
+    });
+
     // Language selector
     container.querySelectorAll("#stLangSelector .lang-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        I18N.setLang(btn.dataset.lang); // saves to storage + updates DOM
-        // Re-render settings with new language
+        I18N.setLang(btn.dataset.lang);
         container.innerHTML = renderView(settings);
         attachEvents(container, settings);
         loadProfile(container);
@@ -606,7 +824,6 @@ const SettingsView = (() => {
           container.querySelectorAll(`${id} .seg-btn`).forEach(b => b.classList.remove("active"));
           btn.classList.add("active");
           scheduleSave(container);
-          // Apply theme immediately
           if (id === "#sThemeSeg" && typeof applyTheme === "function") {
             applyTheme(btn.dataset.val);
             if (typeof App !== "undefined") App.settings.theme = btn.dataset.val;
@@ -640,6 +857,14 @@ const SettingsView = (() => {
     container.querySelector("#sKlAutoRelist")?.addEventListener("change", (e) => {
       container.querySelector("#sKlRelistIntervalWrap")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
       scheduleSave(container);
+    });
+
+    // Shipping fields → auto-save
+    ["#sShipSenderName", "#sShipSenderStreet", "#sShipSenderZip", "#sShipSenderCity",
+     "#sShipSenderCountry", "#sShipDefaultWeight", "#sShipProduct", "#sShipCarrier"].forEach(sel => {
+      const el = container.querySelector(sel);
+      if (!el) return;
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => scheduleSave(container));
     });
 
     // Price history vacuum
@@ -700,7 +925,6 @@ const SettingsView = (() => {
         const autoCreateCb = container.querySelector("#sEbaySyncAutoCreate");
         const lastInfo   = container.querySelector("#ebaySyncLastInfo");
 
-        // Connection status
         if (connStatus) {
           connStatus.textContent = syncStatus.connected
             ? "Verbunden mit eBay Seller Account"
@@ -721,18 +945,15 @@ const SettingsView = (() => {
           }
         }
 
-        // Restore saved state
         if (enabledCb)    enabledCb.checked = syncStatus.enabled !== false;
         if (intervalSel)  intervalSel.value = String(syncStatus.interval_min || 30);
         if (autoCreateCb) autoCreateCb.checked = syncStatus.auto_create !== false;
 
-        // Last sync info
         if (lastInfo && syncStatus.last_sync_at) {
           const d = new Date(syncStatus.last_sync_at);
           lastInfo.textContent = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
         }
 
-        // Event listeners
         enabledCb?.addEventListener("change", () => window.fc.ebaySyncSetEnabled(enabledCb.checked));
         intervalSel?.addEventListener("change", () => window.fc.ebaySyncSetInterval(parseInt(intervalSel.value)));
         autoCreateCb?.addEventListener("change", async () => {
@@ -805,18 +1026,15 @@ const SettingsView = (() => {
           }
         }
 
-        // Restore saved state
         if (enabledCb)    enabledCb.checked = klStatus.enabled !== false;
         if (intervalSel)  intervalSel.value = String(klStatus.interval_min || 30);
         if (autoCreateCb) autoCreateCb.checked = klStatus.auto_create !== false;
 
-        // Last sync info
         if (lastInfo && klStatus.last_sync_at) {
           const d = new Date(klStatus.last_sync_at);
           lastInfo.textContent = d.toLocaleString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
         }
 
-        // Event listeners
         enabledCb?.addEventListener("change", () => window.fc.kauflandSyncSetEnabled(enabledCb.checked));
         intervalSel?.addEventListener("change", () => window.fc.kauflandSyncSetInterval(parseInt(intervalSel.value)));
         autoCreateCb?.addEventListener("change", async () => {
@@ -875,6 +1093,77 @@ const SettingsView = (() => {
         Toast.error("Sync-Fehler", e.message || "Verbindung fehlgeschlagen");
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
+      }
+    });
+
+    // ── DHL Shipping section ──────────────────────────────────────────────────
+    (async () => {
+      try {
+        const dhlStatus  = await window.fc.dhlStatus().catch(() => ({ connected: false }));
+        const connStatus = container.querySelector("#dhlConnStatus");
+        const connBtn    = container.querySelector("#dhlConnBtn");
+        const credsForm  = container.querySelector("#dhlCredsForm");
+
+        if (connStatus) {
+          connStatus.textContent = dhlStatus.connected
+            ? "Verbunden mit DHL Geschäftskundenportal"
+            : "Nicht verbunden";
+          connStatus.style.color = dhlStatus.connected ? "var(--green)" : "var(--text-muted)";
+        }
+        if (connBtn) {
+          if (dhlStatus.connected) {
+            connBtn.innerHTML = `<span class="badge badge-connected">● Verbunden</span>
+              <button class="btn btn-secondary btn-sm ml-8 text-xs" id="btnDhlDisconnect">Trennen</button>`;
+            if (credsForm) credsForm.style.display = "none";
+            connBtn.querySelector("#btnDhlDisconnect")?.addEventListener("click", async () => {
+              await window.fc.dhlDeleteCreds();
+              Toast.info("Getrennt", "DHL-Verbindung wurde entfernt.");
+              if (connStatus) { connStatus.textContent = "Nicht verbunden"; connStatus.style.color = "var(--text-muted)"; }
+              if (connBtn) connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnDhlShowForm">Verbinden</button>`;
+              if (credsForm) credsForm.style.display = "";
+              connBtn.querySelector("#btnDhlShowForm")?.addEventListener("click", () => { if (credsForm) credsForm.style.display = ""; });
+            });
+          } else {
+            connBtn.innerHTML = `<button class="btn btn-primary btn-sm" id="btnDhlShowForm">Verbinden</button>`;
+            connBtn.querySelector("#btnDhlShowForm")?.addEventListener("click", () => { if (credsForm) credsForm.style.display = ""; });
+            if (credsForm) credsForm.style.display = "";
+          }
+        }
+      } catch (e) {
+        console.error("[Settings] DHL init error:", e);
+        const connStatus = container.querySelector("#dhlConnStatus");
+        if (connStatus) { connStatus.textContent = "Nicht verbunden"; connStatus.style.color = "var(--text-muted)"; }
+        const credsForm = container.querySelector("#dhlCredsForm");
+        if (credsForm) credsForm.style.display = "";
+      }
+    })();
+
+    // DHL Connect button
+    container.querySelector("#btnDhlConnect")?.addEventListener("click", async () => {
+      const btn    = container.querySelector("#btnDhlConnect");
+      const apiKey = container.querySelector("#sDhlApiKey")?.value?.trim();
+      const ekp    = container.querySelector("#sDhlEkp")?.value?.trim();
+      const user   = container.querySelector("#sDhlUser")?.value?.trim();
+      const pass   = container.querySelector("#sDhlPass")?.value?.trim();
+      if (!apiKey || !ekp || !user || !pass) { Toast.error("Fehler", "Bitte alle DHL-Felder ausfüllen."); return; }
+      if (btn) { btn.disabled = true; btn.textContent = "Prüfe…"; }
+      try {
+        const result = await window.fc.dhlSaveCreds({ api_key: apiKey, ekp, username: user, password: pass });
+        if (result?.ok) {
+          Toast.success("Verbunden", "DHL Geschäftskundenportal erfolgreich verbunden!");
+          const connStatus = container.querySelector("#dhlConnStatus");
+          const connBtn    = container.querySelector("#dhlConnBtn");
+          const credsForm  = container.querySelector("#dhlCredsForm");
+          if (connStatus) { connStatus.textContent = "Verbunden mit DHL Geschäftskundenportal"; connStatus.style.color = "var(--green)"; }
+          if (connBtn) connBtn.innerHTML = `<span class="badge badge-connected">● Verbunden</span>`;
+          if (credsForm) credsForm.style.display = "none";
+        } else {
+          Toast.error("Verbindung fehlgeschlagen", result?.error || "DHL-Credentials ungültig.");
+        }
+      } catch (e) {
+        Toast.error("Fehler", e.message || "Verbindung fehlgeschlagen");
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = "Verbinden"; }
       }
     });
 

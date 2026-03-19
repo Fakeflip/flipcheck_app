@@ -2228,6 +2228,44 @@ img { display: block; max-width: 100%; }
   padding: 10px 14px;
 }
 
+/* ── Settings Tabs ───────────────────────────────────────────────────── */
+.st-tabs {
+  display: flex;
+  gap: 2px;
+  max-width: 680px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 24px;
+  padding: 0;
+}
+.st-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: var(--r) var(--r) 0 0;
+  border: 1px solid transparent;
+  border-bottom: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color var(--t-fast), background var(--t-fast);
+  position: relative;
+  bottom: -1px;
+  white-space: nowrap;
+}
+.st-tab svg { opacity: 0.6; flex-shrink: 0; }
+.st-tab:hover  { color: var(--text-primary); }
+.st-tab:hover svg { opacity: 0.85; }
+.st-tab.active {
+  background: var(--bg-panel);
+  border-color: var(--border);
+  color: var(--text-primary);
+  font-weight: 600;
+}
+.st-tab.active svg { opacity: 1; }
+
 /* ── Settings SaaS Layout ────────────────────────────────────────────── */
 .st-wrapper {
   max-width: 680px;
@@ -3770,8 +3808,9 @@ a.mp-asin-link:visited {
   position: relative;
 }
 .an-kpi-card:hover { box-shadow: var(--shadow-xs); border-color: var(--border2); }
-.an-kpi-card.an-kpi-green { border-bottom: 2px solid var(--green-bdr); }
-.an-kpi-card.an-kpi-red   { border-bottom: 2px solid var(--red-bdr); }
+.an-kpi-card.an-kpi-green  { border-bottom: 2px solid var(--green-bdr); }
+.an-kpi-card.an-kpi-red    { border-bottom: 2px solid var(--red-bdr); }
+.an-kpi-card.an-kpi-orange { border-bottom: 2px solid #d97706; }
 
 /* Top row: label + small icon */
 .an-kpi-top {
@@ -3795,6 +3834,8 @@ a.mp-asin-link:visited {
 .an-kpi-ico--green  { background: var(--green-sub);  border-color: var(--green-bdr);  color: var(--green);  }
 .an-kpi-ico--red    { background: var(--red-sub);    border-color: var(--red-bdr);    color: var(--red);    }
 .an-kpi-ico--accent { background: var(--accent-sub); border-color: var(--accent-bdr); color: var(--accent); }
+.an-kpi-ico--orange { background: rgba(217,119,6,.12); border-color: rgba(217,119,6,.3); color: #d97706; }
+.text-orange { color: #d97706; }
 
 /* ── Panel section headers ─────────────────────────────────────────────────── */
 .an-panel-head {

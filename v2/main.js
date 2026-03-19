@@ -2818,6 +2818,152 @@ ipcMain.handle("kaufland:credsStatus", () => {
 });
 
 
+// ─── DHL Shipping ─────────────────────────────────────────────────────────────
+const DHL_SVC = "flipcheck-dhl";
+const DHL_ACC = "shipping-creds";
+const DHL_CREDS_PATH = path.join(app.getPath("userData"), "dhl_shipping_creds.json");
+let _dhlCredsCache = null;
+
+function loadDhlCreds() {
+  if (_dhlCredsCache) return _dhlCredsCache;
+  try {
+    const data = JSON.parse(fs.readFileSync(DHL_CREDS_PATH, "utf8"));
+    _dhlCredsCache = data;
+    return data;
+  } catch { return null; }
+}
+
+async function _initDhlCreds() {
+  try {
+    const raw = await keytar.getPassword(DHL_SVC, DHL_ACC);
+    if (raw) { _dhlCredsCache = JSON.parse(raw); return; }
+  } catch {}
+  try {
+    const data = JSON.parse(fs.readFileSync(DHL_CREDS_PATH, "utf8"));
+    if (data?.api_key) {
+      _dhlCredsCache = data;
+      keytar.setPassword(DHL_SVC, DHL_ACC, JSON.stringify(data)).catch(() => {});
+    }
+  } catch {}
+}
+
+function saveDhlCreds(data) {
+  _dhlCredsCache = data;
+  keytar.setPassword(DHL_SVC, DHL_ACC, JSON.stringify(data)).catch(e =>
+    console.warn("[DhlCreds] Keytar save failed:", e.message)
+  );
+  try {
+    fs.writeFileSync(DHL_CREDS_PATH, JSON.stringify(data, null, 2), "utf8");
+    console.log("[DhlCreds] Saved locally");
+  } catch (e) { console.error("[DhlCreds] Save failed:", e.message); }
+}
+
+function deleteDhlCreds() {
+  _dhlCredsCache = null;
+  keytar.deletePassword(DHL_SVC, DHL_ACC).catch(() => {});
+  try { fs.unlinkSync(DHL_CREDS_PATH); } catch {}
+  console.log("[DhlCreds] Deleted");
+}
+
+function encodeDhlCreds(data) {
+  if (!data) return "";
+  return Buffer.from(JSON.stringify(data)).toString("base64");
+}
+
+function dhlApiCall(urlStr, authToken, method = "GET", bodyObj = null) {
+  const creds = loadDhlCreds();
+  return new Promise((resolve, reject) => {
+    const url  = new URL(urlStr);
+    const mod  = url.protocol === "https:" ? https : http;
+    const headers = { "Content-Type": "application/json" };
+    if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+    if (creds) headers["X-DHL-Credentials"] = encodeDhlCreds(creds);
+    const bodyStr = bodyObj ? JSON.stringify(bodyObj) : null;
+    if (bodyStr) headers["Content-Length"] = Buffer.byteLength(bodyStr);
+    const opts = {
+      hostname: url.hostname,
+      port:     url.port || (url.protocol === "https:" ? 443 : 80),
+      path:     url.pathname + url.search,
+      method,
+      headers,
+    };
+    const req = mod.request(opts, res => {
+      let body = "";
+      res.on("data", c => body += c);
+      res.on("end", () => {
+        try { resolve({ status: res.statusCode, data: JSON.parse(body) }); }
+        catch { resolve({ status: res.statusCode, data: body }); }
+      });
+    });
+    req.on("error", reject);
+    req.setTimeout(30000, () => { req.destroy(); reject(new Error("timeout")); });
+    if (bodyStr) req.write(bodyStr);
+    req.end();
+  });
+}
+
+ipcMain.handle("dhl:saveCreds", async (_e, { api_key, ekp, username, password }) => {
+  if (!api_key || !ekp || !username || !password) return { ok: false, error: "Alle DHL-Felder erforderlich" };
+  saveDhlCreds({ api_key, ekp, username, password });
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const res   = await dhlApiCall(`${base}/dhl/auth/status`, token);
+    console.log("[DhlCreds] Response:", JSON.stringify(res.data));
+    if (res.data?.connected) {
+      return { ok: true };
+    }
+    deleteDhlCreds();
+    return { ok: false, error: res.data?.error || "DHL-Credentials ungültig." };
+  } catch (e) {
+    console.error("[DhlCreds] Error:", e);
+    deleteDhlCreds();
+    return { ok: false, error: e.message };
+  }
+});
+
+ipcMain.handle("dhl:deleteCreds", () => {
+  deleteDhlCreds();
+  return { ok: true };
+});
+
+ipcMain.handle("dhl:status", () => {
+  const creds = loadDhlCreds();
+  return { connected: !!(creds?.api_key && creds?.ekp) };
+});
+
+ipcMain.handle("dhl:createLabel", async (_e, data) => {
+  const creds = loadDhlCreds();
+  if (!creds?.api_key) return { ok: false, error: "DHL nicht verbunden" };
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const res   = await dhlApiCall(`${base}/dhl/shipments`, token, "POST", data);
+    if (res.data?.ok) return res.data;
+    return { ok: false, error: res.data?.error || "Label-Erstellung fehlgeschlagen" };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// Init DHL creds on startup
+_initDhlCreds().catch(() => {});
+
+// ─── eBay CompleteSale (mark as shipped + tracking) ──────────────────────────
+ipcMain.handle("ebay:completeSale", async (_e, { item_id, transaction_id, tracking_number, carrier }) => {
+  if (!item_id || !tracking_number) return { ok: false, error: "item_id und tracking_number erforderlich" };
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const res   = await sellerApiPost(`${base}/seller/shipment/complete`, {
+      item_id, transaction_id: transaction_id || "0", tracking_number, carrier: carrier || "DHL"
+    }, token);
+    return res.data || { ok: false, error: "Keine Antwort vom Server" };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
 // ─── IPC: Error Reporter Webhook (loaded from env, never hardcoded in renderer) ──
 ipcMain.handle("errorWebhookUrl", () => process.env.DISCORD_ERROR_WEBHOOK || "");
 

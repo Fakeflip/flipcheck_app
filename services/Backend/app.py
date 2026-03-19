@@ -1606,6 +1606,7 @@ try:
         add_legacy_token, remove_legacy_token,
         get_sold_with_financials, get_order_financials,
         parse_seller_token, encode_seller_token,
+        complete_sale as ebay_complete_sale,
     )
     _SELLER_AVAILABLE = True
 except ImportError:
@@ -1997,6 +1998,39 @@ async def seller_sold_listings(request: Request, page: int = 1, per_page: int = 
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
+class CompleteSaleBody(BaseModel):
+    item_id: str
+    transaction_id: str
+    tracking_number: str
+    carrier: str = "DHL"
+
+
+@app.post("/seller/shipment/complete")
+async def seller_complete_sale(body: CompleteSaleBody, request: Request):
+    """Mark an eBay order as shipped with tracking info via CompleteSale."""
+    if not _SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
+    td = _get_seller_token_from_request(request)
+    if not td:
+        return JSONResponse({"ok": False, "error": "No seller token provided"}, status_code=401)
+    try:
+        from ebay_seller import get_token_for_trading
+        token, is_legacy, new_td = await get_token_for_trading(td)
+        result = await ebay_complete_sale(
+            item_id=body.item_id,
+            transaction_id=body.transaction_id,
+            tracking_number=body.tracking_number,
+            carrier=body.carrier,
+            token=token,
+            legacy=is_legacy,
+        )
+        if new_td:
+            result["updated_token"] = encode_seller_token(new_td)
+        return result
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
 # ─── Kaufland Seller API ─────────────────────────────────────────────────────
 try:
     from kaufland_seller import (
@@ -2090,6 +2124,78 @@ async def kaufland_reprice(body: KauflandRepriceBody, request: Request):
         return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
     try:
         return await kl_update_unit_price(creds[0], creds[1], body.unit_id, body.new_price)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+# ─── DHL Shipping API ────────────────────────────────────────────────────────
+try:
+    from dhl_shipping import (
+        verify_credentials as dhl_verify_credentials,
+        create_shipment as dhl_create_shipment,
+        parse_dhl_creds,
+    )
+    _DHL_SHIPPING_AVAILABLE = True
+except ImportError:
+    _DHL_SHIPPING_AVAILABLE = False
+
+    async def dhl_verify_credentials(creds): return {"ok": False, "error": "dhl_shipping module not available"}
+    async def dhl_create_shipment(**kw): return {"ok": False, "error": "not available"}
+    def parse_dhl_creds(raw): return None
+
+
+def _get_dhl_creds_from_request(request) -> dict | None:
+    """Extract DHL credentials from X-DHL-Credentials header (base64 JSON)."""
+    raw = request.headers.get("x-dhl-credentials", "")
+    if not raw:
+        return None
+    return parse_dhl_creds(raw)
+
+
+@app.get("/dhl/auth/status")
+async def dhl_auth_status(request: Request):
+    """Verify DHL API credentials."""
+    if not _DHL_SHIPPING_AVAILABLE:
+        return {"ok": False, "connected": False, "reason": "module_unavailable"}
+    creds = _get_dhl_creds_from_request(request)
+    if not creds:
+        return {"ok": True, "connected": False, "reason": "no_credentials"}
+    try:
+        result = await dhl_verify_credentials(creds)
+        connected = result.get("connected", False)
+        resp = {"ok": True, "connected": connected}
+        if not connected and result.get("error"):
+            resp["error"] = result["error"]
+        return resp
+    except Exception as e:
+        return {"ok": False, "connected": False, "error": str(e)}
+
+
+class DhlShipmentBody(BaseModel):
+    sender: dict
+    recipient: dict
+    weight_kg: float = 1.0
+    product: str = "V01PAK"
+    reference: str = ""
+
+
+@app.post("/dhl/shipments")
+async def dhl_shipments(body: DhlShipmentBody, request: Request):
+    """Create a DHL shipment and return the label."""
+    if not _DHL_SHIPPING_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "DHL shipping not configured"}, status_code=503)
+    creds = _get_dhl_creds_from_request(request)
+    if not creds:
+        return JSONResponse({"ok": False, "error": "No DHL credentials provided"}, status_code=401)
+    try:
+        return await dhl_create_shipment(
+            creds=creds,
+            sender=body.sender,
+            recipient=body.recipient,
+            weight_kg=body.weight_kg,
+            product=body.product,
+            reference=body.reference,
+        )
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 

@@ -63,6 +63,10 @@
  * @property {string}       cat_id      - eBay fee category ID (e.g. "sonstiges", "handys")
  * @property {string}       condition   - Item condition: "new" | "like_new" | "very_good" | "good" | "acceptable" | "defective"
  * @property {string|null}  ebay_offer_id - eBay offerId or SKU for direct Seller API price updates (null if not linked)
+ * @property {boolean}      shipped       - Whether the item has been shipped (label created)
+ * @property {string|null}  tracking_number - Carrier tracking number (e.g. DHL shipment number)
+ * @property {string|null}  tracking_carrier - Carrier name ("DHL", "DPD", "Hermes")
+ * @property {string|null}  ebay_order_id  - eBay order ID for fulfillment API (null if not from eBay sync)
  * @property {{enabled:boolean,undercut_pct:number,min_margin_pct:number}|null} reprice_rule - Per-item reprice rule (overrides global)
  */
 

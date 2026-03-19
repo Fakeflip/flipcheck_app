@@ -282,6 +282,65 @@ async def revise_fixed_price_item(item_id: str, new_price: float, token: str, le
     return {"ok": False, "item_id": item_id, "error": error_msg}
 
 
+async def complete_sale(
+    item_id: str,
+    transaction_id: str,
+    tracking_number: str,
+    carrier: str,
+    token: str,
+    legacy: bool = False,
+) -> Dict:
+    """
+    Mark an eBay order as shipped with tracking number via CompleteSale Trading API.
+    carrier: "DHL", "DPD", "Hermes", "Deutsche Post" etc.
+    """
+    # Map carrier names to eBay-recognized values
+    carrier_map = {
+        "DHL": "DHL",
+        "DPD": "DPD",
+        "Hermes": "Hermes",
+        "GLS": "GLS",
+        "Deutsche Post": "Deutsche Post",
+        "UPS": "UPS",
+    }
+    ebay_carrier = carrier_map.get(carrier, carrier)
+
+    xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<CompleteSaleRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemID>{item_id}</ItemID>
+  <TransactionID>{transaction_id}</TransactionID>
+  <Shipped>true</Shipped>
+  <Shipment>
+    <ShipmentTrackingDetails>
+      <ShipmentTrackingNumber>{tracking_number}</ShipmentTrackingNumber>
+      <ShippingCarrierUsed>{ebay_carrier}</ShippingCarrierUsed>
+    </ShipmentTrackingDetails>
+  </Shipment>
+  <ErrorLanguage>de_DE</ErrorLanguage>
+</CompleteSaleRequest>"""
+
+    async with httpx.AsyncClient() as client:
+        resp = await client.post(
+            EBAY_TRADING_URL,
+            headers=_trading_headers("CompleteSale", token, legacy=legacy),
+            content=xml_body.encode("utf-8"),
+            timeout=15,
+        )
+
+    try:
+        root = ET.fromstring(resp.text)
+    except ET.ParseError as e:
+        return {"ok": False, "error": f"XML parse error: {e}"}
+
+    ack = _xml_tag(root, "Ack")
+    if ack in ("Success", "Warning"):
+        return {"ok": True, "item_id": item_id, "tracking_number": tracking_number}
+    error_msg = _xml_tag(root, "Errors", "LongMessage") or \
+                _xml_tag(root, "Errors", "ShortMessage") or \
+                f"Ack={ack}"
+    return {"ok": False, "item_id": item_id, "error": error_msg}
+
+
 async def bulk_revise_prices(updates: List[Dict], token_data: Dict = None) -> Dict:
     """
     Batch price updates via ReviseFixedPriceItem (no limit per call — sequential).
