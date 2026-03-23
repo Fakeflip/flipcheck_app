@@ -146,6 +146,125 @@ const SalesView = (() => {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  // ── Steuerexport ─────────────────────────────────────────────────────────
+  function _calcFeeAmt(item) {
+    const vk = item.sell_price || 0;
+    if (typeof calcMarketFee === "function") return calcMarketFee(vk, item.market || "ebay", item.cat_id);
+    if (item.market === "ebay" || !item.market) return calcEbayFee(vk, item.cat_id || "sonstiges");
+    return vk * (FLAT_FEES[item.market || "other"] ?? 0);
+  }
+
+  function exportTaxCSV(sold, year) {
+    const yearItems = sold.filter(i => i.sold_at && new Date(i.sold_at).getFullYear() === year);
+    if (yearItems.length === 0) { Toast.warning("Keine Daten", `Keine Verkäufe für ${year} gefunden.`); return; }
+    yearItems.sort((a, b) => new Date(a.sold_at) - new Date(b.sold_at));
+
+    const cols = [
+      "Datum","Artikel","EAN","SKU","Zustand","Plattform",
+      "Einkaufspreis (EK)","Verkaufspreis (VK)","Menge",
+      "Marktplatz-Gebuehr","Versandeinnahme","Versandkosten",
+      "Erstattung","Gebuehren-Rueckerstattung",
+      "Netto-Gewinn","ROI %","Status",
+      "Bestellnummer","Sendungsnummer",
+    ];
+
+    let totEk=0, totVk=0, totFee=0, totShipIn=0, totShipOut=0, totRefund=0, totProfit=0;
+
+    const rows = yearItems.map(i => {
+      const qty      = i.qty || 1;
+      const ek       = (i.ek || 0) * qty;
+      const vk       = (i.sell_price || 0) * qty;
+      const fee      = _calcFeeAmt(i) * qty;
+      const shipIn   = (i.ship_in  || 0) * qty;
+      const shipOut  = (i.ship_out || 0) * qty;
+      const refund   = i.refund_amount      || 0;
+      const feeCredit= i.refund_fee_credit  || 0;
+      const profit   = vk - ek - fee - shipOut + shipIn + feeCredit - refund;
+      totEk += ek; totVk += vk; totFee += fee; totShipIn += shipIn;
+      totShipOut += shipOut; totRefund += refund; totProfit += profit;
+      const roi = ek > 0 ? ((profit / ek) * 100).toFixed(1) : "";
+      const n = v => v !== 0 ? v.toFixed(2).replace(".",",") : "0,00";
+      const q = s => `"${String(s ?? "").replace(/"/g,'""')}"`;
+      return [
+        fmtDate(i.sold_at), q(i.title||i.ean||""), i.ean||"", i.sku||"",
+        FC?.CONDITION_LABELS?.[i.condition]||i.condition||"",
+        PLATFORM_LABELS[i.market]||i.market||"Sonstige",
+        n(ek), n(vk), qty, n(fee), n(shipIn), n(shipOut), n(refund), n(feeCredit),
+        n(profit), roi?roi.replace(".",","):"",
+        i.status==="RETURN"?"Retoure":"Verkauft",
+        i.ebay_order_id||i.kaufland_order_id||"",
+        i.tracking_number||"",
+      ].join(";");
+    });
+
+    const n = v => v.toFixed(2).replace(".",",");
+    const sumRow = [
+      `GESAMT ${year}`, `"${yearItems.length} Artikel"`, "","","","",
+      n(totEk), n(totVk), "", n(totFee), n(totShipIn), n(totShipOut),
+      n(totRefund), "", n(totProfit), "", "", "", "",
+    ].join(";");
+
+    const csv  = [cols.join(";"), ...rows, "", sumRow].join("\r\n");
+    const blob = new Blob(["\uFEFF"+csv], { type:"text/csv;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href = url; a.download = `flipcheck-steuerexport-${year}.csv`; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    Toast.success("Steuerexport", `${yearItems.length} Verkäufe für ${year} exportiert.`);
+  }
+
+  function openTaxExportModal() {
+    const years = [...new Set(
+      _allSold.filter(i => i.sold_at).map(i => new Date(i.sold_at).getFullYear())
+    )].sort((a, b) => b - a);
+    if (years.length === 0) { Toast.warning("Keine Daten", "Noch keine Verkäufe vorhanden."); return; }
+
+    const curYear    = new Date().getFullYear();
+    const defaultYear = years.includes(curYear - 1) ? curYear - 1 : years[0];
+
+    const statsHtml = years.map(y => {
+      const items   = _allSold.filter(i => i.sold_at && new Date(i.sold_at).getFullYear() === y);
+      const profit  = items.reduce((s, i) => s + netProfit(i), 0);
+      const returns = items.filter(i => i.status === "RETURN").length;
+      return `<label style="cursor:pointer;display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg-elevated);margin-bottom:6px">
+        <input type="radio" name="taxYear" value="${y}" ${y===defaultYear?"checked":""} style="accent-color:var(--accent)" />
+        <div style="flex:1">
+          <div style="font-weight:600;font-size:14px">${y}</div>
+          <div style="font-size:12px;color:var(--text-muted)">${items.length} Verkäufe${returns>0?` · ${returns} Retouren`:""}</div>
+        </div>
+        <div style="font-size:13px;font-weight:600;color:${profit>=0?"var(--green)":"var(--red)"}">${fmtEur(profit)}</div>
+      </label>`;
+    }).join("");
+
+    const body = `<div class="col gap-12">
+      <div style="padding:10px 12px;border-radius:8px;background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);font-size:13px;color:var(--text-primary)">
+        Export enthält alle steuerrelevanten Felder: EK, VK, Gebühren, Versand, Erstattungen, Nettogewinn und eine Summenzeile.
+      </div>
+      <div>
+        <div class="text-xs text-muted font-semibold mb-8">Steuerjahr wählen</div>
+        ${statsHtml}
+      </div>
+      <div class="text-xs text-muted" style="line-height:1.7">
+        Felder: Datum · Artikel · EAN · SKU · Zustand · Plattform · EK · VK · Menge · Gebühr · Versandeinnahme · Versandkosten · Erstattung · Gebührenrückerstattung · <strong>Netto-Gewinn</strong> · ROI · Status · Bestellnr. · Sendungsnr.
+      </div>
+    </div>`;
+
+    Modal.open({
+      title: "📄 Steuerexport",
+      body,
+      width: 460,
+      buttons: [
+        { label: "Abbrechen", variant: "btn-ghost", action: () => Modal.close() },
+        { label: "CSV exportieren", variant: "btn-primary", action: () => {
+          const sel = document.querySelector('input[name="taxYear"]:checked');
+          if (!sel) return;
+          Modal.close();
+          exportTaxCSV(_allSold, parseInt(sel.value));
+        }},
+      ],
+    });
+  }
+
   // ── Main render ──────────────────────────────────────────────────────────
   async function mount(el) {
     _el = el;
@@ -232,6 +351,14 @@ const SalesView = (() => {
             <path d="M14 10v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
           CSV
+        </button>
+        <button class="btn btn-secondary btn-sm" id="btnTaxExport">
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" style="margin-right:4px">
+            <rect x="2" y="1" width="10" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/>
+            <path d="M5 5h5M5 8h5M5 11h3" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+            <path d="M11 10l2 2-2 2" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Steuerexport
         </button>
       </div>
     </div>
@@ -401,6 +528,9 @@ const SalesView = (() => {
 
     const btnExport = _el.querySelector("#btnExportCSV");
     if (btnExport) btnExport.addEventListener("click", () => exportCSV(filtered));
+
+    const btnTaxExport = _el.querySelector("#btnTaxExport");
+    if (btnTaxExport) btnTaxExport.addEventListener("click", () => openTaxExportModal());
 
     const btnGoInv = _el.querySelector("#btnGoInventory");
     if (btnGoInv) btnGoInv.addEventListener("click", () => {
