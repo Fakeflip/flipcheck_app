@@ -22,11 +22,27 @@ const ListingAssistant = (() => {
   ];
 
   // ── Beschreibung generieren ───────────────────────────────────────────────
-  function generateDescription(title, ean, conditionId, shipMethod) {
+  function generateDescription(title, ean, conditionId, shipMethod, mode = "privat") {
     const CONDITIONS = _conditions();
     const cond     = CONDITIONS.find(c => c.id === conditionId) || CONDITIONS[2];
     const ship     = SHIP_METHODS.find(s => s.id === shipMethod) || SHIP_METHODS[0];
     const condLine = `${cond.label} — ${cond.desc}`;
+
+    if (mode === "gewerblich") {
+      return `Zum Verkauf steht: ${title}
+
+EAN / GTIN: ${ean}
+Zustand: ${condLine}
+
+Der Artikel wurde sorgfältig geprüft und befindet sich im beschriebenen Zustand.
+Alle Artikel werden vor dem Versand nochmals kontrolliert.
+
+Versand: ${ship.label}, sicher und versichert verpackt.
+Lieferzeit: 1–3 Werktage nach Zahlungseingang.
+Zahlung: PayPal, Überweisung oder eBay-Checkout.
+
+Bei Fragen stehen wir Ihnen jederzeit zur Verfügung!`;
+    }
 
     return `Zum Verkauf steht: ${title}
 
@@ -83,11 +99,12 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
   }
 
   // ── Modal Body ────────────────────────────────────────────────────────────
-  function renderBody(data, ean, ek) {
+  function renderBody(data, ean, ek, shipPresets = []) {
     const suggestedVk = data.sell_price_median ?? data.sell_price_avg ?? 0;
     const title       = data.title || ean;
-    const defaultDesc = generateDescription(title, ean, "very_good", "dhl");
+    const defaultDesc = generateDescription(title, ean, "very_good", "dhl", "privat");
     const { fee, profit, margin, roi } = liveCalc(suggestedVk, parseFloat(ek), 0);
+    const defaultShipCost = shipPresets.length > 0 ? (shipPresets[0].price || 0) : 0;
 
     const condOptions = _conditions().map(c =>
       `<option value="${c.id}"${c.id === "very_good" ? " selected" : ""}>${c.label}</option>`
@@ -112,7 +129,13 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
             ${data.verdict ? `&nbsp;·&nbsp;<span class="badge badge-${data.verdict === "BUY" ? "green" : data.verdict === "HOLD" ? "yellow" : "red"}" style="font-size:9px">${data.verdict}</span>` : ""}
           </div>
 
-          <label class="input-label mb-4">${I18N.t('lst.lbl.description')}</label>
+          <div class="row gap-6 mb-8" style="align-items:center">
+            <label class="input-label" style="margin:0">${I18N.t('lst.lbl.description')}</label>
+            <div class="row gap-4" style="margin-left:auto">
+              <button type="button" class="btn btn-ghost btn-sm la-tpl-btn active" data-tpl="privat" style="font-size:11px;padding:3px 8px">Privat</button>
+              <button type="button" class="btn btn-ghost btn-sm la-tpl-btn" data-tpl="gewerblich" style="font-size:11px;padding:3px 8px">Gewerblich</button>
+            </div>
+          </div>
           <textarea id="laDesc" class="la-desc">${escHtml(defaultDesc)}</textarea>
 
           <div class="row gap-8 mt-8">
@@ -160,7 +183,7 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
               <label class="input-label">${I18N.t('lst.lbl.ship_cost')}</label>
               <div class="input-prefix-wrap">
                 <span class="prefix">€</span>
-                <input id="laShipOut" class="input" type="number" step="0.01" min="0" value="0.00"/>
+                <input id="laShipOut" class="input" type="number" step="0.01" min="0" value="${defaultShipCost > 0 ? defaultShipCost.toFixed(2) : "0.00"}"/>
               </div>
             </div>
           </div>
@@ -224,17 +247,27 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
       vkInp?.addEventListener("input", updateCalc);
       shipOutInp?.addEventListener("input", updateCalc);
 
-      // Beschreibung regenerieren wenn Zustand oder Versand ändert
+      // Beschreibung regenerieren wenn Zustand, Versand oder Template ändert
+      let _tplMode = "privat";
       const regenDesc = () => {
         if (!descTa) return;
         descTa.value = generateDescription(
           data.title || ean, ean,
           condSel?.value || "very_good",
-          shipMeth?.value || "dhl"
+          shipMeth?.value || "dhl",
+          _tplMode
         );
       };
       condSel?.addEventListener("change", regenDesc);
       shipMeth?.addEventListener("change", regenDesc);
+      overlay.querySelectorAll(".la-tpl-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          _tplMode = btn.dataset.tpl;
+          overlay.querySelectorAll(".la-tpl-btn").forEach(b => b.classList.remove("active", "btn-primary"));
+          btn.classList.add("active", "btn-primary");
+          regenDesc();
+        });
+      });
 
       // Beschreibung kopieren
       overlay.querySelector("#laCopyDesc")?.addEventListener("click", async () => {
@@ -299,14 +332,15 @@ Bei Fragen stehe ich gerne zur Verfügung!`;
   }
 
   // ── Öffnen ────────────────────────────────────────────────────────────────
-  function open(data, ean, ek) {
+  async function open(data, ean, ek) {
+    const settings = await Storage.getSettings().catch(() => ({}));
+    const shipPresets = (settings.shipping?.presets || []).filter(p => p.name && p.weight > 0);
     Modal.open({
       title: I18N.t('lst.title'),
-      body:  renderBody(data, ean, parseFloat(ek)),
+      body:  renderBody(data, ean, parseFloat(ek), shipPresets),
       width: 860,
     });
     // Buttons sind im Body selbst (la-ctas), nicht im Modal-Footer
-    // Footer bleibt leer → kein extra close-Button nötig
     bindEvents(data, ean, ek);
   }
 

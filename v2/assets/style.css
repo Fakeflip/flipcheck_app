@@ -2124,6 +2124,24 @@ img { display: block; max-width: 100%; }
   cursor: help;
 }
 
+/* ── Inventory warning dot ───────────────────────────────────────────── */
+.inv-warn-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.15);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+  color: #F59E0B;
+  font-size: 9px;
+  font-weight: 700;
+  cursor: help;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
 /* Extra small ghost button (for inline actions) */
 .btn-xs {
   padding: 2px 6px;

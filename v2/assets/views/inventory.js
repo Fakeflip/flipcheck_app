@@ -32,7 +32,7 @@ const InventoryView = (() => {
     container: null,
     items:     [],
     selected:  new Set(),
-    filter:    { q: "", status: "", market: "", source: "", shipped: "" },
+    filter:    { q: "", status: "", market: "", source: "", shipped: "", warn: "" },
     sort:      { col: "age", dir: "asc" },
     vs:        { data: [], wrap: null, busy: false },
   };
@@ -105,7 +105,7 @@ const InventoryView = (() => {
     // Reset state fresh on every mount
     _state.container = container;
     _state.selected  = new Set();
-    _state.filter    = { q: "", status: "", market: "", source: "", shipped: "" };
+    _state.filter    = { q: "", status: "", market: "", source: "", shipped: "", warn: "" };
     _state.sort      = { col: "age", dir: "asc" };
     _state.vs        = { data: [], wrap: null, busy: false };
 
@@ -188,6 +188,10 @@ const InventoryView = (() => {
           <option value="">Versand: Alle</option>
           <option value="pending">📦 Ausstehend</option>
           <option value="shipped">✅ Versendet</option>
+        </select>
+        <select id="invWarnFilter" class="select">
+          <option value="">Alle</option>
+          <option value="warn">⚠ Mit Warnungen</option>
         </select>
       </div>
 
@@ -444,12 +448,22 @@ const InventoryView = (() => {
       }
     }
 
+    // ── Warning indicators ────────────────────────────────────────────────
+    const warns = [];
+    if (item.ek == null && item.status !== "SOLD" && item.status !== "ARCHIVED") warns.push({ tip: "Kein EK hinterlegt", icon: "€" });
+    if (!item.ean && item.status !== "ARCHIVED") warns.push({ tip: "Keine EAN", icon: "#" });
+    if (item.status === "SOLD" && !item.shipped && item.sold_at) {
+      const soldDays = Math.floor((Date.now() - new Date(item.sold_at).getTime()) / 86400000);
+      if (soldDays >= 2) warns.push({ tip: `Seit ${soldDays} Tagen nicht versendet`, icon: "!" });
+    }
+
     return `
       <tr>
         <td><input type="checkbox" class="inv-row-check" data-id="${esc(item.id)}" ${checked ? "checked" : ""} /></td>
         <td>
           <div style="display:flex;align-items:center;gap:6px">
             <div style="font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px" title="${esc(item.title||item.ean)}">${esc(item.title||item.ean||"—")}</div>
+            ${warns.map(w => `<span class="inv-warn-dot" title="${esc(w.tip)}">${w.icon}</span>`).join("")}
           </div>
           ${item.source === "ebay_sync" ? `<span class="badge" style="margin-top:3px;font-size:9px;background:rgba(99,102,241,.12);color:#818CF8;border:1px solid rgba(99,102,241,.25);padding:1px 5px" title="Automatisch von eBay importiert">⟳ eBay Sync</span>` : ""}
           ${item.label ? `<span class="badge badge-gray" style="margin-top:3px;font-size:10px">${esc(item.label)}</span>` : ""}
@@ -547,6 +561,12 @@ const InventoryView = (() => {
 
     container.querySelector("#invShippedFilter")?.addEventListener("change", e => {
       _state.filter.shipped = e.target.value;
+      renderTable(container);
+      updateCount(container);
+    });
+
+    container.querySelector("#invWarnFilter")?.addEventListener("change", e => {
+      _state.filter.warn = e.target.value;
       renderTable(container);
       updateCount(container);
     });
@@ -1464,6 +1484,7 @@ const InventoryView = (() => {
     const defaultWeight = ship.default_weight || 1.0;
     const defaultProduct = ship.default_product || "V01PAK";
     const hasSender = sender.name && sender.street && sender.zip && sender.city;
+    const presets = (ship.presets || []).filter(p => p.name && p.weight > 0);
 
     // Try to extract recipient from eBay order data (if synced)
     const recipientName   = item.buyer_name   || "";
@@ -1471,9 +1492,25 @@ const InventoryView = (() => {
     const recipientZip    = item.buyer_zip     || "";
     const recipientCity   = item.buyer_city    || "";
 
+    const DHL_PRODUCTS = { V01PAK: "DHL Paket", V62WP: "Warenpost", V01PRIO: "Paket Prio", V86PARCEL: "Kleinpaket" };
+
     const body = `
       <div class="col gap-12">
         ${!hasSender ? `<div class="repr-alert repr-alert--warn"><span class="repr-alert-icon">⚠</span> Bitte Absender-Adresse in Settings → Versand hinterlegen</div>` : ""}
+
+        ${presets.length > 0 ? `
+        <div class="col gap-6">
+          <label class="text-xs text-muted font-semibold">Paketgröße</label>
+          <div class="row gap-6 flex-wrap" id="shipPresetBtns">
+            ${presets.map((p, i) => `
+              <button type="button" class="btn btn-ghost ship-preset-btn" data-idx="${i}"
+                data-weight="${p.weight}" data-product="${esc(p.product)}" data-price="${p.price||0}"
+                style="font-size:12px;padding:5px 12px">
+                <strong>${esc(p.name)}</strong>
+                <span style="color:var(--text-muted);margin-left:4px">${p.weight}kg${p.price ? ` · ${fmtEur(p.price)}` : ""}</span>
+              </button>`).join("")}
+          </div>
+        </div>` : ""}
 
         <div class="st-sub-header"><div class="st-sub-label">Empfänger</div></div>
         <div class="col gap-8">
@@ -1500,10 +1537,18 @@ const InventoryView = (() => {
               <option value="V86PARCEL" ${defaultProduct === "V86PARCEL" ? "selected" : ""}>Kleinpaket</option>
             </select>
           </div>
+          <div class="col gap-4" style="width:90px">
+            <label class="text-xs text-muted">Label-Kosten</label>
+            <div class="input-prefix-wrap">
+              <span class="prefix">€</span>
+              <input type="number" id="shipLabelCost" class="input st-input-currency" value="0" min="0" step="0.01" placeholder="0.00" />
+            </div>
+          </div>
         </div>
 
-        <div class="row gap-8 mt-4">
+        <div class="row gap-8 mt-4" style="justify-content:space-between;align-items:center">
           <span class="text-xs text-muted">Artikel: <strong>${esc(item.title || item.ean || "—")}</strong></span>
+          <span class="text-xs" id="shipProfitInfo" style="color:var(--text-muted)"></span>
         </div>
       </div>
     `;
@@ -1511,6 +1556,40 @@ const InventoryView = (() => {
     Modal.open({
       title: "📦 Versenden",
       body,
+      onOpen: () => {
+        // Preset buttons — wire up after DOM is ready
+        const _updateProfitInfo = () => {
+          const cost  = parseFloat(document.querySelector("#shipLabelCost")?.value) || 0;
+          const sell  = item.sell_price || 0;
+          const ek    = item.ek || 0;
+          const info  = document.querySelector("#shipProfitInfo");
+          if (!info) return;
+          if (sell && ek && cost) {
+            const net = sell - ek - cost;
+            info.textContent = `Marge nach Versand: ${fmtEur(net)} (${((net/sell)*100).toFixed(1)}%)`;
+            info.style.color = net >= 0 ? "var(--green)" : "var(--red)";
+          } else { info.textContent = ""; }
+        };
+        document.querySelector("#shipLabelCost")?.addEventListener("input", _updateProfitInfo);
+        document.querySelectorAll(".ship-preset-btn").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const w = parseFloat(btn.dataset.weight);
+            const p = btn.dataset.product;
+            const c = parseFloat(btn.dataset.price) || 0;
+            const wEl = document.querySelector("#shipWeight");
+            const pEl = document.querySelector("#shipProduct");
+            const cEl = document.querySelector("#shipLabelCost");
+            if (wEl) wEl.value = w;
+            if (pEl) pEl.value = p;
+            if (cEl) cEl.value = c.toFixed(2);
+            // Highlight active preset
+            document.querySelectorAll(".ship-preset-btn").forEach(b => b.classList.remove("btn-primary"));
+            btn.classList.add("btn-primary");
+            _updateProfitInfo();
+          });
+        });
+        _updateProfitInfo();
+      },
       buttons: [
         { label: "Abbrechen", variant: "btn-ghost", action: () => Modal.close() },
         { label: "Label erstellen & versenden", variant: "btn-primary", action: async () => {
@@ -1520,6 +1599,7 @@ const InventoryView = (() => {
           const recipCity   = document.querySelector("#shipRecipCity")?.value?.trim();
           const weight      = parseFloat(document.querySelector("#shipWeight")?.value) || defaultWeight;
           const product     = document.querySelector("#shipProduct")?.value || defaultProduct;
+          const labelCost   = parseFloat(document.querySelector("#shipLabelCost")?.value) || 0;
 
           if (!recipName || !recipStreet || !recipZip || !recipCity) {
             Toast.error("Fehler", "Bitte alle Empfänger-Felder ausfüllen.");
@@ -1554,6 +1634,7 @@ const InventoryView = (() => {
             item.shipped = true;
             item.tracking_number = trackingNo;
             item.tracking_carrier = "DHL";
+            if (labelCost > 0) item.ship_out = labelCost;
             await Storage.upsertItem(item);
 
             // 3. Upload tracking to marketplace

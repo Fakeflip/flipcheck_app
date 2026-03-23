@@ -112,6 +112,12 @@ const InventoryData = (() => {
       if (filter.source && (i.source || "manual") !== filter.source) return false;
       if (filter.shipped === "pending" && !(i.status === "SOLD" && !i.shipped)) return false;
       if (filter.shipped === "shipped" && !i.shipped) return false;
+      if (filter.warn === "warn") {
+        const hasWarn = (i.ek == null && i.status !== "SOLD" && i.status !== "ARCHIVED")
+          || (!i.ean && i.status !== "ARCHIVED")
+          || (i.status === "SOLD" && !i.shipped && i.sold_at && Math.floor((Date.now() - new Date(i.sold_at).getTime()) / 86400000) >= 2);
+        if (!hasWarn) return false;
+      }
       if (q) {
         const hay = `${i.title} ${i.ean} ${i.sku} ${i.label}`.toLowerCase();
         if (!hay.includes(q)) return false;

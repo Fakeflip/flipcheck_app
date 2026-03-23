@@ -31,7 +31,7 @@ const Modal = (() => {
    * @param {FC_ModalOptions} options
    * @returns {Promise<*>} Resolves with the clicked button's `value`, or `null` on Esc / close.
    */
-  function open({ title, body, buttons = [], width }) {
+  function open({ title, body, buttons = [], width, onOpen }) {
     if (!overlay) init();
 
     if (titleEl) titleEl.textContent = title || "";
@@ -66,6 +66,9 @@ const Modal = (() => {
     }
 
     if (overlay) overlay.style.display = "flex";
+
+    // Call onOpen after DOM is fully rendered
+    if (onOpen) requestAnimationFrame(() => onOpen());
 
     return new Promise(resolve => { resolvePromise = resolve; });
   }

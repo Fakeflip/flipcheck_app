@@ -72,6 +72,12 @@ const SettingsView = (() => {
         sender_country: container.querySelector("#sShipSenderCountry")?.value || "DE",
         default_weight: parseFloat(container.querySelector("#sShipDefaultWeight")?.value) || 1.0,
         default_product: container.querySelector("#sShipProduct")?.value || "V01PAK",
+        presets: [0,1,2,3].map(i => ({
+          name:    container.querySelector(`#sPresetName${i}`)?.value?.trim() || "",
+          weight:  parseFloat(container.querySelector(`#sPresetWeight${i}`)?.value) || 0,
+          product: container.querySelector(`#sPresetProduct${i}`)?.value || "V01PAK",
+          price:   parseFloat(container.querySelector(`#sPresetPrice${i}`)?.value) || 0,
+        })).filter(p => p.name && p.weight > 0),
       },
     };
   }
@@ -582,7 +588,7 @@ const SettingsView = (() => {
               <div class="settings-row">
                 <div class="settings-row-left">
                   <h4>Standard-Gewicht</h4>
-                  <p>Gewicht in kg, wenn nicht am Artikel hinterlegt</p>
+                  <p>Gewicht in kg, wenn kein Preset gewählt</p>
                 </div>
                 <div class="input-prefix-wrap input--sm">
                   <span class="prefix">kg</span>
@@ -592,8 +598,8 @@ const SettingsView = (() => {
               </div>
               <div class="settings-row settings-row--last">
                 <div class="settings-row-left">
-                  <h4>Produkt</h4>
-                  <p>DHL-Versandprodukt</p>
+                  <h4>Standard-Produkt</h4>
+                  <p>DHL-Versandprodukt wenn kein Preset</p>
                 </div>
                 <select id="sShipProduct" class="select select--xl">
                   <option value="V01PAK" ${(ship.default_product||"V01PAK")==="V01PAK" ? "selected" : ""}>DHL Paket</option>
@@ -602,6 +608,39 @@ const SettingsView = (() => {
                   <option value="V86PARCEL" ${(ship.default_product)==="V86PARCEL" ? "selected" : ""}>DHL Kleinpaket</option>
                 </select>
               </div>
+            </div>
+          </div>
+
+          <!-- Paketgrößen-Presets -->
+          <div class="st-section">
+            ${sectionHeader("Paketgrößen-Presets", icoPackage(), "Bis zu 4 Presets definieren — im Versand-Dialog per Klick auswählen")}
+            <div class="panel st-panel">
+              ${[0,1,2,3].map(i => {
+                const p = (ship.presets || [])[i] || {};
+                const isLast = i === 3;
+                return `<div class="settings-row${isLast ? " settings-row--last" : ""}">
+                  <div class="settings-row-left">
+                    <h4>Preset ${i + 1}</h4>
+                  </div>
+                  <div class="row gap-6" style="flex:1;max-width:520px">
+                    <input id="sPresetName${i}" class="input" style="width:70px" placeholder="z.B. S" value="${esc(p.name||"")}" />
+                    <div class="input-prefix-wrap" style="width:90px">
+                      <span class="prefix">kg</span>
+                      <input id="sPresetWeight${i}" class="input st-input-currency" type="number" min="0.1" step="0.1" placeholder="0.5" value="${p.weight||""}" />
+                    </div>
+                    <select id="sPresetProduct${i}" class="select" style="flex:1">
+                      <option value="V01PAK"    ${(p.product||"V01PAK")==="V01PAK"    ? "selected":""}>DHL Paket</option>
+                      <option value="V62WP"     ${p.product==="V62WP"     ? "selected":""}>Warenpost</option>
+                      <option value="V01PRIO"   ${p.product==="V01PRIO"   ? "selected":""}>Paket Prio</option>
+                      <option value="V86PARCEL" ${p.product==="V86PARCEL" ? "selected":""}>Kleinpaket</option>
+                    </select>
+                    <div class="input-prefix-wrap" style="width:90px">
+                      <span class="prefix">€</span>
+                      <input id="sPresetPrice${i}" class="input st-input-currency" type="number" min="0" step="0.01" placeholder="4.99" value="${p.price||""}" />
+                    </div>
+                  </div>
+                </div>`;
+              }).join("")}
             </div>
           </div>
 
