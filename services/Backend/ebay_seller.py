@@ -806,3 +806,189 @@ async def get_sold_with_financials(page: int = 1, per_page: int = 100, days: int
 
     sold_result["has_financials"] = len(financials) > 0
     return sold_result
+
+
+# ── GetOrders — buyer address + shipped status ───────────────────────────────
+
+async def get_orders_details(order_ids: List[str], token_data: Dict = None) -> Dict[str, Dict]:
+    """
+    Fetch buyer shipping address and shipped status for a list of eBay orders
+    via GetOrders Trading API.
+
+    Returns dict keyed by OrderLineItemID (our order_id):
+    {
+      "order_id": {
+        "buyer_name": "Max Mustermann",
+        "buyer_street": "Musterstr. 1",
+        "buyer_zip": "12345",
+        "buyer_city": "Berlin",
+        "buyer_country": "DE",
+        "shipped": True/False,
+        "transaction_id": "1234567890",
+      }
+    }
+    """
+    if not order_ids:
+        return {}
+
+    token, is_legacy, _updated = await get_token_for_trading(token_data)
+
+    results: Dict[str, Dict] = {}
+
+    # GetOrders supports up to 20 OrderIDs per call — batch them
+    # OrderLineItemID format: "ItemID-TransactionID"
+    # We need to extract unique OrderIDs (the full OrderLineItemID IS the order reference)
+
+    # GetOrders accepts OrderIDArray with actual eBay Order IDs
+    # But our order_ids are OrderLineItemIDs. We need to use them as such.
+    # Use GetOrderTransactions which accepts OrderLineItemID directly
+    batch_size = 20
+    for i in range(0, len(order_ids), batch_size):
+        batch = order_ids[i:i + batch_size]
+
+        item_txn_pairs = []
+        for oid in batch:
+            if "-" in oid:
+                parts = oid.split("-", 1)
+                item_txn_pairs.append((parts[0], parts[1]))
+
+        if not item_txn_pairs:
+            continue
+
+        item_txn_xml = "\n".join([
+            f"""      <ItemTransaction>
+        <ItemID>{item_id}</ItemID>
+        <TransactionID>{txn_id}</TransactionID>
+      </ItemTransaction>"""
+            for item_id, txn_id in item_txn_pairs
+        ])
+
+        xml_body = f"""<?xml version="1.0" encoding="utf-8"?>
+<GetOrderTransactionsRequest xmlns="urn:ebay:apis:eBLBaseComponents">
+  <ItemTransactionIDArray>
+{item_txn_xml}
+  </ItemTransactionIDArray>
+  <DetailLevel>ReturnAll</DetailLevel>
+  <ErrorLanguage>de_DE</ErrorLanguage>
+</GetOrderTransactionsRequest>"""
+
+        try:
+            async with httpx.AsyncClient() as client:
+                resp = await client.post(
+                    EBAY_TRADING_URL,
+                    headers=_trading_headers("GetOrderTransactions", token, legacy=is_legacy),
+                    content=xml_body.encode("utf-8"),
+                    timeout=20,
+                )
+
+            root = ET.fromstring(resp.text)
+            ack = _xml_tag(root, "Ack")
+            if ack not in ("Success", "Warning"):
+                logger.warning(f"[GetOrderTransactions] Ack={ack}")
+                continue
+
+            ns = "urn:ebay:apis:eBLBaseComponents"
+
+            # Parse OrderArray → Order → TransactionArray → Transaction
+            order_array = root.find(f"{{{ns}}}OrderArray")
+            if order_array is None:
+                continue
+
+            for order_el in order_array.findall(f"{{{ns}}}Order"):
+                # Shipped status
+                shipped_time = _xml_tag(order_el, "ShippedTime")
+                order_shipped = shipped_time is not None and shipped_time != ""
+
+                # Shipping address
+                addr = order_el.find(f"{{{ns}}}ShippingAddress")
+                buyer_name    = ""
+                buyer_street  = ""
+                buyer_zip     = ""
+                buyer_city    = ""
+                buyer_country = "DE"
+
+                if addr is not None:
+                    buyer_name    = (addr.findtext(f"{{{ns}}}Name") or "").strip()
+                    street1       = (addr.findtext(f"{{{ns}}}Street1") or "").strip()
+                    street2       = (addr.findtext(f"{{{ns}}}Street2") or "").strip()
+                    buyer_street  = f"{street1} {street2}".strip() if street2 else street1
+                    buyer_zip     = (addr.findtext(f"{{{ns}}}PostalCode") or "").strip()
+                    buyer_city    = (addr.findtext(f"{{{ns}}}CityName") or "").strip()
+                    buyer_country = (addr.findtext(f"{{{ns}}}Country") or "DE").strip()
+
+                # Match transactions to our order_ids
+                txn_array = order_el.find(f"{{{ns}}}TransactionArray")
+                if txn_array is None:
+                    continue
+                for txn in txn_array.findall(f"{{{ns}}}Transaction"):
+                    oli_id = _xml_tag(txn, "OrderLineItemID") or ""
+                    txn_id = _xml_tag(txn, "TransactionID") or ""
+                    item_el = txn.find(f"{{{ns}}}Item")
+                    item_id = _xml_tag(item_el, "ItemID") if item_el is not None else ""
+
+                    if oli_id and oli_id in order_ids:
+                        results[oli_id] = {
+                            "buyer_name":    buyer_name,
+                            "buyer_street":  buyer_street,
+                            "buyer_zip":     buyer_zip,
+                            "buyer_city":    buyer_city,
+                            "buyer_country": buyer_country,
+                            "shipped":       order_shipped,
+                            "transaction_id": txn_id,
+                            "item_id":       item_id,
+                        }
+
+        except Exception as e:
+            logger.warning(f"[GetOrderTransactions] Error: {e}")
+            continue
+
+    return results
+
+
+async def get_sold_with_details(page: int = 1, per_page: int = 100, days: int = 60, token_data: Dict = None) -> Dict:
+    """
+    Convenience: fetch sold list + enrich with financials AND buyer address/shipped status.
+    """
+    # First get sold list with financials
+    sold_result = await get_sold_with_financials(page=page, per_page=per_page, days=days, token_data=token_data)
+    if not sold_result.get("ok") or not sold_result.get("items"):
+        return sold_result
+
+    # Collect unique order IDs for detail lookup
+    order_ids = list({
+        item["order_id"] for item in sold_result["items"]
+        if item.get("order_id")
+    })
+
+    if not order_ids:
+        return sold_result
+
+    try:
+        details = await get_orders_details(order_ids, token_data=token_data)
+    except Exception as e:
+        logger.warning(f"[OrderDetails] Bulk lookup failed: {e}")
+        details = {}
+
+    # Enrich sold items with buyer address + shipped status
+    for item in sold_result["items"]:
+        oid = item.get("order_id")
+        if oid and oid in details:
+            d = details[oid]
+            item["buyer_name"]    = d["buyer_name"]
+            item["buyer_street"]  = d["buyer_street"]
+            item["buyer_zip"]     = d["buyer_zip"]
+            item["buyer_city"]    = d["buyer_city"]
+            item["buyer_country"] = d["buyer_country"]
+            item["shipped"]       = d["shipped"]
+            item["transaction_id"] = d["transaction_id"]
+        else:
+            item["buyer_name"]    = ""
+            item["buyer_street"]  = ""
+            item["buyer_zip"]     = ""
+            item["buyer_city"]    = ""
+            item["buyer_country"] = "DE"
+            item["shipped"]       = False
+            item["transaction_id"] = ""
+
+    sold_result["has_details"] = len(details) > 0
+    return sold_result

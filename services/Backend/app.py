@@ -1605,6 +1605,7 @@ try:
         is_connected, is_legacy_mode, get_my_active_listings, get_my_sold_list,
         add_legacy_token, remove_legacy_token,
         get_sold_with_financials, get_order_financials,
+        get_sold_with_details, get_orders_details,
         parse_seller_token, encode_seller_token,
         complete_sale as ebay_complete_sale,
     )
@@ -1620,7 +1621,9 @@ except ImportError:
     async def get_my_active_listings(**_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def get_my_sold_list(**_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def get_sold_with_financials(**_): return {"ok": False, "items": []}  # type: ignore[misc]
+    async def get_sold_with_details(**_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def get_order_financials(order_ids, token_data=None): return {}  # type: ignore[misc]
+    async def get_orders_details(order_ids, token_data=None): return {}  # type: ignore[misc]
     def add_legacy_token(td, token): return {}  # type: ignore[misc]
     def remove_legacy_token(td=None): return None  # type: ignore[misc]
     def parse_seller_token(raw): return None  # type: ignore[misc]
@@ -1983,17 +1986,21 @@ async def seller_active_listings(request: Request, page: int = 1, per_page: int 
 
 
 @app.get("/seller/listings/sold")
-async def seller_sold_listings(request: Request, page: int = 1, per_page: int = 100, days: int = 60, financials: bool = True):
-    """Fetch seller's recently sold items, enriched with real eBay fees if available."""
+async def seller_sold_listings(request: Request, page: int = 1, per_page: int = 100, days: int = 60, financials: bool = True, details: bool = True):
+    """Fetch seller's recently sold items, enriched with real eBay fees + buyer address if available."""
     if not _SELLER_AVAILABLE:
         return JSONResponse({"ok": False, "error": "eBay seller not configured"}, status_code=503)
     td = _get_seller_token_from_request(request)
     if not td:
         return JSONResponse({"ok": False, "error": "No seller token provided"}, status_code=401)
     try:
+        pp = min(int(per_page), 200)
+        d = min(int(days), 60)
+        if details and financials:
+            return await get_sold_with_details(page=page, per_page=pp, days=d, token_data=td)
         if financials:
-            return await get_sold_with_financials(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60), token_data=td)
-        return await get_my_sold_list(page=page, per_page=min(int(per_page), 200), days=min(int(days), 60), token_data=td)
+            return await get_sold_with_financials(page=page, per_page=pp, days=d, token_data=td)
+        return await get_my_sold_list(page=page, per_page=pp, days=d, token_data=td)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
@@ -2038,6 +2045,7 @@ try:
         get_active_units as kl_get_active_units,
         get_orders as kl_get_orders,
         update_unit_price as kl_update_unit_price,
+        send_order_unit as kl_send_order_unit,
         parse_kaufland_creds,
     )
     _KAUFLAND_SELLER_AVAILABLE = True
@@ -2048,6 +2056,7 @@ except ImportError:
     async def kl_get_active_units(ck, sk, **_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def kl_get_orders(ck, sk, **_): return {"ok": False, "items": []}  # type: ignore[misc]
     async def kl_update_unit_price(ck, sk, uid, price): return {"ok": False, "error": "not available"}  # type: ignore[misc]
+    async def kl_send_order_unit(ck, sk, ouid, tn, carrier="DHL"): return {"ok": False, "error": "not available"}  # type: ignore[misc]
     def parse_kaufland_creds(raw): return None  # type: ignore[misc]
 
 
@@ -2105,6 +2114,26 @@ async def kaufland_sold_listings(request: Request, page: int = 1, per_page: int 
         return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
     try:
         return await kl_get_orders(creds[0], creds[1], days=min(int(days), 60), page=page, per_page=min(int(per_page), 200))
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+
+
+class KauflandShipBody(BaseModel):
+    order_unit_id: str
+    tracking_number: str
+    carrier: str = "DHL"
+
+
+@app.post("/kaufland/shipment/complete")
+async def kaufland_complete_shipment(body: KauflandShipBody, request: Request):
+    """Mark a Kaufland order unit as shipped with tracking info."""
+    if not _KAUFLAND_SELLER_AVAILABLE:
+        return JSONResponse({"ok": False, "error": "Kaufland seller not configured"}, status_code=503)
+    creds = _get_kaufland_creds_from_request(request)
+    if not creds:
+        return JSONResponse({"ok": False, "error": "No Kaufland credentials provided"}, status_code=401)
+    try:
+        return await kl_send_order_unit(creds[0], creds[1], body.order_unit_id, body.tracking_number, body.carrier)
     except Exception as e:
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 

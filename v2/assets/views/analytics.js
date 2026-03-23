@@ -461,7 +461,7 @@ const AnalyticsView = (() => {
           </div>
           ${s.soldCount === 0
             ? renderAnEmpty(I18N.t('an.empty.no_sold_vk'))
-            : `<div class="chart-container"><canvas id="chartProfit" height="200"></canvas></div>`}
+            : `<div class="chart-container" style="height:200px"><canvas id="chartProfit"></canvas></div>`}
         </div>
 
         <div class="panel">
@@ -478,7 +478,7 @@ const AnalyticsView = (() => {
           </div>
           ${s.soldCount === 0
             ? renderAnEmpty(I18N.t('an.empty.no_sales'))
-            : `<div class="chart-container"><canvas id="chartRevCost" height="200"></canvas></div>`}
+            : `<div class="chart-container" style="height:200px"><canvas id="chartRevCost"></canvas></div>`}
         </div>
 
       </div>
@@ -500,7 +500,7 @@ const AnalyticsView = (() => {
           </div>
           ${totalCount === 0
             ? renderAnEmpty(I18N.t('an.empty.no_inventory'))
-            : `<div class="an-doughnut-wrap"><canvas id="chartMarket"></canvas></div>`}
+            : `<div class="an-doughnut-wrap" style="height:200px"><canvas id="chartMarket"></canvas></div>`}
         </div>
 
         <div class="panel">
@@ -653,8 +653,11 @@ const AnalyticsView = (() => {
 
   // ── Chart builders ────────────────────────────────────────────────────────
   function initCharts(stats, soldItems, container) {
-    Chart.defaults.font.family = C.font;
-    Chart.defaults.color       = C.text;
+    Chart.defaults.font.family    = C.font;
+    Chart.defaults.color          = C.text;
+    Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
+    Chart.defaults.animation      = { duration: 300 };
+    Chart.defaults.resize         = { delay: 100 };
 
     const period = _period === "monthly"
       ? calcMonthlyPeriod(soldItems)
@@ -697,7 +700,7 @@ const AnalyticsView = (() => {
       },
       options: {
         responsive:          true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         interaction: { intersect: false, mode: "index" },
         plugins: {
           legend: { display: false },
@@ -747,7 +750,7 @@ const AnalyticsView = (() => {
       },
       options: {
         responsive:          true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         interaction: { intersect: false, mode: "index" },
         plugins: {
           legend: {
@@ -789,7 +792,7 @@ const AnalyticsView = (() => {
       },
       options: {
         responsive:          true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
         cutout:              "70%",
         plugins: {
           legend: {

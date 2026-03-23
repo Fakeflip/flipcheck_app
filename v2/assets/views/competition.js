@@ -536,6 +536,8 @@ const CompetitionView = (() => {
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          devicePixelRatio: window.devicePixelRatio || 1,
+          animation: { duration: 300 },
           plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `${c.parsed.y.toFixed(2)}\u20ac` } } },
           scales: {
             x: { grid: { color: "rgba(255,255,255,0.04)" }, ticks: { color: "#475569", font: { size: 10 } } },

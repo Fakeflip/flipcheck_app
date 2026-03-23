@@ -361,6 +361,7 @@ contextBridge.exposeInMainWorld("fc", {
   /** Get sync history log. @returns {Promise<Array>} */
   ebaySyncGetLog:      () => ipcRenderer.invoke("ebaySync:getLog"),
   /** Listen for sync completion (auto or manual). @param {(stats: object) => void} cb */
+  onEbaySyncStarted:   (cb) => ipcRenderer.on("ebaySync:started",   () => cb()),
   onEbaySyncCompleted: (cb) => ipcRenderer.on("ebaySync:completed", (_e, stats) => cb(stats)),
   /** Listen for sync errors. @param {(info: {error: string}) => void} cb */
   onEbaySyncError:     (cb) => ipcRenderer.on("ebaySync:error", (_e, info) => cb(info)),
@@ -373,6 +374,7 @@ contextBridge.exposeInMainWorld("fc", {
   kauflandSyncSetInterval: (min) => ipcRenderer.invoke("kauflandSync:setInterval", min),
   kauflandSyncSetEnabled:  (on) => ipcRenderer.invoke("kauflandSync:setEnabled", on),
   kauflandSyncGetLog:      () => ipcRenderer.invoke("kauflandSync:getLog"),
+  onKauflandSyncStarted:   (cb) => ipcRenderer.on("kauflandSync:started",   () => cb()),
   onKauflandSyncCompleted: (cb) => ipcRenderer.on("kauflandSync:completed", (_e, stats) => cb(stats)),
   onKauflandSyncError:     (cb) => ipcRenderer.on("kauflandSync:error", (_e, info) => cb(info)),
 
@@ -387,8 +389,9 @@ contextBridge.exposeInMainWorld("fc", {
   dhlStatus:       () => ipcRenderer.invoke("dhl:status"),
   dhlCreateLabel:  (data) => ipcRenderer.invoke("dhl:createLabel", data),
 
-  // ── eBay Shipment ─────────────────────────────────────────────────────
-  ebayCompleteSale: (data) => ipcRenderer.invoke("ebay:completeSale", data),
+  // ── Shipment (eBay + Kaufland) ──────────────────────────────────────
+  ebayCompleteSale:     (data) => ipcRenderer.invoke("ebay:completeSale", data),
+  kauflandCompleteSale: (data) => ipcRenderer.invoke("kaufland:completeSale", data),
 
   // Error reporter webhook URL (loaded from env, not hardcoded)
   errorWebhookUrl: () => ipcRenderer.invoke("errorWebhookUrl"),

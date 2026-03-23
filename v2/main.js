@@ -2029,6 +2029,7 @@ let _ebaySyncRunning = false;
 async function runEbaySyncCycle() {
   if (_ebaySyncRunning) return { ok: false, reason: "already_running" };
   _ebaySyncRunning = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("ebaySync:started");
   console.log("[EbaySync] Cycle started");
   const stats = { active_fetched: 0, sold_fetched: 0, new_items: 0, updated: 0, sold_marked: 0, archived: 0 };
   try {
@@ -2169,7 +2170,22 @@ async function runEbaySyncCycle() {
       const alreadyProcessed = items.some(i =>
         i.ebay_order_id === sold.order_id && i.status === "SOLD" && sold.order_id
       );
-      if (alreadyProcessed) continue;
+      if (alreadyProcessed) {
+        // Even if already processed, update buyer address if it was missing
+        const existing = items.find(i => i.ebay_order_id === sold.order_id && sold.order_id);
+        if (existing && sold.buyer_name && !existing.buyer_name) {
+          existing.buyer_name    = sold.buyer_name    || "";
+          existing.buyer_street  = sold.buyer_street  || "";
+          existing.buyer_zip     = sold.buyer_zip     || "";
+          existing.buyer_city    = sold.buyer_city    || "";
+          existing.buyer_country = sold.buyer_country || "DE";
+          if (sold.transaction_id) existing.ebay_transaction_id = sold.transaction_id;
+          // If eBay says it's shipped and we haven't tracked it locally, update
+          if (sold.shipped && !existing.shipped) existing.shipped = true;
+          existing.updated_at = now;
+        }
+        continue;
+      }
 
       let match = byOfferId.get(sold.item_id);
       if (!match && sold.ean_guess) match = byEan.get(sold.ean_guess);
@@ -2180,6 +2196,17 @@ async function runEbaySyncCycle() {
         // Real fee data from Finances API (null if unavailable)
         const realFee  = sold.ebay_fee != null ? sold.ebay_fee : null;
         const realShip = sold.shipping_cost != null ? sold.shipping_cost : null;
+
+        // Buyer address + shipped status from GetOrderTransactions
+        const buyerData = {
+          buyer_name:         sold.buyer_name    || "",
+          buyer_street:       sold.buyer_street  || "",
+          buyer_zip:          sold.buyer_zip     || "",
+          buyer_city:         sold.buyer_city    || "",
+          buyer_country:      sold.buyer_country || "DE",
+          shipped:            sold.shipped        || false,
+          ebay_transaction_id: sold.transaction_id || null,
+        };
 
         if (match.qty > qtySold) {
           // Split: reduce original, create SOLD clone
@@ -2197,20 +2224,28 @@ async function runEbaySyncCycle() {
             ebay_fee:        realFee,
             ebay_ship_cost:  realShip,
             source:          match.source || "ebay_sync",
+            ...buyerData,
           });
           // If real shipping cost available, also set ship_out for backward compat
           if (realShip != null) clone.ship_out = realShip;
           items.push(clone);
         } else {
           // Entire qty sold
-          match.status         = "SOLD";
-          match.sell_price     = sold.unit_price || sold.total_price || match.sell_price;
-          match.sold_at        = sold.transaction_date || now;
-          match.ebay_order_id  = sold.order_id || null;
-          match.ebay_fee       = realFee;
-          match.ebay_ship_cost = realShip;
+          match.status              = "SOLD";
+          match.sell_price          = sold.unit_price || sold.total_price || match.sell_price;
+          match.sold_at             = sold.transaction_date || now;
+          match.ebay_order_id       = sold.order_id || null;
+          match.ebay_fee            = realFee;
+          match.ebay_ship_cost      = realShip;
+          match.buyer_name          = buyerData.buyer_name;
+          match.buyer_street        = buyerData.buyer_street;
+          match.buyer_zip           = buyerData.buyer_zip;
+          match.buyer_city          = buyerData.buyer_city;
+          match.buyer_country       = buyerData.buyer_country;
+          match.shipped             = buyerData.shipped;
+          match.ebay_transaction_id = buyerData.ebay_transaction_id;
           if (realShip != null) match.ship_out = realShip;
-          match.updated_at     = now;
+          match.updated_at          = now;
         }
         stats.sold_marked++;
       }
@@ -2490,6 +2525,7 @@ let _kauflandSyncRunning = false;
 async function runKauflandSyncCycle() {
   if (_kauflandSyncRunning) return { ok: false, reason: "already_running" };
   _kauflandSyncRunning = true;
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("kauflandSync:started");
   console.log("[KauflandSync] Cycle started");
   const stats = { active_fetched: 0, sold_fetched: 0, new_items: 0, updated: 0, sold_marked: 0, archived: 0 };
   try {
@@ -2619,13 +2655,36 @@ async function runKauflandSyncCycle() {
       const alreadyProcessed = items.some(i =>
         i.kaufland_order_id === sold.order_id && i.status === "SOLD" && sold.order_id
       );
-      if (alreadyProcessed) continue;
+      if (alreadyProcessed) {
+        // Update buyer address if it was missing
+        const existing = items.find(i => i.kaufland_order_id === sold.order_id && sold.order_id);
+        if (existing && sold.buyer_name && !existing.buyer_name) {
+          existing.buyer_name    = sold.buyer_name    || "";
+          existing.buyer_street  = sold.buyer_street  || "";
+          existing.buyer_zip     = sold.buyer_zip     || "";
+          existing.buyer_city    = sold.buyer_city    || "";
+          existing.buyer_country = sold.buyer_country || "DE";
+          if (sold.shipped && !existing.shipped) existing.shipped = true;
+          existing.updated_at = now;
+        }
+        continue;
+      }
 
       let match = byKauflandId.get(sold.item_id);
       if (!match && sold.ean_guess) match = byEan.get(sold.ean_guess);
 
       if (match && match.status !== "SOLD") {
         const qtySold = sold.quantity_sold || 1;
+
+        // Buyer address from Kaufland Orders API
+        const buyerData = {
+          buyer_name:    sold.buyer_name    || "",
+          buyer_street:  sold.buyer_street  || "",
+          buyer_zip:     sold.buyer_zip     || "",
+          buyer_city:    sold.buyer_city    || "",
+          buyer_country: sold.buyer_country || "DE",
+          shipped:       sold.shipped       || false,
+        };
 
         if (match.qty > qtySold) {
           match.qty -= qtySold;
@@ -2639,6 +2698,7 @@ async function runKauflandSyncCycle() {
             sold_at:            sold.transaction_date || now,
             kaufland_order_id:  sold.order_id || null,
             source:             match.source || "kaufland_sync",
+            ...buyerData,
           });
           items.push(clone);
         } else {
@@ -2646,6 +2706,12 @@ async function runKauflandSyncCycle() {
           match.sell_price        = sold.unit_price || sold.total_price || match.sell_price;
           match.sold_at           = sold.transaction_date || now;
           match.kaufland_order_id = sold.order_id || null;
+          match.buyer_name        = buyerData.buyer_name;
+          match.buyer_street      = buyerData.buyer_street;
+          match.buyer_zip         = buyerData.buyer_zip;
+          match.buyer_city        = buyerData.buyer_city;
+          match.buyer_country     = buyerData.buyer_country;
+          match.shipped           = buyerData.shipped;
           match.updated_at        = now;
         }
         stats.sold_marked++;
@@ -2957,6 +3023,21 @@ ipcMain.handle("ebay:completeSale", async (_e, { item_id, transaction_id, tracki
     const token = await getToken().catch(() => null);
     const res   = await sellerApiPost(`${base}/seller/shipment/complete`, {
       item_id, transaction_id: transaction_id || "0", tracking_number, carrier: carrier || "DHL"
+    }, token);
+    return res.data || { ok: false, error: "Keine Antwort vom Server" };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
+});
+
+// ─── IPC: Kaufland CompleteSale (mark order unit as shipped) ─────────────────
+ipcMain.handle("kaufland:completeSale", async (_e, { order_unit_id, tracking_number, carrier }) => {
+  if (!order_unit_id || !tracking_number) return { ok: false, error: "order_unit_id und tracking_number erforderlich" };
+  try {
+    const base  = apiBaseBackend();
+    const token = await getToken().catch(() => null);
+    const res   = await kauflandApiPost(`${base}/kaufland/shipment/complete`, {
+      order_unit_id, tracking_number, carrier: carrier || "DHL"
     }, token);
     return res.data || { ok: false, error: "Keine Antwort vom Server" };
   } catch (e) {

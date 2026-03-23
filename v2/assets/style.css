@@ -352,6 +352,44 @@ img { display: block; max-width: 100%; }
   flex-direction: column;
   gap: 1px;
 }
+
+/* ── Sync Status Bar ─────────────────────────────────────────────────── */
+.sync-status-bar {
+  padding: 6px 8px;
+  margin-bottom: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-radius: 6px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+}
+.sync-status-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1;
+}
+.sync-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  flex-shrink: 0;
+  transition: background 0.3s;
+}
+.sync-dot.syncing  { background: #F59E0B; animation: sync-pulse 1s ease-in-out infinite; }
+.sync-dot.ok       { background: var(--green); }
+.sync-dot.error    { background: var(--red); }
+.sync-label        { color: var(--text-muted); font-weight: 500; min-width: 48px; }
+.sync-time         { color: var(--text-secondary); margin-left: auto; font-size: 10px; }
+@keyframes sync-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+/* Hide text in collapsed sidebar */
+.sidebar-collapsed .sync-status-bar { display: none; }
 .nav-logout { color: var(--text-muted); }
 .nav-logout:hover { color: var(--red); background: var(--red-subtle); }
 
@@ -1054,8 +1092,12 @@ img { display: block; max-width: 100%; }
 .chart-wrap {
   position: relative;
   width: 100%;
+  min-height: 0;          /* flex/grid shrink fix */
 }
-.chart-wrap canvas { max-height: 240px; }
+.chart-wrap canvas {
+  width: 100% !important;  /* prevent Retina shrink on macOS */
+  height: 100% !important;
+}
 
 /* ── Flipcheck ───────────────────────────────────────────────────────── */
 .flipcheck-form {
@@ -2449,6 +2491,11 @@ img { display: block; max-width: 100%; }
 .chart-container {
   position: relative;
   padding: 4px 0;
+  min-height: 0;
+}
+.chart-container canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────── */
@@ -3898,6 +3945,10 @@ a.mp-asin-link:visited {
   max-width: 240px;
   margin: 0 auto;
   position: relative;
+}
+.an-doughnut-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
 }
 
 /* ── Market profit bars ─────────────────────────────────────────────────────── */

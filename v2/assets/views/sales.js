@@ -480,8 +480,11 @@ const SalesView = (() => {
     });
 
     if (typeof Chart === "undefined") return;
-    Chart.defaults.font.family = C.font;
-    Chart.defaults.color       = C.text;
+    Chart.defaults.font.family    = C.font;
+    Chart.defaults.color          = C.text;
+    Chart.defaults.devicePixelRatio = window.devicePixelRatio || 1;
+    Chart.defaults.animation      = { duration: 300 };
+    Chart.defaults.resize         = { delay: 100 };
 
     // ── Bar Chart: Gewinn/Monat ──────────────────────────────────────────
     const ctxBar = _el.querySelector("#salesChartBar");

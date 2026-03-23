@@ -62,11 +62,25 @@
  * @property {string|null}  sold_at     - ISO timestamp of sale (null while unsold)
  * @property {string}       cat_id      - eBay fee category ID (e.g. "sonstiges", "handys")
  * @property {string}       condition   - Item condition: "new" | "like_new" | "very_good" | "good" | "acceptable" | "defective"
- * @property {string|null}  ebay_offer_id - eBay offerId or SKU for direct Seller API price updates (null if not linked)
- * @property {boolean}      shipped       - Whether the item has been shipped (label created)
- * @property {string|null}  tracking_number - Carrier tracking number (e.g. DHL shipment number)
- * @property {string|null}  tracking_carrier - Carrier name ("DHL", "DPD", "Hermes")
- * @property {string|null}  ebay_order_id  - eBay order ID for fulfillment API (null if not from eBay sync)
+ * @property {string|null}  ebay_offer_id      - eBay offerId / ItemID for Seller API (null if not linked)
+ * @property {string|null}  ebay_order_id      - eBay OrderLineItemID for dedup (null if not from sync)
+ * @property {string|null}  ebay_transaction_id - eBay TransactionID for CompleteSale (null if not fetched)
+ * @property {number|null}  ebay_fee           - Real marketplace fee from Finances API (null = estimated)
+ * @property {number|null}  ebay_ship_cost     - Real shipping label cost from Finances API
+ * @property {string|null}  kaufland_unit_id   - Kaufland unit ID (links to active listing)
+ * @property {string|null}  kaufland_product_id - Kaufland product ID
+ * @property {string|null}  kaufland_order_id  - Kaufland order ID (dedup for sold items)
+ * @property {number}       refund_amount      - Refund amount in EUR (0 = no refund)
+ * @property {string|null}  refund_date        - ISO timestamp of refund (null = no refund)
+ * @property {number}       refund_fee_credit  - eBay fee credit on refund (0 = none)
+ * @property {boolean}      shipped            - Whether the item has been shipped (label created / API status)
+ * @property {string|null}  tracking_number    - Carrier tracking number (e.g. DHL shipment number)
+ * @property {string|null}  tracking_carrier   - Carrier name ("DHL", "DPD", "Hermes")
+ * @property {string}       buyer_name         - Buyer/recipient full name (from order API)
+ * @property {string}       buyer_street       - Buyer street + house number
+ * @property {string}       buyer_zip          - Buyer postal code
+ * @property {string}       buyer_city         - Buyer city
+ * @property {string}       buyer_country      - Buyer country code (default "DE")
  * @property {{enabled:boolean,undercut_pct:number,min_margin_pct:number}|null} reprice_rule - Per-item reprice rule (overrides global)
  */
 

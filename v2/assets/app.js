@@ -979,9 +979,41 @@ async function initApp() {
     });
   }
 
-  // ── eBay Sync completion toast — fires on auto-sync and manual sync ──────────
+  // ── Sync Status helpers ───────────────────────────────────────────────────
+  function _syncSetState(platform, state, timeStr) {
+    // state: "syncing" | "ok" | "error" | "idle"
+    const dot  = document.getElementById(`syncDot${platform}`);
+    const time = document.getElementById(`syncTime${platform}`);
+    if (dot)  { dot.className = "sync-dot" + (state !== "idle" ? " " + state : ""); }
+    if (time) { time.textContent = timeStr || "—"; }
+  }
+
+  function _syncRelativeTime(isoStr) {
+    if (!isoStr) return "—";
+    const diffMs  = Date.now() - new Date(isoStr).getTime();
+    const diffMin = Math.floor(diffMs / 60000);
+    if (diffMin < 1)   return "gerade eben";
+    if (diffMin < 60)  return `vor ${diffMin} Min`;
+    const diffH = Math.floor(diffMin / 60);
+    if (diffH < 24)    return `vor ${diffH} Std`;
+    return `vor ${Math.floor(diffH / 24)} Tag${Math.floor(diffH / 24) > 1 ? "en" : ""}`;
+  }
+
+  // Initialise from last sync times stored in settings
+  window.fc?.ebaySyncStatus?.().then(s => {
+    if (s?.last_sync_at) _syncSetState("Ebay", "ok", _syncRelativeTime(s.last_sync_at));
+  }).catch(() => {});
+  window.fc?.kauflandSyncStatus?.().then(s => {
+    if (s?.last_sync_at) _syncSetState("Kaufland", "ok", _syncRelativeTime(s.last_sync_at));
+  }).catch(() => {});
+
+  // ── eBay Sync events ──────────────────────────────────────────────────────
+  if (window.fc?.onEbaySyncStarted) {
+    window.fc.onEbaySyncStarted(() => _syncSetState("Ebay", "syncing", "läuft…"));
+  }
   if (window.fc?.onEbaySyncCompleted) {
     window.fc.onEbaySyncCompleted((stats) => {
+      _syncSetState("Ebay", "ok", "gerade eben");
       if (typeof Toast === "undefined") return;
       const parts = [];
       if (stats.new_items)         parts.push(`${stats.new_items} neu`);
@@ -995,7 +1027,27 @@ async function initApp() {
   }
   if (window.fc?.onEbaySyncError) {
     window.fc.onEbaySyncError((info) => {
-      if (typeof Toast !== "undefined") Toast.error("eBay Sync fehlgeschlagen", info?.error || "Unbekannter Fehler");
+      _syncSetState("Ebay", "error", "Fehler");
+      const errMsg = info?.error || "Unbekannter Fehler";
+      if (typeof Toast !== "undefined") Toast.error("eBay Sync fehlgeschlagen", errMsg);
+      window.fc?.notify?.("eBay Sync fehlgeschlagen", errMsg);
+    });
+  }
+
+  // ── Kaufland Sync events ──────────────────────────────────────────────────
+  if (window.fc?.onKauflandSyncStarted) {
+    window.fc.onKauflandSyncStarted(() => _syncSetState("Kaufland", "syncing", "läuft…"));
+  }
+  if (window.fc?.onKauflandSyncCompleted) {
+    window.fc.onKauflandSyncCompleted((stats) => {
+      _syncSetState("Kaufland", "ok", "gerade eben");
+    });
+  }
+  if (window.fc?.onKauflandSyncError) {
+    window.fc.onKauflandSyncError((info) => {
+      _syncSetState("Kaufland", "error", "Fehler");
+      const errMsg = info?.error || "Unbekannter Fehler";
+      window.fc?.notify?.("Kaufland Sync fehlgeschlagen", errMsg);
     });
   }
 

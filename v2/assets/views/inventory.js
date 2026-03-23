@@ -32,7 +32,7 @@ const InventoryView = (() => {
     container: null,
     items:     [],
     selected:  new Set(),
-    filter:    { q: "", status: "", market: "", source: "" },
+    filter:    { q: "", status: "", market: "", source: "", shipped: "" },
     sort:      { col: "age", dir: "asc" },
     vs:        { data: [], wrap: null, busy: false },
   };
@@ -105,7 +105,7 @@ const InventoryView = (() => {
     // Reset state fresh on every mount
     _state.container = container;
     _state.selected  = new Set();
-    _state.filter    = { q: "", status: "", market: "", source: "" };
+    _state.filter    = { q: "", status: "", market: "", source: "", shipped: "" };
     _state.sort      = { col: "age", dir: "asc" };
     _state.vs        = { data: [], wrap: null, busy: false };
 
@@ -183,6 +183,11 @@ const InventoryView = (() => {
           <option value="ebay_sync">eBay Sync</option>
           <option value="extension">Extension</option>
           <option value="csv">CSV Import</option>
+        </select>
+        <select id="invShippedFilter" class="select">
+          <option value="">Versand: Alle</option>
+          <option value="pending">📦 Ausstehend</option>
+          <option value="shipped">✅ Versendet</option>
         </select>
       </div>
 
@@ -321,7 +326,7 @@ const InventoryView = (() => {
         <div class="empty-state">
           <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-4 0v2M12 12v4M10 14h4"/></svg>
           <p class="empty-title">${I18N.t('inv.empty.title')}</p>
-          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market || _state.filter.source ? I18N.t('inv.empty.sub_filtered') : I18N.t('inv.empty.sub_empty')}</p>
+          <p class="empty-sub">${_state.filter.q || _state.filter.status || _state.filter.market || _state.filter.source || _state.filter.shipped ? I18N.t('inv.empty.sub_filtered') : I18N.t('inv.empty.sub_empty')}</p>
         </div>
       `;
       return;
@@ -467,6 +472,9 @@ const InventoryView = (() => {
             ${item.status !== "SOLD" ? `<button class="btn btn-ghost btn-icon btn-inv-sold" data-id="${esc(item.id)}" title="Als verkauft markieren">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8l4 4 6-7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </button>` : ""}
+            ${item.status === "SOLD" ? `<button class="btn btn-ghost btn-icon btn-inv-return" data-id="${esc(item.id)}" title="Retoure erfassen" style="color:var(--yellow)">
+              <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1 0 1.5-3.9M2 2v4h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </button>` : ""}
             ${item.status === "SOLD" && !item.shipped ? `<button class="btn btn-ghost btn-icon btn-inv-ship" data-id="${esc(item.id)}" title="Versenden">
               <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M1 3h9v8H1zM10 6h3l2 3v3h-5V6z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><circle cx="4" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/><circle cx="12.5" cy="12" r="1.2" stroke="currentColor" stroke-width="1.3"/></svg>
             </button>` : ""}
@@ -533,6 +541,12 @@ const InventoryView = (() => {
 
     container.querySelector("#invSourceFilter")?.addEventListener("change", e => {
       _state.filter.source = e.target.value;
+      renderTable(container);
+      updateCount(container);
+    });
+
+    container.querySelector("#invShippedFilter")?.addEventListener("change", e => {
+      _state.filter.shipped = e.target.value;
       renderTable(container);
       updateCount(container);
     });
@@ -617,6 +631,9 @@ const InventoryView = (() => {
 
       const shipBtn = e.target.closest(".btn-inv-ship");
       if (shipBtn) { openShipModal(shipBtn.dataset.id, container); return; }
+
+      const returnBtn = e.target.closest(".btn-inv-return");
+      if (returnBtn) { openReturnModal(returnBtn.dataset.id, container); return; }
 
       const flipBtn = e.target.closest(".btn-inv-flip");
       if (flipBtn) {
@@ -1356,6 +1373,81 @@ const InventoryView = (() => {
   }
 
   // ── Versand Modal ─────────────────────────────────────────────────────────
+  async function openReturnModal(id, container) {
+    const item = _state.items.find(i => i.id === id);
+    if (!item) return;
+
+    const sellPrice = item.sell_price || 0;
+
+    const body = `
+      <div class="col gap-12">
+        <div class="repr-alert repr-alert--warn">
+          <span class="repr-alert-icon">↩</span>
+          Retoure für <strong>${esc(item.title || item.ean || "Artikel")}</strong> erfassen
+        </div>
+
+        <div class="col gap-8">
+          <div class="col gap-4">
+            <label class="text-xs text-muted">Rückerstattungsbetrag (€)</label>
+            <input type="number" id="retRefund" class="input" value="${sellPrice.toFixed(2)}" min="0" step="0.01" placeholder="0.00" />
+            <span class="text-xs text-muted">Verkaufspreis war ${fmtEur(sellPrice)} — Voll- oder Teilerstattung eintragen</span>
+          </div>
+          <div class="col gap-4">
+            <label class="text-xs text-muted">eBay Gebühren-Rückerstattung (€)</label>
+            <input type="number" id="retFeeCredit" class="input" value="0" min="0" step="0.01" placeholder="0.00" />
+          </div>
+          <div class="col gap-4">
+            <label class="text-xs text-muted">Artikel danach wieder einlagern?</label>
+            <select id="retRestock" class="select">
+              <option value="return">Ja — Status auf RETURN setzen</option>
+              <option value="in_stock">Ja — zurück auf IN_STOCK</option>
+              <option value="archived">Nein — archivieren</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    `;
+
+    Modal.open({
+      title: "↩ Retoure erfassen",
+      body,
+      buttons: [
+        { label: "Abbrechen", variant: "btn-ghost", action: () => Modal.close() },
+        { label: "Retoure speichern", variant: "btn-primary", action: async () => {
+          const refundAmt  = parseFloat(document.querySelector("#retRefund")?.value) || 0;
+          const feeCredit  = parseFloat(document.querySelector("#retFeeCredit")?.value) || 0;
+          const restock    = document.querySelector("#retRestock")?.value || "return";
+
+          const newStatus = restock === "in_stock" ? "IN_STOCK"
+                          : restock === "archived"  ? "ARCHIVED"
+                          : "RETURN";
+
+          const updates = {
+            ...item,
+            status:            newStatus,
+            refund_amount:     refundAmt,
+            refund_date:       new Date().toISOString(),
+            refund_fee_credit: feeCredit,
+          };
+
+          // If restocking, clear sale fields
+          if (restock === "in_stock") {
+            updates.sell_price   = null;
+            updates.sold_at      = null;
+            updates.shipped      = false;
+            updates.ebay_order_id = null;
+          }
+
+          await Storage.upsertItem(updates);
+          Modal.close();
+          Toast.success("Retoure gespeichert", `${fmtEur(refundAmt)} erstattet · Status: ${newStatus}`);
+          await loadItems(container);
+          renderAll(container);
+        }},
+      ],
+    });
+  }
+
   async function openShipModal(id, container) {
     const item = _state.items.find(i => i.id === id);
     if (!item) return;
@@ -1464,18 +1556,30 @@ const InventoryView = (() => {
             item.tracking_carrier = "DHL";
             await Storage.upsertItem(item);
 
-            // 3. Upload tracking to eBay (if eBay item)
-            if (item.market === "ebay" && (item.ebay_offer_id || item.ebay_order_id)) {
+            // 3. Upload tracking to marketplace
+            if (item.market === "ebay" && item.ebay_offer_id) {
               try {
+                const txnId = item.ebay_transaction_id || (item.ebay_order_id ? item.ebay_order_id.split("-")[1] : "0");
                 await window.fc.ebayCompleteSale({
-                  item_id: item.ebay_offer_id || "",
-                  transaction_id: item.ebay_order_id || "0",
+                  item_id: item.ebay_offer_id,
+                  transaction_id: txnId,
                   tracking_number: trackingNo,
                   carrier: "DHL",
                 });
               } catch (e) {
                 console.warn("[Ship] eBay CompleteSale failed:", e);
                 Toast.warning("Hinweis", "Label erstellt, aber eBay-Tracking konnte nicht hochgeladen werden.");
+              }
+            } else if (item.market === "kaufland" && item.kaufland_order_id) {
+              try {
+                await window.fc.kauflandCompleteSale({
+                  order_unit_id: item.kaufland_unit_id || item.kaufland_order_id,
+                  tracking_number: trackingNo,
+                  carrier: "DHL",
+                });
+              } catch (e) {
+                console.warn("[Ship] Kaufland CompleteSale failed:", e);
+                Toast.warning("Hinweis", "Label erstellt, aber Kaufland-Tracking konnte nicht hochgeladen werden.");
               }
             }
 
@@ -1559,12 +1663,21 @@ const InventoryView = (() => {
 
           if (result.label_pdf_b64) pdfParts.push(result.label_pdf_b64);
 
-          // eBay tracking upload
-          if (item.market === "ebay" && (item.ebay_offer_id || item.ebay_order_id)) {
+          // Marketplace tracking upload
+          if (item.market === "ebay" && item.ebay_offer_id) {
             try {
+              const txnId = item.ebay_transaction_id || (item.ebay_order_id ? item.ebay_order_id.split("-")[1] : "0");
               await window.fc.ebayCompleteSale({
-                item_id: item.ebay_offer_id || "",
-                transaction_id: item.ebay_order_id || "0",
+                item_id: item.ebay_offer_id,
+                transaction_id: txnId,
+                tracking_number: result.shipment_no,
+                carrier: "DHL",
+              });
+            } catch {}
+          } else if (item.market === "kaufland" && item.kaufland_order_id) {
+            try {
+              await window.fc.kauflandCompleteSale({
+                order_unit_id: item.kaufland_unit_id || item.kaufland_order_id,
                 tracking_number: result.shipment_no,
                 carrier: "DHL",
               });

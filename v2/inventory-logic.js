@@ -110,6 +110,21 @@ function normalizeItem(input) {
   it.kaufland_product_id = it.kaufland_product_id || null;  // Kaufland product ID
   it.kaufland_order_id   = it.kaufland_order_id   || null;  // Kaufland order ID (dedup for sold items)
 
+  // Fulfillment / shipping fields
+  it.shipped          = it.shipped          || false;       // Label created / shipped via API
+  it.tracking_number  = it.tracking_number  || null;        // DHL/Hermes/DPD tracking number
+  it.tracking_carrier = it.tracking_carrier || null;        // "DHL", "DPD", "Hermes"
+
+  // Buyer address (from eBay GetOrderTransactions / Kaufland Orders API)
+  it.buyer_name    = it.buyer_name    || "";   // Recipient full name
+  it.buyer_street  = it.buyer_street  || "";   // Street + house number
+  it.buyer_zip     = it.buyer_zip     || "";   // Postal code
+  it.buyer_city    = it.buyer_city    || "";   // City
+  it.buyer_country = it.buyer_country || "DE"; // Country code (default DE)
+
+  // eBay transaction ID (for CompleteSale — different from order_id)
+  it.ebay_transaction_id = it.ebay_transaction_id || null;
+
   return /** @type {import('./assets/lib/types.js').FC_InventoryItem} */ (it);
 }
 

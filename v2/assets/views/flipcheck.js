@@ -1344,6 +1344,8 @@ const FlipcheckView = (() => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        animation: { duration: 300 },
         interaction: { intersect: false, mode: "index" },
         plugins: {
           legend: {
@@ -1451,6 +1453,7 @@ const FlipcheckView = (() => {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 1,
         animation: false,
         plugins: {
           legend: { display: false },

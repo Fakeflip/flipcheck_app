@@ -226,10 +226,30 @@ async def get_orders(
         order_id = str(order.get("id_order", ""))
         order_status = order.get("status", "")
         ts_created = order.get("ts_created") or order.get("ts_units_created") or ""
-        buyer_name = order.get("buyer", {}).get("name", "") if isinstance(order.get("buyer"), dict) else ""
-        # Mask buyer name for privacy
-        if buyer_name and len(buyer_name) > 3:
-            buyer_name = buyer_name[:3] + "***"
+
+        # Full buyer name (for shipping label)
+        buyer_obj = order.get("buyer", {}) if isinstance(order.get("buyer"), dict) else {}
+        full_buyer_name = buyer_obj.get("name", "")
+        # Masked buyer name (for display / privacy)
+        masked_buyer = full_buyer_name[:3] + "***" if full_buyer_name and len(full_buyer_name) > 3 else full_buyer_name
+
+        # Shipping address from order
+        shipping_addr = order.get("shipping_address") or order.get("delivery_address") or {}
+        if isinstance(shipping_addr, dict):
+            addr_name    = shipping_addr.get("first_name", "") + " " + shipping_addr.get("last_name", "")
+            addr_name    = addr_name.strip() or full_buyer_name
+            addr_street  = shipping_addr.get("street", "")
+            addr_house   = shipping_addr.get("house_number", "")
+            addr_full    = f"{addr_street} {addr_house}".strip() if addr_house else addr_street
+            addr_zip     = shipping_addr.get("postcode", "") or shipping_addr.get("postal_code", "")
+            addr_city    = shipping_addr.get("city", "")
+            addr_country = shipping_addr.get("country", "DE")
+        else:
+            addr_name = full_buyer_name
+            addr_full = ""
+            addr_zip = ""
+            addr_city = ""
+            addr_country = "DE"
 
         order_units = order.get("order_units", [])
         for ou in order_units:
@@ -239,6 +259,10 @@ async def get_orders(
 
             unit_status = ou.get("status") or order_status
             is_return = unit_status in _RETURN_STATUSES
+
+            # Shipped = status is "sent" or similar
+            is_shipped = unit_status.lower() in ("sent", "received", "delivered",
+                                                  "shipped", "completed")
 
             # Refund amount: Kaufland refunds the unit price on return
             refund_amount = price_euro if is_return else 0
@@ -252,10 +276,17 @@ async def get_orders(
                 "unit_price": price_euro,
                 "total_price": round(price_euro * qty, 2),
                 "transaction_date": ts_created,
-                "buyer": buyer_name,
+                "buyer": masked_buyer,
                 "status": unit_status,
                 "is_return": is_return,
                 "refund_amount": refund_amount,
+                # Buyer address for shipping labels
+                "buyer_name":    addr_name,
+                "buyer_street":  addr_full,
+                "buyer_zip":     addr_zip,
+                "buyer_city":    addr_city,
+                "buyer_country": addr_country,
+                "shipped":       is_shipped,
             })
 
     return {
@@ -265,6 +296,50 @@ async def get_orders(
         "page": page,
         "items": items,
     }
+
+
+async def send_order_unit(
+    client_key: str,
+    secret_key: str,
+    order_unit_id: str,
+    tracking_number: str,
+    carrier: str = "DHL",
+) -> Dict:
+    """
+    Mark a Kaufland order unit as shipped with tracking info.
+    PATCH /order-units/{id_order_unit}/send
+    Body: { "carrier_code": "dhl", "tracking_numbers": "123..." }
+    """
+    # Map carrier names to Kaufland carrier_code values
+    carrier_map = {
+        "DHL":            "dhl",
+        "DPD":            "dpd",
+        "Hermes":         "hermes",
+        "GLS":            "gls",
+        "UPS":            "ups",
+        "Deutsche Post":  "deutsche_post",
+        "FedEx":          "fedex",
+        "TNT":            "tnt",
+        "dhl":            "dhl",
+        "dpd":            "dpd",
+        "hermes":         "hermes",
+        "gls":            "gls",
+    }
+    carrier_code = carrier_map.get(carrier, carrier.lower())
+
+    result = await _kaufland_request(
+        "PATCH",
+        f"/order-units/{order_unit_id}/send",
+        client_key,
+        secret_key,
+        body={
+            "carrier_code": carrier_code,
+            "tracking_numbers": tracking_number,
+        },
+    )
+    if result.get("ok"):
+        return {"ok": True, "order_unit_id": order_unit_id, "tracking_number": tracking_number}
+    return {"ok": False, "order_unit_id": order_unit_id, "error": result.get("error", "Send failed")}
 
 
 async def update_unit_price(

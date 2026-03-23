@@ -327,8 +327,8 @@ const HistoryView = (() => {
             <h3 class="panel-title" style="margin-bottom:0">${I18N.t('hist.chart.title')}</h3>
             <span class="badge badge-gray">${I18N.t('hist.chart.last')} ${entries.length} ${I18N.t('hist.chart.datapoints')}</span>
           </div>
-          <div class="chart-container">
-            <canvas id="histChart" height="200"></canvas>
+          <div class="chart-container" style="height:200px">
+            <canvas id="histChart"></canvas>
           </div>
         </div>
 
@@ -450,7 +450,9 @@ const HistoryView = (() => {
       },
       options: {
         responsive: true,
-        maintainAspectRatio: true,
+        maintainAspectRatio: false,
+        devicePixelRatio: window.devicePixelRatio || 1,
+        animation: { duration: 300 },
         interaction: { intersect: false, mode: "index" },
         plugins: {
           legend: {
