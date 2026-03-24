@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Flipcheck",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Profitabilitätsanalyse für eBay-Reseller: BUY/HOLD/SKIP-Verdikt, Gewinnkalkulator, Preisverlauf & Deal-Benachrichtigungen.",
   "background": {
     "service_worker": "background.js"
@@ -236,6 +236,24 @@
         "shared/fee-calc.js",
         "content/panel-component.js",
         "content/ebay-product.js"
+      ],
+      "run_at": "document_idle"
+    },
+    {
+      "matches": [
+        "https://www.ebay.de/sl/sell*",
+        "https://www.ebay.de/sl/list*",
+        "https://www.ebay.de/sl/create*",
+        "https://www.ebay.de/lstng/*",
+        "https://www.ebay.de/sl/revise*",
+        "https://www.ebay.de/sl/relist*"
+      ],
+      "js": [
+        "shared/constants.js",
+        "shared/ean-utils.js",
+        "shared/fee-calc.js",
+        "content/panel-component.js",
+        "content/ebay-sell.js"
       ],
       "run_at": "document_idle"
     },
