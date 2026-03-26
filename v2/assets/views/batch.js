@@ -60,14 +60,21 @@ const BatchView = (() => {
   // ─── Full profit calc (frontend-side, no shipping for batch) ──────────────
   function calcProfit(vkGross, ekGross, catId, vatMode, ekMode) {
     if (!vkGross || vkGross <= 0) return null;
-    const vat      = vatMode === "ust_19" ? 1.19 : 1.0;
-    const feeGross = calcEbayFee(vkGross, catId);
-    const feeNet   = feeGross / vat;
-    const vkNet    = vkGross  / vat;
-    const ekNet    = (vatMode === "ust_19" && ekMode === "gross") ? ekGross / vat : ekGross;
+    const VAT = 1.19;
+    const feeNetto = calcEbayFee(vkGross, catId);
+    let feeNet, vkNet, ekNet;
+    if (vatMode === "ust_19") {
+      feeNet = feeNetto;
+      vkNet  = vkGross / VAT;
+      ekNet  = ekMode === "gross" ? ekGross / VAT : ekGross;
+    } else {
+      feeNet = feeNetto * VAT;  // Kleinunternehmer pays brutto fees
+      vkNet  = vkGross;
+      ekNet  = ekGross;
+    }
     const profit   = vkNet - feeNet - ekNet;
-    const margin   = vkGross > 0 ? (profit / vkGross * 100) : 0;
-    return { profit, margin, feeGross };
+    const margin   = vkNet > 0 ? (profit / vkNet * 100) : 0;
+    return { profit, margin, feeGross: feeNetto };
   }
 
   // ─── Build category <optgroup> HTML ────────────────────────────────────────

@@ -62,21 +62,27 @@ const FlipcheckView = (() => {
 
   function calcProfit(vkGross, ekGross, catId, shipIn, shipOut) {
     const cat   = CATEGORIES.find(c => c.id === catId) || CATEGORIES[CATEGORIES.length - 1];
-    let fee = 0;
+    let feeNetto = 0;
     let rem = vkGross;
     for (const [limit, pct] of cat.tiers) {
-      if (limit == null) { fee += rem * pct; break; }
+      if (limit == null) { feeNetto += rem * pct; break; }
       const chunk = Math.min(rem, limit);
-      fee += chunk * pct;
+      feeNetto += chunk * pct;
       rem  = Math.max(0, rem - limit);
       if (rem <= 0) break;
     }
-    fee = Math.max(fee, 0.35);
-    const vat    = _vatMode === "ust_19" ? 1.19 : 1.0;
-    const vkNet  = vkGross / vat;
-    const feeNet = fee / vat;
-    const ekNet  = (_vatMode === "ust_19" && _ekMode === "gross") ? ekGross / vat : ekGross;
-    return vkNet - feeNet - (shipIn || 0) - (shipOut || 0) - ekNet;
+    feeNetto = Math.max(feeNetto, 0.35);
+    // eBay fees are netto; eBay adds 19% MwSt. on the invoice.
+    // USt.-pflichtig: MwSt. on fees is deductible → net cost = feeNetto
+    // Kleinunternehmer: pays brutto (feeNetto × 1.19), no deduction
+    if (_vatMode === "ust_19") {
+      const vkNet  = vkGross / 1.19;
+      const ekNet  = _ekMode === "gross" ? ekGross / 1.19 : ekGross;
+      return vkNet - feeNetto - (shipIn || 0) / 1.19 - (shipOut || 0) / 1.19 - ekNet;
+    } else {
+      const feeCost = feeNetto * 1.19; // Kleinunternehmer zahlt brutto
+      return vkGross - feeCost - (shipIn || 0) - (shipOut || 0) - ekGross;
+    }
   }
 
   function _deriveScore(d) {

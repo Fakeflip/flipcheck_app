@@ -39,19 +39,20 @@ AMAZON_REFERRAL_FEES: Dict[str, float] = {
     "sonstiges":           0.15,
 }
 
-# FBA Fee tiers (size → (weight_kg, fee_eur))
-# Simplified DE FBA fee table (2024)
+# FBA Fee tiers — NETTO values (zzgl. 19 % MwSt.), Amazon DE 2025
+# Source: Amazon Seller Central DE fee schedule (updated annually)
 FBA_TIERS = [
-    # (max_weight_kg, max_longest_side_cm, fee_eur, label)
-    (0.20,  20, 2.70, "Klein Standard"),
-    (0.40,  30, 3.00, "Klein Standard+"),
-    (0.90,  33, 3.40, "Standard 1"),
-    (1.50,  33, 3.80, "Standard 2"),
-    (3.00,  45, 4.70, "Groß 1"),
-    (5.00,  61, 5.40, "Groß 2"),
-    (9.00,  61, 6.50, "Groß 3"),
-    (15.0,  74, 8.10, "Groß 4"),
-    (None, None, 9.80, "Schwer/Sperrig"),  # catch-all
+    # (max_weight_kg, max_longest_side_cm, fee_eur_netto, label)
+    (0.15,  20, 2.41, "Klein Standard"),
+    (0.40,  26, 2.66, "Klein Standard+"),
+    (0.90,  33, 3.01, "Standard"),
+    (1.50,  33, 3.47, "Standard+"),
+    (3.00,  45, 4.41, "Groß 1"),
+    (5.00,  61, 5.07, "Groß 2"),
+    (9.00,  61, 5.85, "Groß 3"),
+    (15.0,  74, 7.35, "Groß 4"),
+    (23.0, 120, 9.73, "Sperrig 1"),
+    (None, None, 12.50, "Sperrig 2"),  # catch-all
 ]
 
 # In-memory Keepa cache: asin → (ts, data)
@@ -514,47 +515,57 @@ def calc_amazon_profit(
     category:       str   = "sonstiges",
     method:         str   = "fba",
     ship_in:        float = 0.0,
-    fba_fee:        float = 3.40,  # default small standard
+    fba_fee:        float = 3.40,  # default small standard (netto, zzgl. MwSt.)
     referral_pct:   Optional[float] = None,
     prep_fee:       float = 0.0,   # PREP/Labeling service fee per unit
     vat_mode:       str   = "no_vat",  # "no_vat" | "ust_19"
     ek_mode:        str   = "gross",   # "gross" | "net"
 ) -> Dict[str, float]:
     """
-    Amazon Revenue Calculator logic (matches Amazon's own calculator exactly):
+    Amazon Revenue Calculator logic.
 
-    vat_mode="ust_19" (USt.-pflichtig):
-      - sell_net  = sell_price / 1.19  (customer brutto → netto Erlös)
-      - ref_fee   = sell_net × ref_pct  (Referral auf NETTO, wie Amazon)
-      - fba_fee   = fba_fee / 1.19      (Amazon-Fees werden netto ausgewiesen)
-      - ek_net    = ek / 1.19           (wenn ek_mode="gross")
-      - ship_in   = ship_in / 1.19
-      - profit    = sell_net - ref_fee - fba_fee_net - ship_in_net - prep_fee - ek_net
+    Key insight: Amazon always calculates referral fee on the BRUTTO selling
+    price (what the buyer pays).  All Amazon fees (referral, FBA, closing) are
+    netto amounts to which Amazon adds 19 % MwSt. on their invoice.
 
-    vat_mode="no_vat" (Kleinunternehmer / kein Vorsteuerabzug):
-      - Alles bleibt brutto (keine Umrechnung), ref_fee auf Brutto-VK.
+    vat_mode="ust_19" (USt.-pflichtig, Vorsteuerabzug):
+      - sell_net   = sell_price / 1.19
+      - ref_fee    = sell_price × ref_pct   (netto, auf BRUTTO-VK wie Amazon)
+      - fba_cost   = fba_fee               (netto, Keepa/table liefern netto)
+      - ek_net     = ek / 1.19             (wenn ek_mode="gross")
+      - profit     = sell_net - ref_fee - fba_cost - ek_net - ship_in_net - prep
 
-    FBM fix: ship_in ist Versand pro Einheit → nur einmal in total_fees,
-    NICHT nochmal vom profit abgezogen.
+    vat_mode="no_vat" (Kleinunternehmer, KEIN Vorsteuerabzug):
+      - Seller pays Amazon-Fees BRUTTO (netto + 19 % MwSt.)
+      - ref_fee    = sell_price × ref_pct × 1.19  (brutto)
+      - fba_cost   = fba_fee × 1.19               (brutto)
+      - profit     = sell_price - ref_fee - fba_cost - ek - ship_in - prep
     """
-    vat = 1.19 if vat_mode == "ust_19" else 1.0
-
-    # Netto-Erlös (Basis für alle Berechnungen bei USt.-Pflicht)
-    sell_net    = round(sell_price / vat, 2)
-
-    # EK und Versand → netto
-    ek_net      = round((ek      / vat) if (vat_mode == "ust_19" and ek_mode == "gross") else ek, 2)
-    ship_in_net = round((ship_in / vat) if vat_mode == "ust_19" else ship_in, 2)
-
-    # FBA-Fee: Amazon veröffentlicht Fees netto (zzgl. MwSt.) → netto umrechnen
-    fba_fee_net = round(fba_fee / vat, 2) if vat_mode == "ust_19" else fba_fee
-
+    VAT = 1.19
     ref_pct = referral_pct if referral_pct is not None else AMAZON_REFERRAL_FEES.get(category, 0.15)
-    # Referral Fee auf NETTO-VK (wie Amazon Revenue Calculator)
-    ref_fee = round(sell_net * ref_pct, 2)
+
+    # Referral: Amazon berechnet IMMER auf den BRUTTO-VK (Kundenpreis inkl. MwSt.)
+    ref_fee_netto = round(sell_price * ref_pct, 2)
+
+    if vat_mode == "ust_19":
+        # ── USt.-pflichtig: alle Werte netto (Vorsteuerabzug auf Fees) ──────
+        sell_net    = round(sell_price / VAT, 2)
+        ek_net      = round((ek / VAT) if ek_mode == "gross" else ek, 2)
+        ship_in_net = round(ship_in / VAT, 2)
+        ref_fee     = ref_fee_netto          # netto Fee-Kosten (MwSt. abzugsfähig)
+        fba_cost    = round(fba_fee, 2)      # Keepa/Tabelle liefern netto
+        prep_cost   = round(prep_fee / VAT, 2) if prep_fee else 0.0
+    else:
+        # ── Kleinunternehmer: alles brutto (kein Vorsteuerabzug) ────────────
+        sell_net    = sell_price
+        ek_net      = ek
+        ship_in_net = ship_in
+        ref_fee     = round(ref_fee_netto * VAT, 2)   # + 19 % MwSt. auf Fee
+        fba_cost    = round(fba_fee * VAT, 2)          # + 19 % MwSt. auf Fee
+        prep_cost   = round(prep_fee * VAT, 2) if prep_fee else 0.0
 
     if method == "fba":
-        fulfillment_fee = fba_fee_net
+        fulfillment_fee = fba_cost
         ship_out_fee    = 0.0
         inbound_cost    = ship_in_net  # FBA: Einlieferungskosten separat
     else:  # fbm
@@ -562,7 +573,7 @@ def calc_amazon_profit(
         ship_out_fee    = ship_in_net  # FBM: Versand pro Einheit in total_fees
         inbound_cost    = 0.0          # bereits in total_fees — kein doppelter Abzug
 
-    total_fees = ref_fee + fulfillment_fee + ship_out_fee + prep_fee
+    total_fees = ref_fee + fulfillment_fee + ship_out_fee + prep_cost
     profit     = round(sell_net - total_fees - ek_net - inbound_cost, 2)
     margin_pct = round((profit / sell_net * 100) if sell_net > 0 else 0, 1)
 
@@ -573,7 +584,7 @@ def calc_amazon_profit(
         "fulfillment_fee": fulfillment_fee,
         "ship_out_fee":    ship_out_fee,
         "ship_in_net":     ship_in_net,
-        "prep_fee":        round(prep_fee, 2),
+        "prep_fee":        prep_cost,
         "total_fees":      round(total_fees, 2),
         "ek_net":          ek_net,
         "profit":          profit,
@@ -872,12 +883,18 @@ async def amazon_check(
     net_payout = round(calc["sell_net"] - calc["referral_fee"] - calc["fulfillment_fee"] - calc["prep_fee"], 2)
 
     # Break-even: minimaler BRUTTO-Listenpreis damit Profit ≥ 0
+    # For no_vat: profit = sell_price - sell_price*ref_pct*1.19 - fba*1.19 - ek = 0
+    #   → sell_price * (1 - ref_pct*1.19) = costs → sell_price = costs / (1 - ref_pct*1.19)
+    # For ust_19: profit = sell_price/1.19 - sell_price*ref_pct - fba - ek/1.19 = 0
+    #   → sell_price * (1/1.19 - ref_pct) = costs → sell_price = costs / (1/1.19 - ref_pct)
     ref_pct_dec = AMAZON_REFERRAL_FEES.get(category, 0.15)
-    _denom      = 1.0 - ref_pct_dec
-    break_even_net = (
-        (calc["fulfillment_fee"] + calc["prep_fee"] + calc["ek_net"] + calc["ship_in_net"]) / _denom
-    ) if _denom > 0 else 0.0
-    break_even = round(break_even_net * vat, 2)  # → brutto Listenpreis
+    if vat_mode == "ust_19":
+        _denom = (1.0 / 1.19) - ref_pct_dec
+        _costs = calc["fulfillment_fee"] + calc["prep_fee"] + calc["ek_net"] + calc["ship_in_net"]
+    else:
+        _denom = 1.0 - ref_pct_dec * 1.19
+        _costs = calc["fulfillment_fee"] + calc["prep_fee"] + calc["ek_net"] + calc["ship_in_net"]
+    break_even = round(_costs / _denom, 2) if _denom > 0 else 0.0
 
     monthly_profit_est = round(calc["profit"] * sales_30d, 2) if sales_30d > 0 else 0.0
     days_to_cash       = round(30 / sales_30d, 1) if sales_30d > 0 else None

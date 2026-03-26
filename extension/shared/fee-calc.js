@@ -63,16 +63,30 @@ function fcCalcEbayFee(priceGross, catId) {
  * @returns {{ feeGross, feeNet, vkNet, ekNet, profit, margin }}
  */
 function fcCalcProfit(vkGross, ekGross, catId, vatMode = 'no_vat', ekMode = 'gross', shipIn = 0, shipOut = 0, adRatePct = 0) {
-  const vat    = vatMode === 'ust_19' ? 1.19 : 1.0;
-  const feeGross = fcCalcEbayFee(vkGross, catId);
-  const feeNet   = feeGross / vat;
-  const vkNet    = vkGross / vat;
-  const ekNet    = (vatMode === 'ust_19' && ekMode === 'gross') ? ekGross / vat : ekGross;
-  const adFeeGross = vkGross * ((adRatePct || 0) / 100);
-  const adFeeNet   = adFeeGross / vat;
+  const VAT = 1.19;
+  // fcCalcEbayFee returns the NETTO fee (% of brutto selling price, before MwSt. on fee)
+  const feeNetto = fcCalcEbayFee(vkGross, catId);
+  const adFeeNetto = vkGross * ((adRatePct || 0) / 100);
+
+  let vkNet, ekNet, feeNet, adFeeNet;
+  if (vatMode === 'ust_19') {
+    // USt.-pflichtig: work in netto, MwSt. on fees is deductible (Vorsteuerabzug)
+    vkNet    = vkGross / VAT;
+    ekNet    = ekMode === 'gross' ? ekGross / VAT : ekGross;
+    feeNet   = feeNetto;       // netto fee cost (MwSt. abzugsfähig)
+    adFeeNet = adFeeNetto;
+  } else {
+    // Kleinunternehmer: pays brutto fees (netto + 19% MwSt.), no Vorsteuerabzug
+    vkNet    = vkGross;
+    ekNet    = ekGross;
+    feeNet   = feeNetto * VAT;   // brutto fee = actual cost
+    adFeeNet = adFeeNetto * VAT;
+  }
+
   const profit   = vkNet - feeNet - ekNet - (shipIn || 0) - (shipOut || 0) - adFeeNet;
-  const margin   = vkGross > 0 ? (profit / vkGross * 100) : 0;
-  return { feeGross, feeNet, vkNet, ekNet, adFeeGross, adFeeNet, profit, margin };
+  const margin   = vkGross > 0 ? (profit / vkNet * 100) : 0;
+  const feeGross = feeNetto; // keep for display compat
+  return { feeGross, feeNet, vkNet, ekNet, adFeeGross: adFeeNetto, adFeeNet, profit, margin };
 }
 
 function fcBuildCatOptions(selectedId) {
@@ -183,15 +197,31 @@ function fcCalcAmazonProfit({
   const shipInCost = method === 'fba' ? shipIn : 0;
 
   // Netto conversion
+  // Amazon fees (referral, FBA, closing) are NETTO amounts. Amazon adds 19% MwSt.
+  // - USt.-pflichtig: seller deducts MwSt. → net cost = fee amount as-is
+  // - Kleinunternehmer: no deduction → actual cost = fee × 1.19
   const sellNet      = +(sellPrice / vat).toFixed(2);
-  const referralNet  = +(referralFeeGross / vat).toFixed(2);
-  const fbaNet       = +(fbaFeeGross / vat).toFixed(2);
-  const closingNet   = +(closingFee / vat).toFixed(2);
-  const storageNet   = +(storageFee / vat).toFixed(2);
-  const prepNet      = +(prepFee / vat).toFixed(2);
+  const ekNet        = (vatMode === 'ust_19' && ekMode === 'gross') ? +(ek / vat).toFixed(2) : ek;
   const shipInNet    = +(shipInCost / vat).toFixed(2);
   const shipOutNet   = +(shipOut / vat).toFixed(2);
-  const ekNet        = (vatMode === 'ust_19' && ekMode === 'gross') ? +(ek / vat).toFixed(2) : ek;
+
+  let referralNet, fbaNet, closingNet, storageNet, prepNet;
+  if (vatMode === 'ust_19') {
+    // USt.-pflichtig: fee amounts are netto cost (MwSt. abzugsfähig)
+    // referralFeeGross = sellPrice(brutto) × ref_pct → this IS the netto fee
+    referralNet  = +referralFeeGross.toFixed(2);
+    fbaNet       = +fbaFeeGross.toFixed(2);
+    closingNet   = +closingFee.toFixed(2);
+    storageNet   = +storageFee.toFixed(2);
+    prepNet      = +prepFee.toFixed(2);
+  } else {
+    // Kleinunternehmer: pays brutto fees (netto + 19% MwSt.), no Vorsteuerabzug
+    referralNet  = +(referralFeeGross * 1.19).toFixed(2);
+    fbaNet       = +(fbaFeeGross * 1.19).toFixed(2);
+    closingNet   = +(closingFee * 1.19).toFixed(2);
+    storageNet   = +(storageFee * 1.19).toFixed(2);
+    prepNet      = +(prepFee * 1.19).toFixed(2);
+  }
 
   const totalFees    = +(referralNet + fbaNet + closingNet + storageNet + prepNet + shipInNet + shipOutNet).toFixed(2);
   const profit       = +(sellNet - totalFees - ekNet).toFixed(2);

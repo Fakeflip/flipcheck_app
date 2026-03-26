@@ -1153,11 +1153,12 @@ class AmazonCheckRequest(BaseModel):
     ek:       float = 0.0
     mode:     str   = "mid"
     method:   str   = "fba"   # "fba" or "fbm"
-    ship_in:  float = 4.99
+    ship_in:  float = 0.0
     category: str   = "sonstiges"
     prep_fee: float = 0.0
     vat_mode: str   = "no_vat"
     ek_mode:  str   = "gross"
+    sell_custom: Optional[float] = None
 
 
 @app.post("/amazon-check")
@@ -1194,16 +1195,17 @@ async def amazon_check(
             r = await client.post(
                 f"{BACKEND_URL}/amazon-check",
                 json={
-                    "asin":     req.asin,
-                    "ean":      req.ean,
-                    "ek":       req.ek,
-                    "mode":     req.mode,
-                    "method":   req.method,
-                    "ship_in":  req.ship_in,
-                    "category": req.category,
-                    "prep_fee": req.prep_fee,
-                    "vat_mode": req.vat_mode,
-                    "ek_mode":  req.ek_mode,
+                    "asin":        req.asin,
+                    "ean":         req.ean,
+                    "ek":          req.ek,
+                    "mode":        req.mode,
+                    "method":      req.method,
+                    "ship_in":     req.ship_in,
+                    "category":    req.category,
+                    "prep_fee":    req.prep_fee,
+                    "vat_mode":    req.vat_mode,
+                    "ek_mode":     req.ek_mode,
+                    "sell_custom": req.sell_custom,
                 },
             )
             if r.status_code == 200:

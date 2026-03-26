@@ -46,22 +46,36 @@ const FlipcheckView = (() => {
   // ─── Full profit calc (frontend-side, tiered fees + VAT) ─────────────────
   // Returns { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, adFeeGross, adFeeNet, profit, margin }
   function calcProfit(vkGross, ekGross, catId, vatMode, ekMode, shipInGross, shipOutGross, packagingPerUnit = 0, qty = 1, market = "ebay", adRatePct = 0) {
-    const vat      = vatMode === "ust_19" ? 1.19 : 1.0;
-    const feeGross = calcMarketFee(vkGross, market, catId);
-    const feeNet   = feeGross / vat;
-    const vkNet    = vkGross  / vat;
-    const ekNet    = (vatMode === "ust_19" && ekMode === "gross") ? ekGross / vat : ekGross;
-    // Guard undefined/NaN shipping params (callers may omit them → default 0)
-    const siNet    = (shipInGross  || 0) / vat;
-    const soNet    = (shipOutGross || 0) / vat;
-    const packNet  = packagingPerUnit; // packaging is already a net cost (no VAT recovery on packaging typically)
-    // Advertising fee (eBay Promoted Listings): percentage of gross sell price
-    const adFeeGross = vkGross * ((adRatePct || 0) / 100);
-    const adFeeNet   = adFeeGross / vat;
+    const VAT = 1.19;
+    // calcMarketFee returns the NETTO fee (% of brutto selling price).
+    // Marketplaces (eBay, Kaufland) add 19% MwSt. on their invoice.
+    const feeNetto = calcMarketFee(vkGross, market, catId);
+    const adFeeNetto = vkGross * ((adRatePct || 0) / 100);
+
+    let feeNet, adFeeNet, vkNet, ekNet, siNet, soNet;
+    if (vatMode === "ust_19") {
+      // USt.-pflichtig: MwSt. on fees is deductible (Vorsteuerabzug)
+      feeNet   = feeNetto;         // netto fee cost
+      adFeeNet = adFeeNetto;
+      vkNet    = vkGross / VAT;
+      ekNet    = ekMode === "gross" ? ekGross / VAT : ekGross;
+      siNet    = (shipInGross  || 0) / VAT;
+      soNet    = (shipOutGross || 0) / VAT;
+    } else {
+      // Kleinunternehmer: pays brutto fees (netto + 19% MwSt.), no Vorsteuerabzug
+      feeNet   = feeNetto * VAT;   // brutto fee = actual cost
+      adFeeNet = adFeeNetto * VAT;
+      vkNet    = vkGross;
+      ekNet    = ekGross;
+      siNet    = shipInGross  || 0;
+      soNet    = shipOutGross || 0;
+    }
+
+    const packNet  = packagingPerUnit;
     const profit   = vkNet - feeNet - ekNet - siNet - soNet - packNet - adFeeNet;
-    // Margin: net profit / net revenue — consistent denominator regardless of VAT mode
     const margin   = vkNet > 0 ? (profit / vkNet * 100) : 0;
-    return { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, adFeeGross, adFeeNet, profit, margin };
+    const feeGross = feeNetto; // keep for display compat
+    return { feeGross, feeNet, vkNet, ekNet, siNet, soNet, packNet, adFeeGross: adFeeNetto, adFeeNet, profit, margin };
   }
 
   function buildCatOptions(selectedId) {
