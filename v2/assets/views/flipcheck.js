@@ -1315,50 +1315,35 @@ const FlipcheckView = (() => {
     const ctx = chartWrap.querySelector("#fcMiniChart");
     if (!ctx) return;
 
-    // When showing a series, also render a bar dataset for daily quantity
-    const hasQty = isFromSeries && chartEntries.some(e => e.qty != null);
+    // Build labels + price data
+    const labels = chartEntries.map(e => {
+      const d = new Date(e.ts);
+      return `${d.getDate()}.${d.getMonth()+1}.`;
+    });
+    const priceData = chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null);
 
-    const priceAxisId = hasQty ? "yPrice" : "y";
+    // Qty bars only when eBay series has daily volume data
+    const hasQty = isFromSeries && chartEntries.some(e => e.qty != null);
+    const qtyData = hasQty ? chartEntries.map(e => e.qty ?? 0) : null;
+
+    const datasets = [{
+      label: I18N.t('fc.chart.avg_price'),
+      data: priceData,
+      borderColor: "#6366F1",
+      backgroundColor: "rgba(99,102,241,0.06)",
+      borderWidth: 2,
+      fill: true,
+      tension: 0.35,
+      pointRadius: chartEntries.length <= 14 ? 3 : 1,
+      pointHoverRadius: 5,
+      pointBackgroundColor: "#6366F1",
+      pointBorderColor: "transparent",
+      spanGaps: true,
+    }];
 
     _miniChart = new Chart(ctx, {
-      type: hasQty ? "bar" : "line",
-      data: {
-        labels: chartEntries.map(e => {
-          const d = new Date(e.ts);
-          return `${d.getDate()}.${d.getMonth()+1}.`;
-        }),
-        datasets: [
-          // Qty bars (background, right y-axis) — only when series has qty data
-          ...(hasQty ? [{
-            type: "bar",
-            label: I18N.t('fc.chart.sales_label'),
-            data: chartEntries.map(e => e.qty ?? 0),
-            backgroundColor: "rgba(99,102,241,0.12)",
-            borderColor: "transparent",
-            borderWidth: 0,
-            yAxisID: "yQty",
-            order: 2,
-          }] : []),
-          // Price line (foreground)
-          {
-            type: "line",
-            label: I18N.t('fc.chart.avg_price'),
-            data: chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null),
-            borderColor: "#6366F1",
-            backgroundColor: "rgba(99,102,241,0.06)",
-            borderWidth: 2,
-            fill: !hasQty,
-            tension: 0.35,
-            pointRadius: chartEntries.length <= 14 ? 3 : 1,
-            pointHoverRadius: 5,
-            pointBackgroundColor: "#6366F1",
-            pointBorderColor: "transparent",
-            spanGaps: true,
-            yAxisID: priceAxisId,
-            order: 1,
-          },
-        ],
-      },
+      type: "line",
+      data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
@@ -1380,9 +1365,7 @@ const FlipcheckView = (() => {
             titleFont: { size: 10 },
             bodyFont: { size: 10 },
             callbacks: {
-              label: c => c.dataset.label === I18N.t('fc.chart.sales_label')
-                ? ` ${I18N.t('fc.chart.sales_label')}: ${c.parsed.y}`
-                : ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}`,
+              label: c => ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}`,
             },
           },
         },
@@ -1391,18 +1374,11 @@ const FlipcheckView = (() => {
             grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
             ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
           },
-          [priceAxisId]: {
+          y: {
             position: "left",
             grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
             ticks: { font: { size: 9 }, color: "#475569", callback: v => fmtEur(v), maxTicksLimit: 4 },
           },
-          ...(hasQty ? {
-            yQty: {
-              position: "right",
-              grid: { drawOnChartArea: false },
-              ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 3 },
-            },
-          } : {}),
         },
       },
     });
