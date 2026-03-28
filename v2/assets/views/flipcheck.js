@@ -232,19 +232,21 @@ const FlipcheckView = (() => {
     // Register barcode scanner IPC listener
     window.fc?.onScannerEan(_onScannerEan);
 
-    // Clipboard EAN detection — suggest auto-fill if clipboard has an EAN
-    try {
-      const eanInp = container.querySelector("#fcEan");
-      if (eanInp && !eanInp.value) {
-        const clip = await navigator.clipboard.readText().catch(() => "");
-        const trimmed = (clip || "").trim();
-        if (/^\d{8,14}$/.test(trimmed)) {
-          eanInp.value = trimmed;
-          eanInp.dispatchEvent(new Event("input", { bubbles: true }));
-          if (typeof Toast !== "undefined") Toast.info("EAN aus Zwischenablage", trimmed);
+    // Clipboard EAN detection — non-blocking (don't freeze mount on permission dialog)
+    setTimeout(async () => {
+      try {
+        const eanInp = container.querySelector("#fcEan");
+        if (eanInp && !eanInp.value) {
+          const clip = await navigator.clipboard.readText().catch(() => "");
+          const trimmed = (clip || "").trim();
+          if (/^\d{8,14}$/.test(trimmed)) {
+            eanInp.value = trimmed;
+            eanInp.dispatchEvent(new Event("input", { bubbles: true }));
+            if (typeof Toast !== "undefined") Toast.info("EAN aus Zwischenablage", trimmed);
+          }
         }
-      }
-    } catch {} // clipboard permission denied — ignore silently
+      } catch {}
+    }, 100);
   }
 
   function unmount() {
