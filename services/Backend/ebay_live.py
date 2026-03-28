@@ -650,7 +650,7 @@ def lookup_ebay_metrics_query(
             avg_gross_basis = float(med_gross_basis)
         if med_gross_basis is None:
             med_gross_basis = float(avg_gross_basis)
-        trends = fetch_research_trends(q, day_range=int(trends_day_range)) if EBAY_RESEARCH_COOKIE else None
+        trends = fetch_research_trends(q, day_range=90) if EBAY_RESEARCH_COOKIE else None
         avg_stats = calc_profit_net(
             sale_gross=float(avg_gross_basis),
             buy_net=float(ek_net),
@@ -765,7 +765,7 @@ def lookup_ebay_metrics_query(
         return {"error": "Konnte keinen gültigen Preis extrahieren."}
     research = fetch_research_stats(q, day_range=int(trends_day_range))
     research_ok = bool(research and (research.get("monthly_sales") is not None))
-    trends = fetch_research_trends(q, day_range=int(trends_day_range)) if EBAY_RESEARCH_COOKIE else None
+    trends = fetch_research_trends(q, day_range=90) if EBAY_RESEARCH_COOKIE else None
     browse_avg_gross = float(browse_prices["browse_avg"])
     browse_median_gross = float(browse_prices["browse_median"])
     research_avg_gross = research.get("avg_price") if research else None
