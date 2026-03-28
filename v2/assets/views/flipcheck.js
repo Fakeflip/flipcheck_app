@@ -1315,58 +1315,46 @@ const FlipcheckView = (() => {
     const ctx = chartWrap.querySelector("#fcMiniChart");
     if (!ctx) return;
 
-    // Build labels + price data
     const labels = chartEntries.map(e => {
       const d = new Date(e.ts);
       return `${d.getDate()}.${d.getMonth()+1}.`;
     });
     const priceData = chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null);
 
-    // Qty bars only when eBay series has daily volume data
-    const hasQty = isFromSeries && chartEntries.some(e => e.qty != null);
-    const qtyData = hasQty ? chartEntries.map(e => e.qty ?? 0) : null;
-
-    const datasets = [{
-      label: I18N.t('fc.chart.avg_price'),
-      data: priceData,
-      borderColor: "#6366F1",
-      backgroundColor: "rgba(99,102,241,0.06)",
-      borderWidth: 2,
-      fill: true,
-      tension: 0.35,
-      pointRadius: chartEntries.length <= 14 ? 3 : 1,
-      pointHoverRadius: 5,
-      pointBackgroundColor: "#6366F1",
-      pointBorderColor: "transparent",
-      spanGaps: true,
-    }];
-
+    // Exact same structure as BSR chart (which renders correctly)
     _miniChart = new Chart(ctx, {
       type: "line",
-      data: { labels, datasets },
+      data: {
+        labels,
+        datasets: [{
+          label: I18N.t('fc.chart.avg_price'),
+          data: priceData,
+          borderColor: "#6366F1",
+          backgroundColor: "rgba(99,102,241,0.06)",
+          borderWidth: 1.5,
+          pointRadius: 0,
+          pointHoverRadius: 3,
+          tension: 0.3,
+          fill: true,
+        }],
+      },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         devicePixelRatio: window.devicePixelRatio || 1,
-        animation: { duration: 300 },
-        interaction: { intersect: false, mode: "index" },
+        animation: false,
         plugins: {
-          legend: {
-            position: "top",
-            align: "end",
-            labels: { font: { size: 10, family: "Inter, sans-serif" }, color: "#94A3B8", boxWidth: 8, boxHeight: 2, padding: 10 },
-          },
+          legend: { display: false },
           tooltip: {
-            backgroundColor: "#16161F",
+            mode: "index",
+            intersect: false,
+            backgroundColor: "rgba(15,15,23,0.9)",
             borderColor: "#2E2E42",
             borderWidth: 1,
-            titleColor: "#F1F5F9",
             bodyColor: "#94A3B8",
             titleFont: { size: 10 },
             bodyFont: { size: 10 },
-            callbacks: {
-              label: c => ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}`,
-            },
+            callbacks: { label: c => ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}` },
           },
         },
         scales: {
@@ -1375,9 +1363,11 @@ const FlipcheckView = (() => {
             ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
           },
           y: {
-            position: "left",
             grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
-            ticks: { font: { size: 9 }, color: "#475569", callback: v => fmtEur(v), maxTicksLimit: 4 },
+            ticks: {
+              font: { size: 9 }, color: "#475569", maxTicksLimit: 4,
+              callback: v => fmtEur(v),
+            },
           },
         },
       },
