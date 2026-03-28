@@ -1317,7 +1317,7 @@ const FlipcheckView = (() => {
     const hasQty = isFromSeries && chartEntries.some(e => e.qty != null);
 
     _miniChart = new Chart(ctx, {
-      type: "bar",  // mixed chart
+      type: hasQty ? "bar" : "line",  // mixed chart only when qty bars present
       data: {
         labels: chartEntries.map(e => {
           const d = new Date(e.ts);

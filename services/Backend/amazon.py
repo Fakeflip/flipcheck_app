@@ -779,12 +779,12 @@ async def amazon_check(
     csv        = product.get("csv") or []
     stats      = product.get("stats") or {}
 
-    # Price arrays from csv (index reference):
-    # 0=Amazon, 1=Marketplace New, 7=Marketplace Used, 10=collectible,
-    # 18=Buy Box, 11=Sales Rank
+    # Price arrays from csv (index reference — Keepa CsvType enum):
+    # 0=Amazon, 1=Marketplace New, 2=Used, 3=Sales Rank,
+    # 10=New FBA, 18=Buy Box Shipping
     buy_box_csv  = csv[18] if len(csv) > 18 else []
     new_csv      = csv[1]  if len(csv) > 1  else []
-    rank_csv     = csv[11] if len(csv) > 11 else []
+    rank_csv     = csv[3]  if len(csv) > 3  else []
     amz_csv      = csv[0]  if len(csv) > 0  else []
 
     # Current prices from stats
@@ -803,8 +803,8 @@ async def amazon_check(
     # Prefer 30-day average — more stable for flip decisions than current snapshot.
     sell_price = (sell_custom if sell_custom and sell_custom > 0 else None) or buy_box_avg30 or buy_box_current or new_avg30 or new_current or 0.0
 
-    # Sales rank → monthly sales estimate
-    rank_current = current[11] if len(current) > 11 else -1
+    # Sales rank → monthly sales estimate (index 3 = SALES in Keepa CsvType)
+    rank_current = current[3] if len(current) > 3 else -1
     rank_val     = rank_current if (rank_current and rank_current > 0) else None
 
     # "X+ bought in past month" badge — Keepa field monthlySold, -1 = not available
