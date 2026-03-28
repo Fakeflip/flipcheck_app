@@ -398,7 +398,7 @@ def _csv_to_series(csv: Optional[List[int]], max_points: int = 90, days: int = 9
     return result
 
 
-def _csv_to_rank_series(rank_csv: Optional[List[int]], max_points: int = 365, days: int = 365) -> List[List]:
+def _csv_to_rank_series(rank_csv: Optional[List[int]], max_points: int = 90, days: int = 90) -> List[List]:
     """
     Convert Keepa rank CSV to [[epoch_ms, rank], ...] series for charting.
     Filters -1 (unavailable) entries. Defaults to last 365 days.
@@ -901,8 +901,8 @@ async def amazon_check(
 
     # ── Price history series ──────────────────────────────────────────────────
     # Return up to 365 days so the 1J chart range is meaningful in the extension
-    bb_series  = _csv_to_series(buy_box_csv if len(buy_box_csv) > 2 else new_csv, max_points=365, days=365)
-    amz_series = _csv_to_series(amz_csv, max_points=365, days=365)
+    bb_series  = _csv_to_series(buy_box_csv if len(buy_box_csv) > 2 else new_csv, max_points=90, days=90)
+    amz_series = _csv_to_series(amz_csv, max_points=90, days=90)
 
     # ── International prices (parallel Keepa calls for EU markets) ───────────
     intl_prices = await fetch_intl_prices(asin) if asin else {}

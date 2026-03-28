@@ -1316,15 +1316,17 @@ const FlipcheckView = (() => {
     // When showing a series, also render a bar dataset for daily quantity
     const hasQty = isFromSeries && chartEntries.some(e => e.qty != null);
 
+    const priceAxisId = hasQty ? "yPrice" : "y";
+
     _miniChart = new Chart(ctx, {
-      type: hasQty ? "bar" : "line",  // mixed chart only when qty bars present
+      type: hasQty ? "bar" : "line",
       data: {
         labels: chartEntries.map(e => {
           const d = new Date(e.ts);
           return `${d.getDate()}.${d.getMonth()+1}.`;
         }),
         datasets: [
-          // Qty bars (background, right y-axis)
+          // Qty bars (background, right y-axis) — only when series has qty data
           ...(hasQty ? [{
             type: "bar",
             label: I18N.t('fc.chart.sales_label'),
@@ -1350,7 +1352,7 @@ const FlipcheckView = (() => {
             pointBackgroundColor: "#6366F1",
             pointBorderColor: "transparent",
             spanGaps: true,
-            yAxisID: "yPrice",
+            yAxisID: priceAxisId,
             order: 1,
           },
         ],
@@ -1387,7 +1389,7 @@ const FlipcheckView = (() => {
             grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
             ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
           },
-          yPrice: {
+          [priceAxisId]: {
             position: "left",
             grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
             ticks: { font: { size: 9 }, color: "#475569", callback: v => fmtEur(v), maxTicksLimit: 4 },

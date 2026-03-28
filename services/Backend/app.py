@@ -649,7 +649,7 @@ async def flipcheck(request: Request):
         shipping_out     = float(body.get("shipping_out") or 0)
         vat_mode         = (body.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (body.get("ek_mode")  or "gross").strip().lower()
-        trends_day_range = int(body.get("trends_day_range") or 30)
+        trends_day_range = int(body.get("trends_day_range") or 90)
     else:
         form = await request.form()
         ean              = (form.get("ean")      or "").strip()
@@ -660,7 +660,7 @@ async def flipcheck(request: Request):
         shipping_out     = float(form.get("shipping_out") or 0)
         vat_mode         = (form.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (form.get("ek_mode")  or "gross").strip().lower()
-        trends_day_range = int(form.get("trends_day_range") or 30)
+        trends_day_range = int(form.get("trends_day_range") or 90)
 
     is_vat = vat_mode == "ust_19"
     vat_factor = 1.19 if is_vat else 1.0
