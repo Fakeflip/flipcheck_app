@@ -1292,6 +1292,9 @@ const FlipcheckView = (() => {
     }
     const periodLabel  = isFromSeries ? `Letzte ${seriesDays} Tage (${seriesSource})` : `${I18N.t('fc.chart.last')} ${chartEntries.length} ${I18N.t('fc.chart.checks')}`;
 
+    // Destroy old chart BEFORE removing its canvas from DOM
+    if (_miniChart) { try { _miniChart.destroy(); } catch {} _miniChart = null; }
+
     chartWrap.innerHTML = `
       <div class="panel" style="padding:14px 16px">
         <div class="row-between mb-12">
@@ -1311,7 +1314,6 @@ const FlipcheckView = (() => {
       </div>
     `;
 
-    if (_miniChart) { try { _miniChart.destroy(); } catch {} _miniChart = null; }
     const ctx = chartWrap.querySelector("#fcMiniChart");
     if (!ctx) return;
 
@@ -1321,57 +1323,60 @@ const FlipcheckView = (() => {
     });
     const priceData = chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null);
 
-    // Exact same structure as BSR chart (which renders correctly)
-    _miniChart = new Chart(ctx, {
-      type: "line",
-      data: {
-        labels,
-        datasets: [{
-          label: I18N.t('fc.chart.avg_price'),
-          data: priceData,
-          borderColor: "#6366F1",
-          backgroundColor: "rgba(99,102,241,0.06)",
-          borderWidth: 1.5,
-          pointRadius: 0,
-          pointHoverRadius: 3,
-          tension: 0.3,
-          fill: true,
-        }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        devicePixelRatio: window.devicePixelRatio || 1,
-        animation: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            mode: "index",
-            intersect: false,
-            backgroundColor: "rgba(15,15,23,0.9)",
-            borderColor: "#2E2E42",
-            borderWidth: 1,
-            bodyColor: "#94A3B8",
-            titleFont: { size: 10 },
-            bodyFont: { size: 10 },
-            callbacks: { label: c => ` ${c.dataset.label}: ${fmtEur(c.parsed.y)}` },
-          },
+    try {
+      _miniChart = new Chart(ctx, {
+        type: "line",
+        data: {
+          labels,
+          datasets: [{
+            label: I18N.t('fc.chart.avg_price'),
+            data: priceData,
+            borderColor: "#6366F1",
+            backgroundColor: "rgba(99,102,241,0.06)",
+            borderWidth: 1.5,
+            pointRadius: 0,
+            pointHoverRadius: 3,
+            tension: 0.3,
+            fill: true,
+          }],
         },
-        scales: {
-          x: {
-            grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
-            ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          devicePixelRatio: window.devicePixelRatio || 1,
+          animation: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              mode: "index",
+              intersect: false,
+              backgroundColor: "rgba(15,15,23,0.9)",
+              borderColor: "#2E2E42",
+              borderWidth: 1,
+              bodyColor: "#94A3B8",
+              titleFont: { size: 10 },
+              bodyFont: { size: 10 },
+              callbacks: { label: function(c) { return " " + c.dataset.label + ": " + fmtEur(c.parsed.y); } },
+            },
           },
-          y: {
-            grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
-            ticks: {
-              font: { size: 9 }, color: "#475569", maxTicksLimit: 4,
-              callback: v => fmtEur(v),
+          scales: {
+            x: {
+              grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+              ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
+            },
+            y: {
+              grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+              ticks: {
+                font: { size: 9 }, color: "#475569", maxTicksLimit: 4,
+                callback: function(v) { return fmtEur(v); },
+              },
             },
           },
         },
-      },
-    });
+      });
+    } catch (err) {
+      console.error("[PriceChart] Chart.js error:", err);
+    }
   }
 
   // ─── BSR Rank Chart (Amazon) ──────────────────────────────────────────────
