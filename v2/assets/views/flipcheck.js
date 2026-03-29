@@ -188,36 +188,16 @@ const FlipcheckView = (() => {
   async function mount(container, navId) {
     _container = container;
 
-    // Load settings for VAT / EK mode + field visibility
-    try {
-      const s = await Storage.getSettings();
-      _vatMode = s?.tax?.vat_mode  || "no_vat";
-      _ekMode  = s?.tax?.ek_mode   || "gross";
-      const ff = s?.flipcheck_fields || {};
-      _visibleFields = {
-        ship_in:   ff.ship_in   !== false,
-        ship_out:  ff.ship_out  !== false,
-        packaging: ff.packaging === true,
-        ad_rate:   ff.ad_rate   === true,
-      };
-    } catch {}
-
-    // Guard: user may have navigated away during async load
-    if (navId !== undefined && navId !== null && typeof App !== "undefined" && App._navId !== navId) return;
-
-    // Check for deep-link or inventory payload
+    // Render form IMMEDIATELY — don't block on async settings load
     const _payload = typeof App !== "undefined" ? App._navPayload : null;
     if (_payload?.ean && _payload.autoRun) {
-      // Deep-link (flipcheck://check): set market, pre-fill, auto-run
       App._navPayload = null;
       if (_payload.market) selectedMarket = _payload.market;
       container.innerHTML = renderForm({ ean: _payload.ean, ek: _payload.ek, category: _payload.cat });
       attachEvents(container);
-      runCheck(container);
     } else {
       container.innerHTML = renderForm();
       attachEvents(container);
-      // Pre-fill EAN from Inventory "Flipcheck" button (simple payload, no auto-run)
       if (_payload?.ean) {
         App._navPayload = null;
         const eanInp = container.querySelector("#fcEan");
@@ -232,21 +212,24 @@ const FlipcheckView = (() => {
     // Register barcode scanner IPC listener
     window.fc?.onScannerEan(_onScannerEan);
 
-    // Clipboard EAN detection — non-blocking (don't freeze mount on permission dialog)
-    setTimeout(async () => {
-      try {
-        const eanInp = container.querySelector("#fcEan");
-        if (eanInp && !eanInp.value) {
-          const clip = await navigator.clipboard.readText().catch(() => "");
-          const trimmed = (clip || "").trim();
-          if (/^\d{8,14}$/.test(trimmed)) {
-            eanInp.value = trimmed;
-            eanInp.dispatchEvent(new Event("input", { bubbles: true }));
-            if (typeof Toast !== "undefined") Toast.info("EAN aus Zwischenablage", trimmed);
-          }
-        }
-      } catch {}
-    }, 100);
+    // Load settings in background (non-blocking — form already visible)
+    Storage.getSettings().then(s => {
+      if (!s) return;
+      _vatMode = s?.tax?.vat_mode  || "no_vat";
+      _ekMode  = s?.tax?.ek_mode   || "gross";
+      const ff = s?.flipcheck_fields || {};
+      _visibleFields = {
+        ship_in:   ff.ship_in   !== false,
+        ship_out:  ff.ship_out  !== false,
+        packaging: ff.packaging === true,
+        ad_rate:   ff.ad_rate   === true,
+      };
+    }).catch(() => {});
+
+    // Auto-run deep-link check AFTER form is rendered
+    if (_payload?.ean && _payload.autoRun) {
+      runCheck(container);
+    }
   }
 
   function unmount() {
