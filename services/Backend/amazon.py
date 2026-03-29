@@ -21,23 +21,33 @@ def _keepa_key() -> str:
 KEEPA_DIV = 100.0
 
 # Amazon Referral Fee by category (approximate DE rates)
+# Amazon DE Referral Fees 2025/2026 — Quelle: Amazon Seller Central Gebührenübersicht
+# https://sellercentral.amazon.de/help/hub/reference/G200336920
 AMAZON_REFERRAL_FEES: Dict[str, float] = {
-    "computer_tablets":    0.07,
-    "handys":              0.07,
-    "konsolen":            0.08,
-    "foto_camcorder":      0.07,
-    "tv_video_audio":      0.07,
-    "haushaltsgeraete":    0.07,
-    "drucker":             0.07,
-    "handy_zubehoer":      0.15,
-    "notebook_zubehoer":   0.15,
-    "kabel":               0.15,
-    "mode":                0.15,
-    "sport_freizeit":      0.15,
-    "spielzeug":           0.15,
-    "buecher":             0.15,
-    "sonstiges":           0.15,
+    "computer_tablets":    0.07,   # Computer & Zubehör (>100€)
+    "handys":              0.07,   # Handys & Smartphones
+    "konsolen":            0.08,   # Konsolen & Videospiele
+    "foto_camcorder":      0.07,   # Kamera & Foto
+    "tv_video_audio":      0.07,   # TV, Video & Audio
+    "grossgeraete":        0.07,   # Großgeräte (Kühlschrank, Waschmaschine etc.)
+    "drucker":             0.07,   # Drucker & Scanner
+    "haushaltsgeraete":    0.15,   # Küche & Haushalt (Staubsauger, Mixer etc.)
+    "handy_zubehoer":      0.15,   # Handy-Zubehör
+    "notebook_zubehoer":   0.15,   # Notebook-Zubehör
+    "kabel":               0.15,   # Kabel & Adapter
+    "mode":                0.15,   # Bekleidung & Schuhe
+    "sport_freizeit":      0.15,   # Sport & Freizeit
+    "spielzeug":           0.15,   # Spielzeug
+    "buecher":             0.15,   # Bücher, Musik, DVD
+    "garten":              0.15,   # Garten
+    "beauty":              0.15,   # Beauty & Gesundheit
+    "haustier":            0.15,   # Haustier
+    "baby":                0.15,   # Baby
+    "sonstiges":           0.15,   # Fallback
 }
+
+# Per-item closing fee (Gebühr pro verkauften Artikel) — netto
+AMAZON_PER_ITEM_FEE = 0.99
 
 # FBA Fee tiers — NETTO values (zzgl. 19 % MwSt.), Amazon DE 2025
 # Source: Amazon Seller Central DE fee schedule (updated annually)
@@ -564,6 +574,9 @@ def calc_amazon_profit(
         fba_cost    = round(fba_fee * VAT, 2)          # + 19 % MwSt. auf Fee
         prep_cost   = round(prep_fee * VAT, 2) if prep_fee else 0.0
 
+    # Per-item fee (Gebühr pro verkauften Artikel) — same VAT treatment as other fees
+    per_item = round(AMAZON_PER_ITEM_FEE * VAT, 2) if vat_mode != "ust_19" else AMAZON_PER_ITEM_FEE
+
     if method == "fba":
         fulfillment_fee = fba_cost
         ship_out_fee    = 0.0
@@ -573,7 +586,7 @@ def calc_amazon_profit(
         ship_out_fee    = ship_in_net  # FBM: Versand pro Einheit in total_fees
         inbound_cost    = 0.0          # bereits in total_fees — kein doppelter Abzug
 
-    total_fees = ref_fee + fulfillment_fee + ship_out_fee + prep_cost
+    total_fees = ref_fee + fulfillment_fee + ship_out_fee + prep_cost + per_item
     profit     = round(sell_net - total_fees - ek_net - inbound_cost, 2)
     margin_pct = round((profit / sell_net * 100) if sell_net > 0 else 0, 1)
 
@@ -582,6 +595,7 @@ def calc_amazon_profit(
         "referral_fee":    ref_fee,
         "referral_pct":    round(ref_pct * 100, 1),
         "fulfillment_fee": fulfillment_fee,
+        "per_item_fee":    per_item,
         "ship_out_fee":    ship_out_fee,
         "ship_in_net":     ship_in_net,
         "prep_fee":        prep_cost,

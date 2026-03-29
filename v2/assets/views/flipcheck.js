@@ -124,12 +124,16 @@ const FlipcheckView = (() => {
     { label: "Schwer/Sperrig",   maxW: null, maxSide: null,fee:9.80 + DE_FBA_SURCHARGE },
   ];
 
+  // Must match backend AMAZON_REFERRAL_FEES exactly
   const AMZ_REFERRAL_FEES = {
-    computer_tablets: 0.06, handys: 0.08, konsolen: 0.08,
-    foto_camcorder: 0.08,   tv_video_audio: 0.08, haushaltsgeraete: 0.08,
-    drucker: 0.08, handy_zubehoer: 0.15, notebook_zubehoer: 0.15,
+    computer_tablets: 0.07, handys: 0.07, konsolen: 0.08,
+    foto_camcorder: 0.07,   tv_video_audio: 0.07, grossgeraete: 0.07,
+    drucker: 0.07, haushaltsgeraete: 0.15,
+    handy_zubehoer: 0.15, notebook_zubehoer: 0.15,
     kabel: 0.15, mode: 0.15, sport_freizeit: 0.15,
-    spielzeug: 0.15, buecher: 0.15, sonstiges: 0.15,
+    spielzeug: 0.15, buecher: 0.15,
+    garten: 0.15, beauty: 0.15, haustier: 0.15, baby: 0.15,
+    sonstiges: 0.15,
   };
 
   // Closing fee — media categories (Bücher, DVDs, Musik, Software, Games)
@@ -137,21 +141,31 @@ const FlipcheckView = (() => {
   const AMZ_CLOSING_CATS = ['buecher'];
 
   // ─── Amazon Breadcrumb → Category Auto-Detect ─────────────────────────────
+  // Auto-detect Amazon category from Keepa category tree → referral fee bracket
+  // Order matters: more specific patterns FIRST, generic last
   const AMZ_CAT_MAP = [
-    { keywords: ['computer', 'laptop', 'notebook', 'tablet', 'pc '], cat: 'computer_tablets' },
-    { keywords: ['handy', 'smartphone', 'mobiltelefon'], cat: 'handys' },
-    { keywords: ['konsole', 'playstation', 'xbox', 'nintendo', 'gaming', 'videospiel'], cat: 'konsolen' },
-    { keywords: ['kamera', 'foto', 'camcorder', 'objektiv'], cat: 'foto_camcorder' },
-    { keywords: ['fernseher', 'tv', 'audio', 'kopfhörer', 'lautsprecher'], cat: 'tv_video_audio' },
-    { keywords: ['haushaltsgerät', 'kühlschrank', 'waschmaschine', 'staubsauger'], cat: 'haushaltsgeraete' },
-    { keywords: ['drucker', 'scanner', 'toner', 'patrone'], cat: 'drucker' },
-    { keywords: ['handyhülle', 'handyzubehör', 'schutzhülle'], cat: 'handy_zubehoer' },
-    { keywords: ['notebookzubehör', 'laptopzubehör', 'tastatur', 'maus'], cat: 'notebook_zubehoer' },
-    { keywords: ['kabel', 'adapter', 'stecker', 'usb', 'hdmi'], cat: 'kabel' },
-    { keywords: ['bekleidung', 'mode', 'kleidung', 'schuhe'], cat: 'mode' },
-    { keywords: ['sport', 'fitness', 'outdoor', 'fahrrad'], cat: 'sport_freizeit' },
-    { keywords: ['spielzeug', 'lego', 'puppe', 'puzzle', 'brettspiel'], cat: 'spielzeug' },
-    { keywords: ['buch', 'bücher', 'taschenbuch', 'dvd', 'blu-ray', 'musik', 'cd'], cat: 'buecher' },
+    // 7% categories (Elektronik, Computer, Handys)
+    { keywords: ['computer', 'laptop', 'notebook', 'tablet', 'pc ', 'desktop', 'server', 'monitor'], cat: 'computer_tablets' },
+    { keywords: ['handy', 'smartphone', 'mobiltelefon', 'iphone', 'samsung galaxy'], cat: 'handys' },
+    { keywords: ['konsole', 'playstation', 'xbox', 'nintendo', 'gaming', 'videospiel', 'switch'], cat: 'konsolen' },
+    { keywords: ['kamera', 'foto', 'camcorder', 'objektiv', 'spiegelreflex', 'dslr', 'gopro'], cat: 'foto_camcorder' },
+    { keywords: ['fernseher', 'tv ', 'audio', 'kopfhörer', 'lautsprecher', 'soundbar', 'receiver', 'hifi', 'beamer', 'projektor'], cat: 'tv_video_audio' },
+    { keywords: ['großgerät', 'kühlschrank', 'waschmaschine', 'trockner', 'geschirrspüler', 'herd', 'backofen', 'gefrierschrank', 'spülmaschine'], cat: 'grossgeraete' },
+    { keywords: ['drucker', 'scanner', 'toner', 'patrone', 'tintenstrahl', 'laser'], cat: 'drucker' },
+    // 15% categories
+    { keywords: ['staubsauger', 'saugroboter', 'akkusauger', 'wischroboter', 'dampfreiniger'], cat: 'haushaltsgeraete' },
+    { keywords: ['küche', 'haushalt', 'mixer', 'toaster', 'kaffeemaschine', 'wasserkocher', 'mikrowelle', 'küchenmaschine', 'heißluftfritteuse', 'airfryer', 'thermomix', 'blender', 'entsafter', 'bügeleisen', 'nähmaschine'], cat: 'haushaltsgeraete' },
+    { keywords: ['handyhülle', 'handyzubehör', 'schutzhülle', 'displayschutz', 'panzerglas', 'case'], cat: 'handy_zubehoer' },
+    { keywords: ['notebookzubehör', 'laptopzubehör', 'tastatur', 'maus', 'mousepad', 'docking', 'hub'], cat: 'notebook_zubehoer' },
+    { keywords: ['kabel', 'adapter', 'stecker', 'usb', 'hdmi', 'ladegerät', 'charger', 'netzteil', 'powerbank'], cat: 'kabel' },
+    { keywords: ['bekleidung', 'mode', 'kleidung', 'schuhe', 'jacke', 'hose', 'shirt', 'sneaker', 'stiefel'], cat: 'mode' },
+    { keywords: ['sport', 'fitness', 'outdoor', 'fahrrad', 'yoga', 'hantel', 'laufband', 'camping', 'wandern', 'trekking'], cat: 'sport_freizeit' },
+    { keywords: ['spielzeug', 'lego', 'puppe', 'puzzle', 'brettspiel', 'playmobil', 'barbie', 'nerf'], cat: 'spielzeug' },
+    { keywords: ['buch', 'bücher', 'taschenbuch', 'dvd', 'blu-ray', 'musik', 'cd', 'vinyl', 'schallplatte'], cat: 'buecher' },
+    { keywords: ['garten', 'rasenmäher', 'grill', 'pflanzen', 'bewässerung', 'terrasse', 'gartengerät'], cat: 'garten' },
+    { keywords: ['beauty', 'kosmetik', 'parfum', 'hautpflege', 'makeup', 'rasierer', 'haartrockner', 'föhn', 'glätteisen'], cat: 'beauty' },
+    { keywords: ['haustier', 'hund', 'katze', 'tierbedarf', 'futter', 'aquarium', 'vogel'], cat: 'haustier' },
+    { keywords: ['baby', 'kinderwagen', 'windel', 'babybett', 'stillkissen', 'babyfon', 'kindersitz'], cat: 'baby' },
   ];
 
   function _detectAmzCategory(categoryName) {
@@ -386,8 +400,16 @@ const FlipcheckView = (() => {
               <div class="input-group">
                 <label class="input-label">${I18N.t('fc.form.amz_category')}</label>
                 <select id="fcAmzCategory" class="select">
-                  ${Object.entries({ computer_tablets:"Computer / Tablets (7%)", handys:"Smartphones (7%)", konsolen:"Gaming / Konsolen (8%)", foto_camcorder:"Foto & Camcorder (7%)", tv_video_audio:"TV, Video & Audio (7%)", haushaltsgeraete:"Haushaltsgeräte (7%)", drucker:"Drucker (7%)", handy_zubehoer:"Handy-Zubehör (15%)", notebook_zubehoer:"Notebook-Zubehör (15%)", kabel:"Kabel & Stecker (15%)", mode:"Mode (15%)", sport_freizeit:"Sport & Freizeit (15%)", spielzeug:"Spielzeug (15%)", buecher:"Bücher (15%)", sonstiges:"Sonstiges (15%)" })
-                    .map(([v,l]) => `<option value="${v}"${v==="sonstiges"?" selected":""}>${esc(l)}</option>`).join("")}
+                  ${Object.entries({
+                    computer_tablets:"Computer / Tablets (7%)", handys:"Smartphones (7%)", konsolen:"Gaming / Konsolen (8%)",
+                    foto_camcorder:"Foto & Camcorder (7%)", tv_video_audio:"TV / Audio (7%)", grossgeraete:"Großgeräte (7%)",
+                    drucker:"Drucker (7%)",
+                    haushaltsgeraete:"Küche & Haushalt (15%)",
+                    handy_zubehoer:"Handy-Zubehör (15%)", notebook_zubehoer:"Notebook-Zubehör (15%)", kabel:"Kabel & Stecker (15%)",
+                    mode:"Mode (15%)", sport_freizeit:"Sport & Freizeit (15%)", spielzeug:"Spielzeug (15%)", buecher:"Bücher (15%)",
+                    garten:"Garten (15%)", beauty:"Beauty & Gesundheit (15%)", haustier:"Haustier (15%)", baby:"Baby (15%)",
+                    sonstiges:"Sonstiges (15%)"
+                  }).map(([v,l]) => `<option value="${v}"${v==="sonstiges"?" selected":""}>${esc(l)}</option>`).join("")}
                 </select>
               </div>
 
