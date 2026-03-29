@@ -530,6 +530,7 @@ def calc_amazon_profit(
     prep_fee:       float = 0.0,   # PREP/Labeling service fee per unit
     vat_mode:       str   = "no_vat",  # "no_vat" | "ust_19"
     ek_mode:        str   = "gross",   # "gross" | "net"
+    ship_mode:      str   = "gross",   # "gross" | "net"
 ) -> Dict[str, float]:
     """
     Amazon Revenue Calculator logic.
@@ -561,7 +562,7 @@ def calc_amazon_profit(
         # ── USt.-pflichtig: alle Werte netto (Vorsteuerabzug auf Fees) ──────
         sell_net    = round(sell_price / VAT, 2)
         ek_net      = round((ek / VAT) if ek_mode == "gross" else ek, 2)
-        ship_in_net = round(ship_in / VAT, 2)
+        ship_in_net = round(ship_in, 2) if ship_mode == "net" else round(ship_in / VAT, 2)
         ref_fee     = ref_fee_netto          # netto Fee-Kosten (MwSt. abzugsfähig)
         fba_cost    = round(fba_fee, 2)      # Keepa/Tabelle liefern netto
         prep_cost   = round(prep_fee / VAT, 2) if prep_fee else 0.0
@@ -771,6 +772,7 @@ async def amazon_check(
     prep_fee: float = 0.0,
     vat_mode: str   = "no_vat",  # "no_vat" | "ust_19"
     ek_mode:  str   = "gross",   # "gross" | "net"
+    ship_mode: str  = "gross",   # "gross" | "net"
     sell_custom: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
@@ -883,6 +885,7 @@ async def amazon_check(
         prep_fee     = prep_fee,
         vat_mode     = vat_mode,
         ek_mode      = ek_mode,
+        ship_mode    = ship_mode,
     )
 
     verdict = decide_amazon(calc["profit"], calc["margin_pct"], sales_30d, mode)

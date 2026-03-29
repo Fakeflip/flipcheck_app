@@ -322,8 +322,8 @@ const API = {
    * @param {number}          [prepFee]
    * @returns {Promise<FC_ApiResponse>}
    */
-  async amazonCheck(asin, ean, ek, mode = "mid", method = "fba", shipIn = 0, category = "sonstiges", prepFee = 0, vatMode = "no_vat", ekMode = "gross", sellCustom) {
-    const body = { asin, ean, ek, mode, method, ship_in: shipIn, category, prep_fee: prepFee, vat_mode: vatMode, ek_mode: ekMode };
+  async amazonCheck(asin, ean, ek, mode = "mid", method = "fba", shipIn = 0, category = "sonstiges", prepFee = 0, vatMode = "no_vat", ekMode = "gross", sellCustom, shipMode = "gross") {
+    const body = { asin, ean, ek, mode, method, ship_in: shipIn, category, prep_fee: prepFee, vat_mode: vatMode, ek_mode: ekMode, ship_mode: shipMode };
     if (sellCustom) body.sell_custom = sellCustom;
     return this.call("/amazon-check", { method: "POST", body });
   },

@@ -649,6 +649,7 @@ async def flipcheck(request: Request):
         shipping_out     = float(body.get("shipping_out") or 0)
         vat_mode         = (body.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (body.get("ek_mode")  or "gross").strip().lower()
+        ship_mode        = (body.get("ship_mode") or "gross").strip().lower()
         trends_day_range = int(body.get("trends_day_range") or 30)
     else:
         form = await request.form()
@@ -660,6 +661,7 @@ async def flipcheck(request: Request):
         shipping_out     = float(form.get("shipping_out") or 0)
         vat_mode         = (form.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (form.get("ek_mode")  or "gross").strip().lower()
+        ship_mode        = (form.get("ship_mode") or "gross").strip().lower()
         trends_day_range = int(form.get("trends_day_range") or 30)
 
     is_vat = vat_mode == "ust_19"
@@ -709,8 +711,8 @@ async def flipcheck(request: Request):
         ek_adj = ek / vat_factor if is_vat and ek_mode == "gross" else ek
         sell_adj = sell / vat_factor if is_vat else sell
         fee_adj = fee / vat_factor if is_vat else fee
-        ship_in_adj = shipping_in / vat_factor if is_vat else shipping_in
-        ship_out_adj = shipping_out / vat_factor if is_vat else shipping_out
+        ship_in_adj = (shipping_in / vat_factor) if (is_vat and ship_mode == "gross") else shipping_in
+        ship_out_adj = (shipping_out / vat_factor) if (is_vat and ship_mode == "gross") else shipping_out
 
         profit = round(sell_adj - ek_adj - fee_adj - ship_in_adj - ship_out_adj, 2)
         margin = round((profit / sell_adj * 100), 1) if sell_adj > 0 else 0
@@ -821,9 +823,9 @@ async def flipcheck(request: Request):
     # EK: if entered gross & VAT active → divide; if already net → keep as-is
     ek_adj = (float(ek) / vat_factor) if (is_vat and ek_mode == "gross") else float(ek)
 
-    # Shipping: assume gross invoices (DHL etc. have VAT) → divide for ust_19
-    ship_in_adj  = shipping_in  / vat_factor
-    ship_out_adj = shipping_out / vat_factor
+    # Shipping: gross → divide by vat_factor; net → use as-is
+    ship_in_adj  = (shipping_in  / vat_factor) if (is_vat and ship_mode == "gross") else shipping_in
+    ship_out_adj = (shipping_out / vat_factor) if (is_vat and ship_mode == "gross") else shipping_out
 
     # Tiered eBay fee on gross price, then adjust for VAT
     fee_avg_gross = _calc_tiered_fee(sell_avg_gross, category)
@@ -1526,6 +1528,7 @@ class AmazonCheckRequest(BaseModel):
     prep_fee: float = 0.0
     vat_mode: str   = "no_vat"  # "no_vat" | "ust_19"
     ek_mode:  str   = "gross"   # "gross" | "net"
+    ship_mode: str  = "gross"   # "gross" | "net"
     sell_custom: Optional[float] = None
 
 
@@ -1542,6 +1545,7 @@ async def amazon_check_endpoint(req: AmazonCheckRequest):
         prep_fee = req.prep_fee,
         vat_mode = req.vat_mode,
         ek_mode  = req.ek_mode,
+        ship_mode = req.ship_mode,
         sell_custom = req.sell_custom,
     )
     return result

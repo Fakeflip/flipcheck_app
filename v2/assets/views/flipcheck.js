@@ -181,6 +181,7 @@ const FlipcheckView = (() => {
   let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland"
   let _vatMode   = "no_vat";
   let _ekMode    = "gross";
+  let _shipMode  = "gross";
   let lastResult = null;
   let lastEan    = null;
   let lastEk     = null;
@@ -229,8 +230,9 @@ const FlipcheckView = (() => {
     // Load settings in background (non-blocking — form already visible)
     Storage.getSettings().then(s => {
       if (!s) return;
-      _vatMode = s?.tax?.vat_mode  || "no_vat";
-      _ekMode  = s?.tax?.ek_mode   || "gross";
+      _vatMode  = s?.tax?.vat_mode   || "no_vat";
+      _ekMode   = s?.tax?.ek_mode    || "gross";
+      _shipMode = s?.tax?.ship_mode  || "gross";
       const ff = s?.flipcheck_fields || {};
       _visibleFields = {
         ship_in:   ff.ship_in   !== false,
@@ -1683,7 +1685,7 @@ const FlipcheckView = (() => {
         const asin   = isAsin ? identifier.toUpperCase() : null;
         const ean    = isAsin ? null : identifier;
 
-        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode, amzVkCustom > 0 ? amzVkCustom : undefined);
+        const { ok, data } = await API.amazonCheck(asin, ean, ek, mode, method, shipIn, category, prepFee, _vatMode, _ekMode, amzVkCustom > 0 ? amzVkCustom : undefined, _shipMode);
         if (!ok && data?.error === "no_plan") { resultEl.innerHTML = renderUpgradeWall(); bindUpgradeButton(container); if (btn) btn.disabled = false; return; }
         if (!ok || !data) throw new Error(data?.detail || "Backend nicht erreichbar");
 
@@ -1780,6 +1782,7 @@ const FlipcheckView = (() => {
           shipping_out: shipOut,
           vat_mode:     _vatMode,
           ek_mode:      _ekMode,
+          ship_mode:    _shipMode,
           ...(klVkCustom > 0 ? { sell_custom: klVkCustom } : {}),
         });
 

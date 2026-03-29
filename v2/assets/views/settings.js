@@ -40,8 +40,9 @@ const SettingsView = (() => {
         weekly_profit_target: parseFloat(container.querySelector("#sWeeklyTarget")?.value) || 0,
       },
       tax: {
-        vat_mode: container.querySelector("#sVatMode")?.value || "no_vat",
-        ek_mode:  container.querySelector("#sEkModeSeg .seg-btn.active")?.dataset.val || "gross",
+        vat_mode:  container.querySelector("#sVatMode")?.value || "no_vat",
+        ek_mode:   container.querySelector("#sEkModeSeg .seg-btn.active")?.dataset.val || "gross",
+        ship_mode: container.querySelector("#sShipModeSeg .seg-btn.active")?.dataset.val || "gross",
       },
       defaults: {
         market:         container.querySelector("#sDefaultMarket")?.value || "ebay",
@@ -100,6 +101,7 @@ const SettingsView = (() => {
     const defaultMarket = s?.defaults?.market || "ebay";
     const defaultMode   = s?.defaults?.flipcheck_mode || "mid";
     const ekMode        = s?.defaults?.ek_mode || "gross";
+    const shipMode      = s?.tax?.ship_mode || "gross";
     const ff            = s?.flipcheck_fields || {};
     const fcShipIn      = ff.ship_in   !== false;
     const fcShipOut     = ff.ship_out  !== false;
@@ -220,6 +222,16 @@ const SettingsView = (() => {
                 <div class="seg" id="sEkModeSeg">
                   <button class="seg-btn ${ekMode === "gross" ? "active" : ""}" data-val="gross">${I18N.t('st.ek.gross')}</button>
                   <button class="seg-btn ${ekMode === "net"   ? "active" : ""}" data-val="net">${I18N.t('st.ek.net')}</button>
+                </div>
+              </div>
+              <div class="settings-row">
+                <div class="settings-row-left">
+                  <h4>Versandkosten</h4>
+                  <p>Gibst du Versandkosten brutto (inkl. MwSt.) oder netto ein?</p>
+                </div>
+                <div class="seg" id="sShipModeSeg">
+                  <button class="seg-btn ${shipMode === "gross" ? "active" : ""}" data-val="gross">Brutto</button>
+                  <button class="seg-btn ${shipMode === "net"   ? "active" : ""}" data-val="net">Netto</button>
                 </div>
               </div>
               <div class="settings-row">
@@ -857,7 +869,7 @@ const SettingsView = (() => {
     });
 
     // Seg buttons → auto-save
-    ["#sEkModeSeg", "#sModeSeg", "#sThemeSeg"].forEach(id => {
+    ["#sEkModeSeg", "#sShipModeSeg", "#sModeSeg", "#sThemeSeg"].forEach(id => {
       container.querySelectorAll(`${id} .seg-btn`).forEach(btn => {
         btn.addEventListener("click", () => {
           container.querySelectorAll(`${id} .seg-btn`).forEach(b => b.classList.remove("active"));
