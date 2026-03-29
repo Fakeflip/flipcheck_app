@@ -1329,24 +1329,64 @@ const FlipcheckView = (() => {
       return `${d.getDate()}.${d.getMonth()+1}.`;
     });
     const priceData = chartEntries.map(e => e.research_avg ?? e.browse_median ?? e.browse_avg ?? null);
+    const hasQty = isFromSeries && chartEntries.some(e => e.qty != null && e.qty > 0);
+
+    const datasets = [];
+    // Qty bars first (behind line, only for eBay series with daily volume)
+    if (hasQty) {
+      datasets.push({
+        label: I18N.t('fc.chart.sales_label'),
+        data: chartEntries.map(e => e.qty ?? 0),
+        type: "bar",
+        backgroundColor: "rgba(99,102,241,0.12)",
+        borderColor: "transparent",
+        borderWidth: 0,
+        yAxisID: "yQty",
+        order: 2,
+      });
+    }
+    // Price line (foreground)
+    datasets.push({
+      label: I18N.t('fc.chart.avg_price'),
+      data: priceData,
+      type: "line",
+      borderColor: "#6366F1",
+      backgroundColor: hasQty ? "transparent" : "rgba(99,102,241,0.06)",
+      borderWidth: 1.5,
+      pointRadius: 0,
+      pointHoverRadius: 3,
+      tension: 0.3,
+      fill: !hasQty,
+      yAxisID: "y",
+      order: 1,
+    });
+
+    const scales = {
+      x: {
+        grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+        ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
+      },
+      y: {
+        position: "left",
+        grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+        ticks: {
+          font: { size: 9 }, color: "#475569", maxTicksLimit: 4,
+          callback: function(v) { return fmtEur(v); },
+        },
+      },
+    };
+    if (hasQty) {
+      scales.yQty = {
+        position: "right",
+        grid: { drawOnChartArea: false },
+        ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 3 },
+      };
+    }
 
     try {
       _miniChart = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
-            label: I18N.t('fc.chart.avg_price'),
-            data: priceData,
-            borderColor: "#6366F1",
-            backgroundColor: "rgba(99,102,241,0.06)",
-            borderWidth: 1.5,
-            pointRadius: 0,
-            pointHoverRadius: 3,
-            tension: 0.3,
-            fill: true,
-          }],
-        },
+        type: hasQty ? "bar" : "line",
+        data: { labels, datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
@@ -1363,22 +1403,15 @@ const FlipcheckView = (() => {
               bodyColor: "#94A3B8",
               titleFont: { size: 10 },
               bodyFont: { size: 10 },
-              callbacks: { label: function(c) { return " " + c.dataset.label + ": " + fmtEur(c.parsed.y); } },
-            },
-          },
-          scales: {
-            x: {
-              grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
-              ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
-            },
-            y: {
-              grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
-              ticks: {
-                font: { size: 9 }, color: "#475569", maxTicksLimit: 4,
-                callback: function(v) { return fmtEur(v); },
+              callbacks: {
+                label: function(c) {
+                  if (c.dataset.yAxisID === "yQty") return " " + c.dataset.label + ": " + c.parsed.y;
+                  return " " + c.dataset.label + ": " + fmtEur(c.parsed.y);
+                },
               },
             },
           },
+          scales,
         },
       });
     } catch (err) {
