@@ -278,7 +278,7 @@ const API = {
    * @param {{ method?: string, body?: * }}   [opts]
    * @returns {Promise<FC_ApiResponse>}
    */
-  async call(path, { method = "GET", body = null } = {}) {
+  async call(path, { method = "GET", body = null, signal } = {}) {
     // Auth endpoints → gate server; everything else → backend API
     const isAuth = path.startsWith("/auth/");
     const base = isAuth
@@ -291,6 +291,7 @@ const API = {
     /** @type {Record<string, unknown>} */
     const opts = { method, headers };
     if (body) opts.body = JSON.stringify(body);
+    if (signal) opts.signal = signal;
 
     const res = await fetch(`${base}${path}`, opts);
     let data = null;
@@ -306,8 +307,8 @@ const API = {
    * @param {Record<string, *>} [extra]  - Additional body fields (e.g. shipping_in, shipping_out)
    * @returns {Promise<FC_ApiResponse>}
    */
-  async flipcheck(ean, ek, mode = "mid", extra = {}) {
-    return this.call("/flipcheck", { method: "POST", body: { ean, ek, mode, ...extra } });
+  async flipcheck(ean, ek, mode = "mid", extra = {}, signal) {
+    return this.call("/flipcheck", { method: "POST", body: { ean, ek, mode, ...extra }, signal });
   },
 
   /**

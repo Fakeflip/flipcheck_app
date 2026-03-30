@@ -1,8 +1,9 @@
 /* Flipcheck v2 — Settings View (SaaS) — Tabbed Layout */
 const SettingsView = (() => {
-  let _container = null;
-  let _saveTimer = null;
-  let _activeTab = "general";
+  let _container    = null;
+  let _saveTimer    = null;
+  let _activeTab    = "general";
+  let _eventsAbort  = null;
 
   async function mount(container) {
     _container = container;
@@ -13,7 +14,12 @@ const SettingsView = (() => {
     loadProfile(container);
   }
 
-  function unmount() { _container = null; }
+  function unmount() {
+    _eventsAbort?.abort();
+    _eventsAbort = null;
+    clearTimeout(_saveTimer);
+    _container = null;
+  }
 
   // ─── Auto-save ─────────────────────────────────────────────────────────────
   function scheduleSave(container) {
@@ -852,10 +858,13 @@ const SettingsView = (() => {
 
   // ─── Events ────────────────────────────────────────────────────────────────
   function attachEvents(container, settings) {
+    _eventsAbort?.abort();
+    _eventsAbort = new AbortController();
+    const sig = { signal: _eventsAbort.signal };
 
     // Tab switching
     container.querySelectorAll(".st-tab").forEach(tab => {
-      tab.addEventListener("click", () => switchTab(container, tab.dataset.tab));
+      tab.addEventListener("click", () => switchTab(container, tab.dataset.tab), sig);
     });
 
     // Language selector
@@ -865,7 +874,7 @@ const SettingsView = (() => {
         container.innerHTML = renderView(settings);
         attachEvents(container, settings);
         loadProfile(container);
-      });
+      }, sig);
     });
 
     // Seg buttons → auto-save
@@ -879,43 +888,43 @@ const SettingsView = (() => {
             applyTheme(btn.dataset.val);
             if (typeof App !== "undefined") App.settings.theme = btn.dataset.val;
           }
-        });
+        }, sig);
       });
     });
 
     // Select / input → auto-save
     ["#sVatMode", "#sDefaultMarket"].forEach(sel => {
-      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container), sig);
     });
-    container.querySelector("#sWeeklyTarget")?.addEventListener("input", () => scheduleSave(container));
+    container.querySelector("#sWeeklyTarget")?.addEventListener("input", () => scheduleSave(container), sig);
 
     // Flipcheck field toggles → auto-save
     ["#sFcShipIn", "#sFcShipOut", "#sFcPackaging", "#sFcAdRate"].forEach(sel => {
-      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container), sig);
     });
 
     // Marketplace options → auto-save + toggle interval visibility
     ["#sEbayKeepInStock", "#sKlKeepInStock"].forEach(sel => {
-      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container), sig);
     });
     ["#sEbayRelistInterval", "#sKlRelistInterval"].forEach(sel => {
-      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container));
+      container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container), sig);
     });
     container.querySelector("#sEbayAutoRelist")?.addEventListener("change", (e) => {
       container.querySelector("#sEbayRelistIntervalWrap")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
       scheduleSave(container);
-    });
+    }, sig);
     container.querySelector("#sKlAutoRelist")?.addEventListener("change", (e) => {
       container.querySelector("#sKlRelistIntervalWrap")?.classList.toggle("interval-wrap--disabled", !e.target.checked);
       scheduleSave(container);
-    });
+    }, sig);
 
     // Shipping fields → auto-save
     ["#sShipSenderName", "#sShipSenderStreet", "#sShipSenderZip", "#sShipSenderCity",
      "#sShipSenderCountry", "#sShipDefaultWeight", "#sShipProduct", "#sShipCarrier"].forEach(sel => {
       const el = container.querySelector(sel);
       if (!el) return;
-      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => scheduleSave(container));
+      el.addEventListener(el.tagName === "SELECT" ? "change" : "input", () => scheduleSave(container), sig);
     });
 
     // Price history vacuum
@@ -938,7 +947,7 @@ const SettingsView = (() => {
         const btn = container.querySelector("#btnVacuumHistory");
         if (btn) btn.textContent = I18N.t('st.danger.history.btn');
       }
-    });
+    }, sig);
 
     // Danger: clear inventory
     container.querySelector("#btnClearInventory")?.addEventListener("click", async () => {
@@ -955,7 +964,7 @@ const SettingsView = (() => {
         ErrorReporter.report(err, "settings:clearInventory");
         Toast.error("Inventory-Fehler", "Inventory konnte nicht gelöscht werden. Bitte erneut versuchen.");
       }
-    });
+    }, sig);
 
     // Danger: logout
     container.querySelector("#btnSettingsLogout")?.addEventListener("click", async () => {
@@ -963,7 +972,7 @@ const SettingsView = (() => {
       if (!ok) return;
       try { await window.fc.logout(); } catch {}
       window.location.reload();
-    });
+    }, sig);
 
     // ── eBay Sync section ──────────────────────────────────────────────────
     (async () => {
@@ -1037,7 +1046,7 @@ const SettingsView = (() => {
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
       }
-    });
+    }, sig);
 
     // ── Kaufland Sync section ────────────────────────────────────────────────
     (async () => {
@@ -1122,7 +1131,7 @@ const SettingsView = (() => {
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Verbinden"; }
       }
-    });
+    }, sig);
 
     // Kaufland Sync Now button
     container.querySelector("#btnKlSyncNow")?.addEventListener("click", async () => {
@@ -1145,7 +1154,7 @@ const SettingsView = (() => {
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Jetzt synchronisieren"; }
       }
-    });
+    }, sig);
 
     // ── DHL Shipping section ──────────────────────────────────────────────────
     (async () => {
@@ -1216,7 +1225,7 @@ const SettingsView = (() => {
       } finally {
         if (btn) { btn.disabled = false; btn.textContent = "Verbinden"; }
       }
-    });
+    }, sig);
 
     // Version
     window.fc?.version?.().then(v => {
@@ -1237,11 +1246,11 @@ const SettingsView = (() => {
           setTimeout(() => { if (statusEl && !statusEl.dataset.hasUpdate) statusEl.textContent = ""; }, 3000);
         }
       }, 3500);
-    });
+    }, sig);
 
     container.querySelector("#btnInstallUpdate")?.addEventListener("click", () => {
       window.fc?.installUpdate?.();
-    });
+    }, sig);
 
     window.fc?.onUpdateAvailable?.((info) => {
       const statusEl = container.querySelector("#updaterStatus");

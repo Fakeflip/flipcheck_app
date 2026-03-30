@@ -1,10 +1,11 @@
 /* Flipcheck v2 — Batch Flipcheck View */
 const BatchView = (() => {
-  let _container = null;
-  let _results   = [];
-  let _running   = false;
-  let _vatMode   = "no_vat";
-  let _ekMode    = "gross";
+  let _container       = null;
+  let _results         = [];
+  let _running         = false;
+  let _abortController = null;
+  let _vatMode         = "no_vat";
+  let _ekMode          = "gross";
 
   // ─── eBay DE category fee structure (mirrors FlipcheckView) ──────────────
   const CATEGORIES = [
@@ -104,8 +105,10 @@ const BatchView = (() => {
   // ─── Mount ─────────────────────────────────────────────────────────────────
   async function mount(container) {
     _container = container;
-    _results   = [];
-    _running   = false;
+    _results         = [];
+    _running         = false;
+    _abortController?.abort();
+    _abortController = null;
 
     // Load VAT / EK settings
     try {
@@ -120,9 +123,11 @@ const BatchView = (() => {
   }
 
   function unmount() {
-    _running   = false;
+    _running         = false;
+    _abortController?.abort();
+    _abortController = null;
     window.fc?.offScannerEan(_onBatchScannerEan);
-    _container = null;
+    _container       = null;
   }
 
   // ─── Render ────────────────────────────────────────────────────────────────
@@ -524,7 +529,7 @@ const BatchView = (() => {
     });
 
     container.querySelector("#btnBatchRun")?.addEventListener("click",  () => runBatch(container));
-    container.querySelector("#btnBatchStop")?.addEventListener("click", () => { _running = false; });
+    container.querySelector("#btnBatchStop")?.addEventListener("click", () => { _running = false; _abortController?.abort(); });
   }
 
   function parseFile(file, container) {
@@ -585,8 +590,10 @@ const BatchView = (() => {
     const batchMkt = container.querySelector("#batchMarketSeg .seg-btn.active")?.dataset.val || "ebay";
     const markets  = batchMkt === "all" ? ["ebay", "amazon", "kaufland"] : [batchMkt];
 
-    _running = true;
-    _results = [];
+    _running         = true;
+    _results         = [];
+    _abortController = new AbortController();
+    const _signal    = _abortController.signal;
 
     // Show progress
     const progressEl    = container.querySelector("#batchProgress");
@@ -625,7 +632,7 @@ const BatchView = (() => {
           try {
             const { ok, data } = await API.flipcheck(ean, defaultEk, mode, {
               vat_mode: _vatMode, ek_mode: _ekMode, category: catId, market: mkt,
-            });
+            }, _signal);
             if (!ok || !data) continue;
             const vk = data.sell_price_median ?? data.sell_price_avg ?? null;
             const calc = vk != null ? calcProfit(vk, defaultEk, catId, _vatMode, _ekMode) : null;
@@ -658,6 +665,7 @@ const BatchView = (() => {
         }
 
       } catch (err) {
+        if (err.name === "AbortError") break;
         _results.push({ ean, ek: defaultEk, error: err.message });
       }
 
@@ -683,7 +691,8 @@ const BatchView = (() => {
     if (progressLabel) progressLabel.textContent = I18N.t('bt.progress.done');
     if (btnRun)  btnRun.disabled = false;
     if (btnStop) btnStop.style.display = "none";
-    _running = false;
+    _running         = false;
+    _abortController = null;
 
     const buyCount  = _results.filter(r => r.verdict === "BUY").length;
     const errCount  = _results.filter(r => r.error).length;

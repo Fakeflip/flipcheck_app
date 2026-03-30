@@ -920,6 +920,8 @@ const CompetitionView = (() => {
     // Save URL
     c.querySelector("#btnSaveWh")?.addEventListener("click", async () => {
       const url = c.querySelector("#whUrlInput")?.value.trim() || "";
+      const urlErr = validateWebhookUrl(url);
+      if (urlErr) { Toast.error("Ungültige URL", urlErr); return; }
       _wh.url = url;
       await Storage.saveSettings({ webhook_url: url, webhook_events: _wh.events });
       const pill = c.querySelector("#whStatusPill");
@@ -990,6 +992,24 @@ const CompetitionView = (() => {
         bindWebhookPanel(container);
       });
     }
+  }
+
+  // ── Webhook URL validation ────────────────────────────────────────────────
+  function validateWebhookUrl(url) {
+    if (!url) return null;
+    let parsed;
+    try { parsed = new URL(url); } catch { return "Bitte eine gültige URL eingeben."; }
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return "Nur https:// und http:// sind erlaubt.";
+    }
+    const h = parsed.hostname.toLowerCase();
+    const isPrivate =
+      h === "localhost" || h === "0.0.0.0" || h === "::1" ||
+      /^127\./.test(h) || /^10\./.test(h) ||
+      /^192\.168\./.test(h) ||
+      /^172\.(1[6-9]|2\d|3[01])\./.test(h);
+    if (isPrivate) return "Private IP-Adressen sind nicht erlaubt.";
+    return null;
   }
 
   // ── Webhook Fire ──────────────────────────────────────────────────────────
