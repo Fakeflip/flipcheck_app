@@ -1087,43 +1087,23 @@ function renderBatchResults() {
   const skip = _batchResults.filter(r => r.verdict === 'SKIP').length;
   const err  = _batchResults.filter(r => r.error).length;
 
-  $('batchResultCount').textContent = `${_batchResults.length} Ergebnisse`;
-  $('batchSummary').innerHTML = [
+  const countEl = $('batchResultCount');
+  if (countEl) countEl.textContent = `${_batchResults.length} Ergebnisse`;
+
+  const summaryEl = $('batchSummary');
+  if (summaryEl) summaryEl.innerHTML = [
     buy  ? `<span class="fc-sum-pill buy">${buy} BUY</span>`    : '',
     hold ? `<span class="fc-sum-pill hold">${hold} HOLD</span>` : '',
     skip ? `<span class="fc-sum-pill skip">${skip} SKIP</span>` : '',
     err  ? `<span class="fc-sum-pill err">${err} Fehler</span>` : '',
   ].join('');
 
-  const fmtCur = v => v != null && !isNaN(v) ? `€${Math.round(v)}` : '—';
-  const fmtPct = v => v != null && !isNaN(v) ? `${Number(v).toFixed(0)}%` : '—';
-  const fmtProfit = v => {
-    if (v == null || isNaN(v)) return '—';
-    return `${v > 0 ? '+' : ''}€${Number(v).toFixed(2)}`;
-  };
+  if (tbody) {
+    tbody.textContent = '';
+    _batchResults.forEach(r => _appendBatchRow(r));
+  }
 
-  tbody.innerHTML = _batchResults.map(r => {
-    if (r.error) {
-      const errColor = r.planLimit ? '#6366F1' : '#475569';
-      const errText  = r.planLimit ? 'Limit' : 'Fehler';
-      return `<tr class="err">
-        <td><span class="fc-tbl-ean" title="${esc(r.ean)}">${esc(r.ean.slice(-8))}</span></td>
-        <td colspan="5" style="color:${errColor};font-size:10px">${errText}</td>
-      </tr>`;
-    }
-    const vc = VERDICT_COLORS[r.verdict] || { bg: '#1E1E2E', border: '#2E2E42', text: '#475569' };
-    const pColor = r.profit > 0 ? '#10B981' : r.profit < 0 ? '#EF4444' : '#94A3B8';
-    return `<tr title="${esc(r.title ? r.title.slice(0, 80) : r.ean)}">
-      <td><span class="fc-tbl-ean">${esc(r.ean.slice(-8))}</span></td>
-      <td><span class="fc-tbl-badge" style="background:${vc.bg};color:${vc.text};border:1px solid ${vc.border}">${esc(r.verdict || '—')}</span></td>
-      <td>${fmtCur(r.vk)}</td>
-      <td style="color:${pColor}">${fmtProfit(r.profit)}</td>
-      <td>${fmtPct(r.margin)}</td>
-      <td style="text-align:right">${r.sales ?? '—'}</td>
-    </tr>`;
-  }).join('');
-
-  wrap.style.display = '';
+  if (wrap) wrap.style.display = '';
 }
 
 function exportBatchCsv() {

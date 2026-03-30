@@ -232,7 +232,7 @@ async function apiFlipcheck({ ean, ek = 0, mode = 'mid', catId = 'sonstiges', sh
     const entry = { ts: Date.now(), data };
     _cache.set(key, entry);
     if (_cache.size > 200) _cache.delete(_cache.keys().next().value);
-    _sessionSet(key, entry); // fire-and-forget
+    _sessionSet(key, entry).catch(e => console.warn('[cache]', e));
     await l2Set(key, data);
     _inflight.delete(key);
     return data;
@@ -392,7 +392,7 @@ async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba',
     const entry = { ts: Date.now(), data };
     _cache.set(key, entry);
     if (_cache.size > 200) _cache.delete(_cache.keys().next().value);
-    _sessionSet(key, entry); // fire-and-forget
+    _sessionSet(key, entry).catch(e => console.warn('[cache]', e));
     await l2Set(key, data);
     _inflight.delete(key);
     return data;
