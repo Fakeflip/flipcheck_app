@@ -645,8 +645,8 @@ async def flipcheck(request: Request):
         ek_raw           = str(body.get("ek", "") if body.get("ek") is not None else "")
         mode             = (body.get("mode")     or "mid").strip().lower()
         category         = (body.get("category") or "sonstiges").strip().lower()
-        shipping_in      = float(body.get("shipping_in")  or 0)
-        shipping_out     = float(body.get("shipping_out") or 0)
+        shipping_in      = _to_float(str(body.get("shipping_in")  or 0)) or 0
+        shipping_out     = _to_float(str(body.get("shipping_out") or 0)) or 0
         vat_mode         = (body.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (body.get("ek_mode")  or "gross").strip().lower()
         ship_mode        = (body.get("ship_mode") or "gross").strip().lower()
@@ -657,8 +657,8 @@ async def flipcheck(request: Request):
         ek_raw           = str(form.get("ek", "") if form.get("ek") is not None else "")
         mode             = (form.get("mode")     or "mid").strip().lower()
         category         = (form.get("category") or "sonstiges").strip().lower()
-        shipping_in      = float(form.get("shipping_in")  or 0)
-        shipping_out     = float(form.get("shipping_out") or 0)
+        shipping_in      = _to_float(str(form.get("shipping_in")  or 0)) or 0
+        shipping_out     = _to_float(str(form.get("shipping_out") or 0)) or 0
         vat_mode         = (form.get("vat_mode") or "no_vat").strip().lower()
         ek_mode          = (form.get("ek_mode")  or "gross").strip().lower()
         ship_mode        = (form.get("ship_mode") or "gross").strip().lower()

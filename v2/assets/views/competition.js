@@ -6,6 +6,7 @@ const CompetitionView = (() => {
   let _sellerSelected = null;
   let _inventory      = [];
   let _invSelected    = null;
+  let _batchRunning   = false;
   let _debounce       = null;
   let _listingFilter  = "all";     // "all" | "new" | "seen"
   let _lastListings   = null;      // { username, total, items, q, fbScore, fbPct, seenSet }
@@ -444,9 +445,14 @@ const CompetitionView = (() => {
     const active = _inventory.filter(i => ["IN_STOCK","LISTED","LISTING_PENDING"].includes(i.status) && i.ean);
     if (!active.length) { Toast.info(I18N.t('comp.toast.no_eans'), I18N.t('comp.toast.no_active')); return; }
     Toast.info(I18N.t('comp.toast.checking'), `${active.length} Items werden geprüft.`);
-    for (const item of active) {
-      await loadInvCompetition(item, true);
-      await new Promise(r => setTimeout(r, 400));
+    _batchRunning = true;
+    try {
+      for (const item of active) {
+        await loadInvCompetition(item, true);
+        await new Promise(r => setTimeout(r, 400));
+      }
+    } finally {
+      _batchRunning = false;
     }
     Toast.success(I18N.t('comp.toast.done'), `${active.length} Items geprüft.`);
     rerenderInvLeft();
@@ -454,6 +460,7 @@ const CompetitionView = (() => {
 
   async function loadInvCompetition(item, silent = false) {
     if (!item.ean) { if (!silent) Toast.warning(I18N.t('comp.toast.ean_missing'), I18N.t('comp.toast.no_ean_set')); return; }
+    if (!silent && _batchRunning) return;
     _invSelected = item;
     rerenderInvLeft();
     const right = _container?.querySelector("#compRight");
@@ -475,7 +482,7 @@ const CompetitionView = (() => {
         const myPrice  = item.sell_price || null;
         const cheapest = items[0]?.total_price ?? null;
         if (myPrice && cheapest && cheapest < myPrice - 0.01) {
-          fireWebhook("undercut", { item, cheapest, myPrice, total: data.total });
+          fireWebhook("undercut", { item, cheapest, myPrice, total: data.total }).catch(e => console.warn('[webhook]', e));
         }
       }
     } catch (err) {
