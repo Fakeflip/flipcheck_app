@@ -192,6 +192,7 @@ const InventoryView = (() => {
         <select id="invWarnFilter" class="select">
           <option value="">Alle</option>
           <option value="warn">⚠ Mit Warnungen</option>
+          <option value="stale">📦 Alte Lager (&gt;30d)</option>
         </select>
       </div>
 

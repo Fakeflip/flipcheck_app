@@ -43,7 +43,8 @@ const SettingsView = (() => {
     return {
       _lastSettingsTab: _activeTab,
       analytics: {
-        weekly_profit_target: parseFloat(container.querySelector("#sWeeklyTarget")?.value) || 0,
+        weekly_profit_target:  parseFloat(container.querySelector("#sWeeklyTarget")?.value)  || 0,
+        monthly_profit_target: parseFloat(container.querySelector("#sMonthlyTarget")?.value) || 0,
       },
       tax: {
         vat_mode:  container.querySelector("#sVatMode")?.value || "no_vat",
@@ -102,7 +103,8 @@ const SettingsView = (() => {
 
   // ─── Render ────────────────────────────────────────────────────────────────
   function renderView(s) {
-    const profit        = s?.analytics?.weekly_profit_target || "";
+    const profit        = s?.analytics?.weekly_profit_target  || "";
+    const monthlyTarget = s?.analytics?.monthly_profit_target || "";
     const vat           = s?.tax?.vat_mode || "no_vat";
     const defaultMarket = s?.defaults?.market || "ebay";
     const defaultMode   = s?.defaults?.flipcheck_mode || "mid";
@@ -300,7 +302,7 @@ const SettingsView = (() => {
           <div class="st-section">
             ${sectionHeader(I18N.t('st.section.analytics'), icoChart(), I18N.t('st.section.analytics.desc'))}
             <div class="panel st-panel">
-              <div class="settings-row settings-row--last">
+              <div class="settings-row">
                 <div class="settings-row-left">
                   <h4>${I18N.t('st.profit.title')}</h4>
                   <p>${I18N.t('st.profit.desc')}</p>
@@ -309,6 +311,17 @@ const SettingsView = (() => {
                   <span class="prefix">€</span>
                   <input id="sWeeklyTarget" class="input st-input-currency" type="number" min="0" step="10"
                     value="${esc(String(profit))}" />
+                </div>
+              </div>
+              <div class="settings-row settings-row--last">
+                <div class="settings-row-left">
+                  <h4>Monatsziel Gewinn</h4>
+                  <p>Gewinn-Ziel für den laufenden Monat (0 = deaktiviert). Wird als Fortschrittsbalken in der Sales-View angezeigt.</p>
+                </div>
+                <div class="input-prefix-wrap input--sm">
+                  <span class="prefix">€</span>
+                  <input id="sMonthlyTarget" class="input st-input-currency" type="number" min="0" step="10"
+                    value="${esc(String(monthlyTarget))}" />
                 </div>
               </div>
             </div>
@@ -896,7 +909,8 @@ const SettingsView = (() => {
     ["#sVatMode", "#sDefaultMarket"].forEach(sel => {
       container.querySelector(sel)?.addEventListener("change", () => scheduleSave(container), sig);
     });
-    container.querySelector("#sWeeklyTarget")?.addEventListener("input", () => scheduleSave(container), sig);
+    container.querySelector("#sWeeklyTarget")?.addEventListener("input",  () => scheduleSave(container), sig);
+    container.querySelector("#sMonthlyTarget")?.addEventListener("input", () => scheduleSave(container), sig);
 
     // Flipcheck field toggles → auto-save
     ["#sFcShipIn", "#sFcShipOut", "#sFcPackaging", "#sFcAdRate"].forEach(sel => {

@@ -118,6 +118,11 @@ const InventoryData = (() => {
           || (i.status === "SOLD" && !i.shipped && i.sold_at && Math.floor((Date.now() - new Date(i.sold_at).getTime()) / 86400000) >= 2);
         if (!hasWarn) return false;
       }
+      if (filter.warn === "stale") {
+        if (!["IN_STOCK", "LISTED", "INBOUND"].includes(i.status)) return false;
+        const ageDays = i.created_at ? Math.floor((Date.now() - new Date(i.created_at).getTime()) / 86400000) : 0;
+        if (ageDays <= 30) return false;
+      }
       if (q) {
         const hay = `${i.title} ${i.ean} ${i.sku} ${i.label}`.toLowerCase();
         if (!hay.includes(q)) return false;

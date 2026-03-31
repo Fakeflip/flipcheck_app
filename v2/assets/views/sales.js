@@ -7,6 +7,7 @@ const SalesView = (() => {
   let _sort     = { key: "sold_at", dir: -1 };
   let _filterMonth    = "";
   let _filterPlatform = "";
+  let _monthlyTarget  = 0;
 
   // Flat fees for non-eBay markets; eBay uses tiered calcEbayFee() from app.js
   const FLAT_FEES = { amz: 0.15, kaufland: 0.105, other: 0 };
@@ -265,6 +266,25 @@ const SalesView = (() => {
     });
   }
 
+  function buildMonthlyGoal() {
+    if (!_monthlyTarget || _monthlyTarget <= 0) return "";
+    const curMonth = new Date().toISOString().slice(0, 7);
+    const monthData = calcMonthly(_allSold);
+    const current = monthData.find(m => m.month === curMonth) || { profit: 0 };
+    const pct = Math.min(100, Math.max(0, (current.profit / _monthlyTarget) * 100));
+    const color = pct >= 100 ? "var(--green)" : pct >= 50 ? "var(--yellow, #f59e0b)" : "var(--red)";
+    const label = pct >= 100 ? "Ziel erreicht!" : `${pct.toFixed(0)}% erreicht`;
+    return `<div class="panel mb-16" style="padding:14px 18px">
+      <div class="row-between mb-8">
+        <span class="kpi-label">Monatsziel</span>
+        <span style="font-size:13px;color:var(--text-muted)">${fmtEur(current.profit)} / ${fmtEur(_monthlyTarget)} &mdash; ${label}</span>
+      </div>
+      <div style="background:var(--bg-secondary,var(--bg-elevated));border-radius:6px;height:8px;overflow:hidden">
+        <div style="height:100%;width:${pct.toFixed(1)}%;background:${color};border-radius:6px;transition:width .4s"></div>
+      </div>
+    </div>`;
+  }
+
   // ── Main render ──────────────────────────────────────────────────────────
   async function mount(el) {
     _el = el;
@@ -274,8 +294,11 @@ const SalesView = (() => {
       <div class="skeleton" style="height:220px;border-radius:12px"></div>
     </div>`;
 
-    const { listInventory } = Storage;
-    const items = await listInventory();
+    const [items, settings] = await Promise.all([
+      Storage.listInventory(),
+      Storage.getSettings().catch(() => ({})),
+    ]);
+    _monthlyTarget = settings?.analytics?.monthly_profit_target || 0;
     _allSold = items.filter(i => (i.status === "SOLD" || i.status === "RETURN") && i.sell_price != null && i.ek != null);
     render();
   }
@@ -382,6 +405,8 @@ const SalesView = (() => {
         <div class="comp-kpi-lbl">${I18N.t('sal.kpi.avg_roi')}</div>
       </div>
     </div>
+
+    ${buildMonthlyGoal()}
 
     <!-- Charts Row -->
     <div class="sales-charts-row mb-16">
