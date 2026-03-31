@@ -526,6 +526,7 @@ function wireEvents() {
         },
         body: JSON.stringify({ cookie }),
       });
+      if (!res.ok) throw new Error(await res.text() || res.statusText);
       const json = await res.json();
       if (json.ok) {
         status.textContent = '✓ Gespeichert';

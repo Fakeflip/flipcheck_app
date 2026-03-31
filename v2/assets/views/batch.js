@@ -627,6 +627,7 @@ const BatchView = (() => {
       try {
         // Multi-market: check all markets, pick best profit
         let bestResult = null;
+        let marketError = null;
         for (const mkt of markets) {
           if (!_running) break;
           try {
@@ -640,10 +641,13 @@ const BatchView = (() => {
             if (!bestResult || profit > (bestResult._calc?.profit ?? bestResult.profit_median ?? -Infinity)) {
               bestResult = { ean, ek: defaultEk, _calc: calc, _market: mkt, ...data };
             }
-          } catch {}
+          } catch (err) {
+            if (err.name === "AbortError") throw err;
+            marketError = err;
+          }
           if (markets.length > 1) await new Promise(r => setTimeout(r, 200));
         }
-        if (!bestResult) throw new Error("Kein Ergebnis");
+        if (!bestResult) throw marketError || new Error("Kein Ergebnis");
 
         _results.push(bestResult);
 
