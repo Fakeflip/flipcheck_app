@@ -79,13 +79,17 @@ const HistoryView = (() => {
     }
     renderList(container, _histList);
 
-    container.querySelector("#histSearch")?.addEventListener("input", e => {
-      const q = e.target.value.toLowerCase();
-      const filtered = _histList.filter(h =>
-        h.ean.includes(q) || (h.title||"").toLowerCase().includes(q)
-      );
-      renderList(container, filtered);
-    });
+    const searchInput = container.querySelector("#histSearch");
+    if (searchInput && !searchInput._histSearchBound) {
+      searchInput._histSearchBound = true;
+      searchInput.addEventListener("input", e => {
+        const q = e.target.value.toLowerCase();
+        const filtered = _histList.filter(h =>
+          h.ean.includes(q) || (h.title||"").toLowerCase().includes(q)
+        );
+        renderList(container, filtered);
+      });
+    }
 
     // Scan form — EAN + EK → Flipcheck → save to history → reload
     const scanBtn = container.querySelector("#btnHistScan");
