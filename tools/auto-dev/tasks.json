@@ -23,32 +23,6 @@
       "impact": "Niedrig",
       "created_at": "2026-03-31T12:12:57.298728",
       "posted": true
-    },
-    {
-      "id": "9ea123f1",
-      "title": "Feature: 'Alarm setzen'-Button direkt im Flipcheck-Ergebnis",
-      "description": "In flipcheck.js (Result-Panel nach einer Analyse) einen '🔔 Alarm setzen'-Button einfügen. Klick öffnet ein Mini-Modal mit vorausgefüllter EAN und vorgeschlagenem Zielpreis (-10% vom aktuellen Median-Preis, editierbar). Beim Bestätigen: Storage.addAlert({ean, target_price, title, market}) + Toast. Gleiches Pattern für history.js Detail-Panel (unter dem Delete-Button). Vorteil: User muss nicht mehr manuell zur Alerts-View navigieren und alle Felder re-tippen — 1-Klick aus dem Analyse-Kontext heraus.",
-      "category": "feature",
-      "files": [
-        "v2/assets/views/flipcheck.js,v2/assets/views/history.js"
-      ],
-      "effort": "45 Min",
-      "impact": "Hoch",
-      "created_at": "2026-03-31T12:13:07.422158",
-      "posted": true
-    },
-    {
-      "id": "9093642c",
-      "title": "Feature: Top-10 Produkte nach Profit im Analytics-View",
-      "description": "In analytics.js unterhalb der bestehenden Charts ein neues Panel 'Beste Produkte' einfügen: Tabelle mit den Top-10 verkauften Items sortiert nach absolutem Gewinn (calcRealProfit), Spalten: Titel/EAN, Markt-Badge, EK, VK, Profit, ROI%. Zwei Tabs: 'Nach Profit' und 'Nach ROI%'. Daten werden aus soldItems (bereits vorhanden im mount()-Scope) berechnet — kein neuer API-Call. Direkt nützlich: Marco sieht auf einen Blick welche Produkt-Typen die höchste Marge liefern → bessere Einkaufsentscheidungen.",
-      "category": "feature",
-      "files": [
-        "v2/assets/views/analytics.js"
-      ],
-      "effort": "1h",
-      "impact": "Hoch",
-      "created_at": "2026-03-31T12:13:14.886748",
-      "posted": true
     }
   ],
   "approved": [],
@@ -82,9 +56,88 @@
       "posted": true,
       "rejected_at": "2026-03-31T10:08:14.899195",
       "rejected_by": "fakeflip056"
+    },
+    {
+      "id": "9ea123f1",
+      "title": "Feature: 'Alarm setzen'-Button direkt im Flipcheck-Ergebnis",
+      "description": "In flipcheck.js (Result-Panel nach einer Analyse) einen '🔔 Alarm setzen'-Button einfügen. Klick öffnet ein Mini-Modal mit vorausgefüllter EAN und vorgeschlagenem Zielpreis (-10% vom aktuellen Median-Preis, editierbar). Beim Bestätigen: Storage.addAlert({ean, target_price, title, market}) + Toast. Gleiches Pattern für history.js Detail-Panel (unter dem Delete-Button). Vorteil: User muss nicht mehr manuell zur Alerts-View navigieren und alle Felder re-tippen — 1-Klick aus dem Analyse-Kontext heraus.",
+      "category": "feature",
+      "files": [
+        "v2/assets/views/flipcheck.js,v2/assets/views/history.js"
+      ],
+      "effort": "45 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T12:13:07.422158",
+      "posted": true,
+      "rejected_at": "2026-03-31T12:13:39.187414",
+      "rejected_by": "fakeflip056"
+    },
+    {
+      "id": "9093642c",
+      "title": "Feature: Top-10 Produkte nach Profit im Analytics-View",
+      "description": "In analytics.js unterhalb der bestehenden Charts ein neues Panel 'Beste Produkte' einfügen: Tabelle mit den Top-10 verkauften Items sortiert nach absolutem Gewinn (calcRealProfit), Spalten: Titel/EAN, Markt-Badge, EK, VK, Profit, ROI%. Zwei Tabs: 'Nach Profit' und 'Nach ROI%'. Daten werden aus soldItems (bereits vorhanden im mount()-Scope) berechnet — kein neuer API-Call. Direkt nützlich: Marco sieht auf einen Blick welche Produkt-Typen die höchste Marge liefern → bessere Einkaufsentscheidungen.",
+      "category": "feature",
+      "files": [
+        "v2/assets/views/analytics.js"
+      ],
+      "effort": "1h",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T12:13:14.886748",
+      "posted": true,
+      "rejected_at": "2026-03-31T12:13:40.176287",
+      "rejected_by": "fakeflip056"
+    },
+    {
+      "id": "25893c7f",
+      "title": "Bug: DealScan CSV-Export ignoriert aktiven Verdict-Filter",
+      "description": "In dealscan.js exportiert exportCSV() immer ALLE _results (Zeile 438: _results.forEach(d => ...)), egal ob der User zuvor auf 'BUY', 'HOLD' oder 'SKIP' gefiltert hat. rerenderGrid() wendet _filterV korrekt an, exportCSV() nicht. Ergebnis: User sieht nur BUY-Deals in der Grid, exportiert aber alle 50 gescannten Ergebnisse — verwirrend und falsch. Fix: vor dem forEach die gleiche Filterlogik wie in rerenderGrid() anwenden: let toExport = [..._results]; if (_filterV !== 'all') toExport = toExport.filter(d => (d.verdict || 'HOLD') === _filterV); dann toExport statt _results iterieren.",
+      "category": "bug",
+      "files": [
+        "v2/assets/views/dealscan.js"
+      ],
+      "effort": "5 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T12:18:17.231557",
+      "posted": true,
+      "rejected_at": "2026-03-31T12:18:58.208056",
+      "rejected_by": "fakeflip056"
     }
   ],
   "completed": [
+    {
+      "id": "db52bb76",
+      "title": "Feature: Monatsziel-Tracker in der Sales-View",
+      "description": "In der Sales-View (sales.js) einen KPI-Block 'Monatsziel' einfügen: User hinterlegt in den Settings (settings.js) einen 'Monatsziel Gewinn' (€-Betrag). In mount() wird dieser Wert via Storage.getSettings() geladen. Im KPI-Bereich oben erscheint: 'Monatsziel: €300 — 67% erreicht (€200)' mit einem farbigen Fortschrittsbalken (grün bei ≥100%, gelb 50-99%, rot <50%). Aktueller Monatswert kommt aus calcMonthly(soldItems).slice(-1)[0].profit — keine neuen API-Calls. Wert in Settings: monthly_profit_target (default 0 = deaktiviert). Zeigt sich nur wenn Ziel > 0 gesetzt ist.",
+      "category": "feature",
+      "files": [
+        "v2/assets/views/sales.js,v2/assets/views/settings.js"
+      ],
+      "effort": "45 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T12:18:25.105409",
+      "posted": true,
+      "approved_at": "2026-03-31T12:18:53.869633",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T14:00:00.000000",
+      "result": "buildMonthlyGoal() in sales.js: Fortschrittsbalken (grün ≥100%, gelb 50-99%, rot <50%) wenn monthly_profit_target > 0. mount() lädt settings parallel zu listInventory(). settings.js: #sMonthlyTarget-Input + collectSettings() + Event-Listener ergänzt. Commit: 8aaed0d"
+    },
+    {
+      "id": "ea7fb566",
+      "title": "Feature: Inventory 'Alte Lager >30d' Schnellfilter",
+      "description": "In der Inventory-View ein neues Filter-Dropdown (oder Button) 'Alte Lager' hinzufügen: filtert Artikel mit Status IN_STOCK/LISTED/INBOUND, bei denen created_at > 30 Tage her ist (gebundenes Kapital).",
+      "category": "feature",
+      "files": [
+        "v2/assets/views/inventory.js,v2/assets/views/inventory-data.js"
+      ],
+      "effort": "20 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T12:18:34.888841",
+      "posted": true,
+      "approved_at": "2026-03-31T12:19:00.346209",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T14:00:00.000000",
+      "result": "inventory-data.js: filter.warn === 'stale' prüft IN_STOCK/LISTED/INBOUND && ageDays > 30 via created_at. inventory.js: Option 'Alte Lager (>30d)' value='stale' in #invWarnFilter ergänzt. Commit: 8aaed0d"
+    },
     {
       "id": "3c43c299",
       "title": "Bug: Duplicate #histSearch Listener in history.js — stapelt bei jedem Scan",
