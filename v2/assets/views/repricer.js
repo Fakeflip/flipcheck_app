@@ -10,6 +10,7 @@ const RepricerView = (() => {
   let _settings   = {};
   let _inventory  = [];
   let _debounce   = null;
+  let _autoTimer  = null;     // setInterval handle for auto-run
 
   const fmt = (v) => v != null ? `€${parseFloat(v).toFixed(2)}` : "—";
   const fmtDate = (ts) => {
@@ -78,8 +79,22 @@ const RepricerView = (() => {
   }
 
   function unmount() {
-    if (_debounce) { clearTimeout(_debounce); _debounce = null; }
+    if (_debounce)   { clearTimeout(_debounce);  _debounce  = null; }
+    if (_autoTimer)  { clearInterval(_autoTimer); _autoTimer = null; }
     _container = null;
+  }
+
+  function _startAutoTimer() {
+    if (_autoTimer) { clearInterval(_autoTimer); _autoTimer = null; }
+    const intervalMin = _settings?.repricer?.auto_run_interval || 0;
+    if (!_active || intervalMin <= 0) return;
+    _autoTimer = setInterval(async () => {
+      if (!_container || !_active) { clearInterval(_autoTimer); _autoTimer = null; return; }
+      try {
+        await Storage.repricerRunNow();
+        await _refreshData();
+      } catch { /* silent — next tick will retry */ }
+    }, intervalMin * 60 * 1000);
   }
 
   // ── Shell ──────────────────────────────────────────────────────────────────
@@ -161,6 +176,7 @@ const RepricerView = (() => {
     _active = !!_status?.active;
     _render();
     _wireEvents();
+    _startAutoTimer();
   }
 
   function _render() {
@@ -187,6 +203,21 @@ const RepricerView = (() => {
       activeLabel.textContent = _active ? "An" : "Aus";
       activeBtn.style.borderColor = _active ? "var(--green)" : "var(--border)";
       activeBtn.style.color       = _active ? "var(--green)" : "var(--text-muted)";
+    }
+    const autoInterval = _settings?.repricer?.auto_run_interval || 0;
+    let autoBadge = _container.querySelector("#reprAutoBadge");
+    if (_active && autoInterval > 0) {
+      const label = autoInterval >= 60 ? `Auto: ${autoInterval/60}h` : `Auto: ${autoInterval}min`;
+      if (!autoBadge) {
+        autoBadge = document.createElement("span");
+        autoBadge.id = "reprAutoBadge";
+        autoBadge.className = "badge badge-muted";
+        autoBadge.style.cssText = "font-size:10px;color:var(--green);border-color:var(--green)";
+        activeBtn?.insertAdjacentElement("beforebegin", autoBadge);
+      }
+      autoBadge.textContent = label;
+    } else if (autoBadge) {
+      autoBadge.remove();
     }
 
     const countEl = _container.querySelector("#reprItemCount");
@@ -602,6 +633,7 @@ const RepricerView = (() => {
       try {
         await window.fc.repricerSetEnabled(_active);
         _render();
+        _startAutoTimer();
         Toast.success(_active ? "Repricer aktiviert" : "Repricer deaktiviert");
       } catch { Toast.error("Fehler beim Umschalten"); }
     });
@@ -820,10 +852,22 @@ const RepricerView = (() => {
 
         <div>
           <label class="text-xs font-semibold text-secondary repr-settings-label">Ausführung</label>
-          <div class="row gap-8">
-            <label class="text-xs text-muted">Intervall</label>
-            <input type="number" id="reprIntervalMin" class="input-sm" value="${repricer.interval_min || 30}" min="10" max="1440" style="width:80px">
-            <span class="text-xs text-muted">Minuten (min. 10)</span>
+          <div class="col gap-8">
+            <div class="row gap-8">
+              <label class="text-xs text-muted">Intervall</label>
+              <input type="number" id="reprIntervalMin" class="input-sm" value="${repricer.interval_min || 30}" min="10" max="1440" style="width:80px">
+              <span class="text-xs text-muted">Minuten (min. 10)</span>
+            </div>
+            <div class="row gap-8">
+              <label class="text-xs text-muted">Auto-Run</label>
+              <select id="reprAutoRunInterval" class="input-sm" style="width:120px">
+                <option value="0"  ${(repricer.auto_run_interval||0)===0   ? "selected" : ""}>Aus</option>
+                <option value="30" ${(repricer.auto_run_interval||0)===30  ? "selected" : ""}>alle 30 Min</option>
+                <option value="60" ${(repricer.auto_run_interval||0)===60  ? "selected" : ""}>alle 1h</option>
+                <option value="120"${(repricer.auto_run_interval||0)===120 ? "selected" : ""}>alle 2h</option>
+              </select>
+              <span class="text-xs text-muted">Automatisch im Hintergrund ausführen (wenn Repricer aktiv)</span>
+            </div>
           </div>
         </div>
 
@@ -984,6 +1028,7 @@ const RepricerView = (() => {
           const newRepricer = {
             ...(s.repricer || {}),
             interval_min:                    parseInt(document.getElementById("reprIntervalMin")?.value      || "30"),
+            auto_run_interval:               parseInt(document.getElementById("reprAutoRunInterval")?.value  || "0"),
             global_price_strategy:           document.getElementById("reprGlobalStrategy")?.value            || "cheapest",
             global_ebay_category:            document.getElementById("reprGlobalCategory")?.value             || "sonstiges",
             global_raise_when_cheapest:      document.getElementById("reprGlobalRaiseWhenCheapest")?.checked ?? true,
@@ -999,6 +1044,8 @@ const RepricerView = (() => {
           await Storage.saveSettings({ ...s, repricer: newRepricer });
           await Storage.repricerSetInterval(newRepricer.interval_min);
           _settings = { ...s, repricer: newRepricer };
+          _render();
+          _startAutoTimer();
           Modal.close();
           Toast.success("Einstellungen gespeichert");
         }},

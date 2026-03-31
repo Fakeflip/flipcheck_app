@@ -16,6 +16,51 @@
   "rejected": [],
   "completed": [
     {
+      "id": "faaa7ec3",
+      "title": "Bug: int() in app.py ohne try/except → ValueError 500 bei nicht-numerischem trends_day_range",
+      "description": "In app.py Zeilen 653 und 665 schützt das neu hinzugefügte max(1,min(365,...)) nicht vor ValueError, wenn ein Client einen nicht-numerischen String sendet (z.B. 'abc'). Grund: '\"abc\" or 30' ergibt '\"abc\"' (truthy String), dann wirft int('abc') eine unbehandelte ValueError → 500 mit Stack Trace (Info Leakage). Fix: try/except (ValueError, TypeError) rund um beide int()-Aufrufe — fallback auf 30.",
+      "category": "bug",
+      "files": ["services/Backend/app.py"],
+      "effort": "5 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T03:18:54.252080",
+      "posted": true,
+      "approved_at": "2026-03-31T03:19:50.858507",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T11:00:00.000000",
+      "result": "try/except (ValueError, TypeError) um beide int()-Aufrufe (JSON body + form). Fallback auf 30. Kein 500 mehr bei nicht-numerischem trends_day_range-Input."
+    },
+    {
+      "id": "3915818a",
+      "title": "Feature: DealScan CSV-Export nach abgeschlossenem Scan",
+      "description": "CSV-Export-Button in Sort-Bar von dealscan.js. Felder: Titel, EAN, Quelle, EK, Profit, ROI%, Score, Verdict, Link.",
+      "category": "feature",
+      "files": ["v2/assets/views/dealscan.js"],
+      "effort": "30 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T03:19:03.419128",
+      "posted": true,
+      "approved_at": "2026-03-31T03:19:52.708152",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T11:00:00.000000",
+      "result": "CSV-Button (#btnDsExportCSV) in Sort-Bar eingefügt, nur sichtbar nach Scan (_results.length > 0). exportCSV() in attachSortFilterEvents() verdrahtet. BOM + Semikolon-CSV mit Feldern Titel/EAN/Quelle/EK/Profit/ROI%/Score/Verdict/Link. Analog zu sales.js-Muster."
+    },
+    {
+      "id": "d372435c",
+      "title": "Feature: Repricer Auto-Run Interval (alle 30min/1h/2h)",
+      "description": "Auto-Run Interval im Repricer Settings Modal + Frontend-Timer.",
+      "category": "feature",
+      "files": ["v2/assets/views/repricer.js"],
+      "effort": "45 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T03:19:17.148363",
+      "posted": true,
+      "approved_at": "2026-03-31T03:19:54.196422",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T11:00:00.000000",
+      "result": "_autoTimer + _startAutoTimer() in repricer.js. Settings-Modal: Dropdown 'Auto-Run' (Aus/30min/1h/2h) → auto_run_interval in _settings.repricer. _startAutoTimer() in _init(), nach Toggle-Active und nach Settings-Save. unmount() räumt clearInterval auf. Header-Badge 'Auto: 30min' sichtbar wenn aktiv."
+    },
+    {
       "id": "7465c294",
       "title": "Bug: float()-Konvertierungen in app.py nicht abgesichert",
       "description": "In /flipcheck-Endpoint (Zeile ~648, 660) werden shipping_in und shipping_out direkt per float(body.get('shipping_in') or 0) konvertiert. Bei nicht-numerischen Eingaben wirft das unbehandelte ValueErrors. Der Helper _to_float() (Zeile 463) existiert bereits und behandelt das sicher, wird aber hier nicht genutzt — inkonsistentes Muster im selben Endpoint. Fix: shipping_in = _to_float(str(body.get('shipping_in') or 0)) or 0 analog zu den anderen Parametern.",
@@ -189,7 +234,9 @@
       "title": "Bug: fetch()-Response ohne res.ok-Check in popup.js",
       "description": "In popup.js Zeile ~529 wird await res.json() aufgerufen ohne vorher res.ok zu prüfen.",
       "category": "bug",
-      "files": ["extension/popup/popup.js"],
+      "files": [
+        "extension/popup/popup.js"
+      ],
       "effort": "5 Min",
       "impact": "Hoch",
       "created_at": "2026-03-31T02:18:41.667435",
@@ -204,7 +251,9 @@
       "title": "Security: trends_day_range ohne Bounds-Check in app.py",
       "description": "trends_day_range in app.py ohne Bereichsprüfung.",
       "category": "security",
-      "files": ["services/Backend/app.py"],
+      "files": [
+        "services/Backend/app.py"
+      ],
       "effort": "10 Min",
       "impact": "Hoch",
       "created_at": "2026-03-31T02:18:53.641090",
@@ -219,7 +268,9 @@
       "title": "Bug: try-catch in batch.js schluckt API-Fehler lautlos",
       "description": "Innerer catch-Block um API.flipcheck()-Calls war leer.",
       "category": "bug",
-      "files": ["v2/assets/views/batch.js"],
+      "files": [
+        "v2/assets/views/batch.js"
+      ],
       "effort": "8 Min",
       "impact": "Mittel",
       "created_at": "2026-03-31T02:18:53.707489",

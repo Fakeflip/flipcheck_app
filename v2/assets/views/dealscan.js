@@ -208,6 +208,12 @@ const DealScanView = (() => {
                   ${v === "all" ? I18N.t('ds.filter.all') : v}
                 </button>
               `).join("")}
+              <button class="btn btn-ghost btn-sm" id="btnDsExportCSV" style="gap:4px;margin-left:4px">
+                <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                  <path d="M14 10v3a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-3M8 2v8M5 7l3 3 3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+                CSV
+              </button>
             </div>
           </div>
 
@@ -426,6 +432,35 @@ const DealScanView = (() => {
         rerenderGrid(container);
       });
     });
+    container.querySelector("#btnDsExportCSV")?.addEventListener("click", exportCSV);
+  }
+
+  function exportCSV() {
+    if (!_results.length) return;
+    const rows = [["Titel","EAN","Quelle","EK","Profit","ROI %","Score","Verdict","Link"]];
+    _results.forEach(d => {
+      const src = d.source || _source || "ebay";
+      const link = d.item_url || (d.asin ? `https://www.amazon.de/dp/${d.asin}` : "");
+      rows.push([
+        d.title   || "",
+        d.ean     || "",
+        src,
+        d.ek      != null ? Number(d.ek).toFixed(2)      : "",
+        d.profit  != null ? Number(d.profit).toFixed(2)  : "",
+        (d.roi_pct ?? d.roi) != null ? Number(d.roi_pct ?? d.roi).toFixed(1) : "",
+        d.score   != null ? Number(d.score).toFixed(0)   : "",
+        d.verdict || "",
+        link,
+      ].map(v => `"${String(v).replace(/"/g, '""')}"`));
+    });
+    const csv  = rows.map(r => r.join(";")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a");
+    a.href     = url;
+    a.download = `flipcheck-dealscan-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   // ── Scan ─────────────────────────────────────────────────────────────────
