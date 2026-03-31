@@ -1,0 +1,233 @@
+{
+  "pending": [
+    {
+      "id": "94dc07b9",
+      "title": "Test: Discord Bot Verbindung",
+      "description": "Dies ist ein Test-Vorschlag um zu prüfen ob der Bot Vorschläge postet und die Buttons funktionieren.",
+      "category": "idea",
+      "files": [],
+      "effort": "0 Min",
+      "impact": "Test",
+      "created_at": "2026-03-30T23:21:11.435832",
+      "posted": true
+    }
+  ],
+  "approved": [],
+  "rejected": [],
+  "completed": [
+    {
+      "id": "7465c294",
+      "title": "Bug: float()-Konvertierungen in app.py nicht abgesichert",
+      "description": "In /flipcheck-Endpoint (Zeile ~648, 660) werden shipping_in und shipping_out direkt per float(body.get('shipping_in') or 0) konvertiert. Bei nicht-numerischen Eingaben wirft das unbehandelte ValueErrors. Der Helper _to_float() (Zeile 463) existiert bereits und behandelt das sicher, wird aber hier nicht genutzt — inkonsistentes Muster im selben Endpoint. Fix: shipping_in = _to_float(str(body.get('shipping_in') or 0)) or 0 analog zu den anderen Parametern.",
+      "category": "bug",
+      "files": [
+        "services/Backend/app.py"
+      ],
+      "effort": "15 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T01:56:18.201429",
+      "posted": true,
+      "approved_at": "2026-03-31T02:10:59.786057",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T09:00:00.000000",
+      "result": "shipping_in/out in beiden Parsing-Blöcken (JSON body + form) auf _to_float(str(...)) or 0 umgestellt. Konsistent mit restlichen Parametern, ValueError-safe. Commit: 6a166d1"
+    },
+    {
+      "id": "b3b03c28",
+      "title": "Bug: Race Condition in checkAllInventory() — _invSelected Mutation",
+      "description": "In competition.js checkAllInventory() (Zeile ~443) werden loadInvCompetition()-Calls sequenziell per await ausgeführt, aber innerhalb des Loops können User gleichzeitig einzelne Einträge anklicken. loadInvCompetition() mutiert _invSelected direkt (Zeile ~457) ohne Lock.",
+      "category": "bug",
+      "files": [
+        "v2/assets/views/competition.js"
+      ],
+      "effort": "25 Min",
+      "impact": "Niedrig",
+      "created_at": "2026-03-31T01:56:27.102823",
+      "posted": true,
+      "approved_at": "2026-03-31T02:11:22.026355",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T09:00:00.000000",
+      "result": "_batchRunning-Flag eingeführt. checkAllInventory() setzt es auf true (try/finally), loadInvCompetition() kehrt früh zurück wenn _batchRunning && !silent → kein _invSelected-Konflikt während Batch-Run. Commit: 6a166d1"
+    },
+    {
+      "id": "3dd4a0af",
+      "title": "Improve: fireWebhook() fire-and-forget ohne .catch() bei Auto-Check",
+      "description": "In competition.js Zeile ~478 wird fireWebhook() ohne await und ohne .catch() aufgerufen.",
+      "category": "improve",
+      "files": [
+        "v2/assets/views/competition.js"
+      ],
+      "effort": "10 Min",
+      "impact": "Niedrig",
+      "created_at": "2026-03-31T01:56:34.227884",
+      "posted": true,
+      "approved_at": "2026-03-31T02:11:36.430132",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T09:00:00.000000",
+      "result": "fireWebhook('undercut', ...).catch(e => console.warn('[webhook]', e)) — Netzwerkfehler werden jetzt in der Console sichtbar statt still verworfen. Commit: 6a166d1"
+    },
+    {
+      "id": "14eed65c",
+      "title": "Bug: Batch-Stop cancelt keine laufenden API-Requests",
+      "description": "In v2/assets/views/batch.js (Zeile ~620-638) werden beim Multi-Markt-Check (ebay, amazon, kaufland) keine Requests gecancelt wenn der User auf Stop klickt. _running-Flag wird geprüft, aber ein laufendes await API.flipcheck() läuft bis zum Ende — verschwendet Backend-Quota. Fix: AbortController pro Batch-Run erstellen, Signal an alle API.flipcheck()-Calls übergeben, bei Stop mit controller.abort() canceln.",
+      "category": "bug",
+      "files": [
+        "v2/assets/views/batch.js"
+      ],
+      "effort": "25 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T00:54:31.348136",
+      "posted": true,
+      "approved_at": "2026-03-31T00:55:06.796896",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:30:00.000000",
+      "result": "AbortController (_abortController) pro Batch-Run in batch.js. Stop-Button ruft now _abortController.abort() auf. Signal wird an API.flipcheck() übergeben, das über app.js (API.call) an fetch() durchgereicht wird. AbortError im catch → break der Outer-Loop. Reset in mount/unmount. Commit: 57c2737"
+    },
+    {
+      "id": "c09c00f8",
+      "title": "Security: Webhook-URL ohne Validierung (SSRF-Risiko)",
+      "description": "In v2/assets/views/competition.js (Zeile ~920-955) wird die Webhook-URL direkt gespeichert und verwendet ohne Format-Prüfung. User könnte interne IPs (127.0.0.1, 192.168.x) oder ungültige Protokolle (file://) eintragen — SSRF-Risiko im Electron-Kontext. Fix: URL.parse() Validierung vor dem Speichern, nur https:// und http:// erlauben, private IP-Ranges blocken.",
+      "category": "security",
+      "files": [
+        "v2/assets/views/competition.js"
+      ],
+      "effort": "20 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T00:54:37.134971",
+      "posted": true,
+      "approved_at": "2026-03-31T00:55:18.897473",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:30:00.000000",
+      "result": "validateWebhookUrl(url) in competition.js: prüft Protokoll (nur https:/http:), blockt private Ranges (localhost, 127.x, 10.x, 192.168.x, 172.16-31.x, ::1, 0.0.0.0) via new URL() + Regex. Wird vor _wh.url = url in btnSaveWh-Handler aufgerufen. Commit: 57c2737"
+    },
+    {
+      "id": "8f218f5d",
+      "title": "Improve: Event Listener Cleanup fehlt in settings.js unmount()",
+      "description": "In v2/assets/views/settings.js (Zeile ~858-1128) werden viele addEventListener-Calls gemacht, aber kein unmount() räumt sie auf. Bei View-Wechsel bleiben die Listener aktiv — Memory Leak in der Electron-App, die lange läuft. Ähnliches Muster auch in inventory.js. Fix: Alle Listener in einem Array sammeln, in unmount() per removeEventListener bereinigen oder AbortSignal verwenden.",
+      "category": "improve",
+      "files": [
+        "v2/assets/views/settings.js",
+        "v2/assets/views/inventory.js"
+      ],
+      "effort": "35 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T00:54:50.940876",
+      "posted": true,
+      "approved_at": "2026-03-31T00:55:32.258225",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:30:00.000000",
+      "result": "AbortController (_eventsAbort) in settings.js. attachEvents() erstellt neuen Controller, übergibt { signal } an alle direkten addEventListener-Calls (~20 Listener). unmount() ruft _eventsAbort.abort() + clearTimeout(_saveTimer) auf. inventory.js bereits sauber (offScannerEan + null-Guard). Commit: 57c2737"
+    },
+    {
+      "id": "2eb49680",
+      "title": "Test #2: Button-Test",
+      "description": "Klick einen der Buttons um die Approval-Kette zu testen.",
+      "category": "idea",
+      "files": [],
+      "effort": "0 Min",
+      "impact": "Test",
+      "created_at": "2026-03-30T23:23:38.474939",
+      "posted": true,
+      "approved_at": "2026-03-30T23:26:03.507549",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T00:00:00.000000",
+      "result": "Test-Task erfolgreich verarbeitet. Approval-Kette funktioniert korrekt: pending → approved → completed."
+    },
+    {
+      "id": "c5c44862",
+      "title": "Bug: Null-Check fehlt in renderBatchResults()",
+      "description": "In popup.js ~Zeile 1082 werden DOM-Elemente wie $('batchSummary').innerHTML direkt beschrieben, ohne zu prüfen ob sie existieren. Bei Template-Ladefehler oder Timing-Problem crasht der komplette Batch-Tab ohne sichtbare Fehlermeldung. Fix: Null-Check vor jedem DOM-Zugriff: const el = $('batchSummary'); if (el) el.innerHTML = ...;",
+      "category": "bug",
+      "files": [
+        "extension/popup/popup.js"
+      ],
+      "effort": "10 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T00:14:01.921419",
+      "posted": true,
+      "approved_at": "2026-03-31T00:14:35.585034",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:00:00.000000",
+      "result": "Null-Guards für batchTbody, batchResultWrap, batchResultCount, batchSummary eingefügt. Gleichzeitig tbody.innerHTML durch _appendBatchRow() ersetzt (kombiniert mit Security-Fix). Commit: 0bb1874"
+    },
+    {
+      "id": "ff6d5d17",
+      "title": "Security: Inkonsistentes HTML-Escaping in Batch-Tabelle",
+      "description": "In popup.js (Zeile ~1063 und ~1105) werden CSS-Werte und teilweise HTML direkt per Template-String injiziert. Während esc() für EAN/Verdict genutzt wird, fehlt konsequentes Escaping bei title-Attributen und CSS-Farbwerten. Ein kompromittiertes Backend könnte XSS im Extension-Kontext auslösen. Fix: DOM-Elemente per createElement() aufbauen statt innerHTML, CSS-Klassen statt inline-Styles nutzen.",
+      "category": "security",
+      "files": [
+        "extension/popup/popup.js"
+      ],
+      "effort": "30 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T00:14:13.109755",
+      "posted": true,
+      "approved_at": "2026-03-31T00:15:05.490503",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:00:00.000000",
+      "result": "tbody.innerHTML = _batchResults.map(...) in renderBatchResults() durch tbody.textContent='' + _batchResults.forEach(r => _appendBatchRow(r)) ersetzt. _appendBatchRow() nutzt bereits createElement() — kein Template-String-XSS mehr. Commit: 0bb1874"
+    },
+    {
+      "id": "4fc3f95f",
+      "title": "Improve: Fire-and-Forget Promise in _sessionSet() ohne Error Handler",
+      "description": "In background.js (Zeile ~235, ~395) wird _sessionSet() ohne await oder .catch() aufgerufen. Wenn chrome.storage.session.set() fehlschlägt (Quota, Browser-Restriktionen), wird der Fehler still verschluckt. L1-Cache hat Daten, L2/Session nicht → Inkonsistenz → unnötige API-Calls. Fix: _sessionSet(key, entry).catch(e => console.warn('[cache]', e));",
+      "category": "improve",
+      "files": [
+        "extension/background.js"
+      ],
+      "effort": "5 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T00:14:13.146504",
+      "posted": true,
+      "approved_at": "2026-03-31T00:15:28.942483",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T08:00:00.000000",
+      "result": "Beide _sessionSet() Aufrufe (Zeile ~235 + ~395) mit .catch(e => console.warn('[cache]', e)) versehen. Storage-Fehler werden jetzt in der Console sichtbar. Commit: 0bb1874"
+    },
+    {
+      "id": "0b56a464",
+      "title": "Bug: fetch()-Response ohne res.ok-Check in popup.js",
+      "description": "In popup.js Zeile ~529 wird await res.json() aufgerufen ohne vorher res.ok zu prüfen.",
+      "category": "bug",
+      "files": ["extension/popup/popup.js"],
+      "effort": "5 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T02:18:41.667435",
+      "posted": true,
+      "approved_at": "2026-03-31T02:19:19.906100",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T10:00:00.000000",
+      "result": "if (!res.ok) throw new Error(await res.text() || res.statusText) vor res.json() eingefügt. User sieht jetzt echte Server-Fehlermeldung statt generischem 'Netzwerk-Fehler'. Commit: 2aacb66"
+    },
+    {
+      "id": "40851c87",
+      "title": "Security: trends_day_range ohne Bounds-Check in app.py",
+      "description": "trends_day_range in app.py ohne Bereichsprüfung.",
+      "category": "security",
+      "files": ["services/Backend/app.py"],
+      "effort": "10 Min",
+      "impact": "Hoch",
+      "created_at": "2026-03-31T02:18:53.641090",
+      "posted": true,
+      "approved_at": "2026-03-31T02:19:44.287502",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T10:00:00.000000",
+      "result": "max(1, min(365, int(...))) in beiden Parsing-Blöcken (JSON body + form). Angreifer-Input >365 wird auf 365 geclampt. Commit: 2aacb66"
+    },
+    {
+      "id": "b79f6836",
+      "title": "Bug: try-catch in batch.js schluckt API-Fehler lautlos",
+      "description": "Innerer catch-Block um API.flipcheck()-Calls war leer.",
+      "category": "bug",
+      "files": ["v2/assets/views/batch.js"],
+      "effort": "8 Min",
+      "impact": "Mittel",
+      "created_at": "2026-03-31T02:18:53.707489",
+      "posted": true,
+      "approved_at": "2026-03-31T02:19:59.757771",
+      "approved_by": "fakeflip056",
+      "completed_at": "2026-03-31T10:00:00.000000",
+      "result": "catch(err): AbortError wird re-thrown (propagiert zu äußerem catch), andere Fehler in marketError gespeichert. if (!bestResult) throw marketError || new Error('Kein Ergebnis') — echter Fehlertext erscheint im Batch-Ergebnis. Commit: 2aacb66"
+    }
+  ]
+}
