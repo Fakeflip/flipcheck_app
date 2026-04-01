@@ -200,8 +200,13 @@ function showLicenseGate() {
     btn.disabled = true; btn.textContent = "Lade…";
     try {
       const data = await createCheckoutSession(trialDays);
-      if (data?.checkout_url) window.open(data.checkout_url, "_blank");
-      else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
+      if (data?.checkout_url) {
+        // Use location.href — window.open is blocked on iOS Safari
+        // because the async gap breaks the user-gesture chain.
+        window.location.href = data.checkout_url;
+        return;
+      }
+      Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
     } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
     btn.disabled = false; btn.innerHTML = resetLabel + " " + arrowSvg;
   }
