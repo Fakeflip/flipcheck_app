@@ -2268,14 +2268,173 @@ async def sneaker_check_endpoint(req: SneakerCheckRequest):
     return result
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+# ── API Key Auth + Rate Limiting ─────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Keys are stored in a JSON file alongside .env.  Each key has:
+#   { "key": "fc_...", "name": "Max Mustermann", "created": "...",
+#     "rate_limit": 100, "active": true }
+#
+# Admin endpoints use FLIPCHECK_ADMIN_KEY from .env as master password.
+# ─────────────────────────────────────────────────────────────────────────────
+
+import hashlib as _hashlib
+from collections import defaultdict as _defaultdict
+from datetime import datetime as _datetime
+
+_API_KEYS_FILE = os.path.join(str(BASE_DIR), ".api_keys.json")
+_ADMIN_KEY = os.getenv("FLIPCHECK_ADMIN_KEY", "")
+
+# In-memory rate limit counters: { key_hash: [(timestamp, ...), ...] }
+_rate_windows: dict = _defaultdict(list)
+_DEFAULT_RATE_LIMIT = 100   # requests per hour
+
+
+def _load_api_keys() -> list:
+    try:
+        with open(_API_KEYS_FILE) as f:
+            return _json.load(f)
+    except Exception:
+        return []
+
+
+def _save_api_keys(keys: list):
+    with open(_API_KEYS_FILE, "w") as f:
+        _json.dump(keys, f, indent=2, default=str)
+
+
+def _find_key(api_key: str) -> Optional[dict]:
+    for k in _load_api_keys():
+        if k.get("key") == api_key and k.get("active", True):
+            return k
+    return None
+
+
+def _check_rate_limit(api_key: str, limit: int = _DEFAULT_RATE_LIMIT) -> tuple:
+    """Returns (allowed: bool, remaining: int, reset_ts: int)."""
+    now = time.time()
+    window_start = now - 3600  # 1 hour window
+    key_hash = _hashlib.sha256(api_key.encode()).hexdigest()[:16]
+
+    # Clean old entries
+    _rate_windows[key_hash] = [ts for ts in _rate_windows[key_hash] if ts > window_start]
+    used = len(_rate_windows[key_hash])
+    remaining = max(0, limit - used)
+
+    if used >= limit:
+        reset_ts = int(_rate_windows[key_hash][0] + 3600)
+        return False, 0, reset_ts
+
+    _rate_windows[key_hash].append(now)
+    return True, remaining - 1, int(now + 3600)
+
+
+def _require_api_key(request: Request) -> tuple:
+    """Validate API key from header. Returns (key_record, error_response)."""
+    api_key = request.headers.get("x-api-key", "").strip()
+    if not api_key:
+        return None, JSONResponse(
+            {"ok": False, "error": "API key required. Send X-API-Key header."},
+            status_code=401,
+        )
+
+    key_record = _find_key(api_key)
+    if not key_record:
+        return None, JSONResponse(
+            {"ok": False, "error": "Invalid or inactive API key."},
+            status_code=403,
+        )
+
+    limit = key_record.get("rate_limit", _DEFAULT_RATE_LIMIT)
+    allowed, remaining, reset_ts = _check_rate_limit(api_key, limit)
+    if not allowed:
+        return None, JSONResponse(
+            {"ok": False, "error": "Rate limit exceeded. Try again later.",
+             "rate_limit": limit, "reset_at": reset_ts},
+            status_code=429,
+            headers={"X-RateLimit-Limit": str(limit), "X-RateLimit-Remaining": "0",
+                      "X-RateLimit-Reset": str(reset_ts)},
+        )
+
+    return key_record, None
+
+
+def _require_admin(request: Request):
+    """Check admin key from header."""
+    admin = request.headers.get("x-admin-key", "").strip()
+    if not _ADMIN_KEY or admin != _ADMIN_KEY:
+        return JSONResponse({"ok": False, "error": "Unauthorized"}, status_code=403)
+    return None
+
+
+# ── Admin: Key Management ────────────────────────────────────────────────────
+
+@app.get("/api/v1/keys")
+async def list_api_keys(request: Request):
+    """List all API keys (admin only)."""
+    err = _require_admin(request)
+    if err:
+        return err
+    keys = _load_api_keys()
+    # Hide full key, show only prefix
+    safe = []
+    for k in keys:
+        safe.append({**k, "key": k["key"][:12] + "..." if len(k.get("key", "")) > 12 else k.get("key", "")})
+    return {"ok": True, "keys": safe}
+
+
+@app.post("/api/v1/keys")
+async def create_api_key(request: Request):
+    """Create a new API key (admin only).
+    Body: { "name": "Max", "rate_limit": 100 }"""
+    err = _require_admin(request)
+    if err:
+        return err
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = body.get("name", "unnamed")
+    rate_limit = int(body.get("rate_limit", _DEFAULT_RATE_LIMIT))
+    new_key = f"fc_live_{secrets.token_urlsafe(32)}"
+    record = {
+        "key": new_key,
+        "name": name,
+        "rate_limit": rate_limit,
+        "active": True,
+        "created": _datetime.utcnow().isoformat(),
+    }
+    keys = _load_api_keys()
+    keys.append(record)
+    _save_api_keys(keys)
+    return {"ok": True, "key": new_key, "name": name, "rate_limit": rate_limit}
+
+
+@app.delete("/api/v1/keys/{key_prefix}")
+async def revoke_api_key(request: Request, key_prefix: str):
+    """Revoke an API key by prefix (admin only)."""
+    err = _require_admin(request)
+    if err:
+        return err
+    keys = _load_api_keys()
+    found = False
+    for k in keys:
+        if k["key"].startswith(key_prefix):
+            k["active"] = False
+            found = True
+    if not found:
+        return JSONResponse({"ok": False, "error": "Key not found"}, status_code=404)
+    _save_api_keys(keys)
+    return {"ok": True, "revoked": key_prefix}
+
+
 # ── Unified API v1 ────────────────────────────────────────────────────────────
-# Single endpoint for all marketplace checks — for external integrations,
-# other checkers, or any tool that wants to query Flipcheck.
+# Single endpoint for all marketplace checks — for external integrations.
 #
 # POST /api/v1/check
-# { "market": "ebay|amazon|kaufland|stockx|goat|sneaker",
-#   "ean": "...", "sku": "...", "asin": "...",
-#   "ek": 25.50, ... }
+# Headers: X-API-Key: fc_live_...
+# Body: { "market": "ebay|amazon|kaufland|stockx|goat|sneaker", ... }
 
 class UnifiedCheckRequest(BaseModel):
     market: str                         # ebay, amazon, kaufland, stockx, goat, sneaker
@@ -2300,11 +2459,14 @@ class UnifiedCheckRequest(BaseModel):
 
 @app.post("/api/v1/check")
 async def unified_check(request: Request, body: UnifiedCheckRequest):
-    """Unified check endpoint — routes to any marketplace."""
+    """Unified check endpoint — routes to any marketplace. Requires API key."""
+    key_record, err = _require_api_key(request)
+    if err:
+        return err
+
     market = body.market.strip().lower()
 
     if market in ("ebay", "kaufland"):
-        # Re-use existing /flipcheck logic
         fake_body = {
             "ean": body.ean or "", "ek": body.ek, "mode": body.mode,
             "category": body.category, "shipping_in": body.shipping_in,
@@ -2313,8 +2475,6 @@ async def unified_check(request: Request, body: UnifiedCheckRequest):
             "market": market, "trends_day_range": body.trends_day_range,
             "sell_custom": body.sell_custom,
         }
-        # Build a fake Request-like scope so we can call flipcheck internally
-        from starlette.testclient import TestClient
         async with httpx.AsyncClient(app=app, base_url="http://internal") as client:
             resp = await client.post("/flipcheck", json=fake_body)
             result = resp.json()
