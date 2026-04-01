@@ -202,12 +202,27 @@
         "https://www.campz.de/*",
         "https://www.addnature.de/*",
         "https://www.trendyol.com/*",
-        "https://www.shein.com/*"
+        "https://www.shein.com/*",
+        "https://stockx.com/*",
+        "https://www.stockx.com/*",
+        "https://www.goat.com/*"
       ],
       "js": [
         "content/panel-component.js"
       ],
       "run_at": "document_start"
+    },
+    {
+      "matches": [
+        "https://stockx.com/*",
+        "https://www.stockx.com/*",
+        "https://www.goat.com/*"
+      ],
+      "js": [
+        "content/panel-component.js",
+        "content/stockx-product.js"
+      ],
+      "run_at": "document_idle"
     },
     {
       "matches": [

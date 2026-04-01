@@ -403,6 +403,32 @@ async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba',
   return promise;
 }
 
+// ── Sneaker Check ────────────────────────────────────────────────────────────
+async function apiSneakerCheck({ sku, ek = 0 }) {
+  const ekNum = parseFloat(ek) || 0;
+  const key   = `snk:${sku}:${ekNum}`;
+
+  const l1 = _cache.get(key);
+  if (l1 && Date.now() - l1.ts < 5 * 60 * 1000) return l1.data;
+
+  const token   = await getToken();
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const res = await _fetchWithRetry('https://api.joinflipcheck.app/sneaker-check', {
+    method:  'POST',
+    headers,
+    body:    JSON.stringify({ sku, ek: ekNum }),
+  }, 30000);
+
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+
+  _cache.set(key, { ts: Date.now(), data });
+  if (_cache.size > 200) _cache.delete(_cache.keys().next().value);
+  return data;
+}
+
 // ── Bridge Helpers ────────────────────────────────────────────────────────────
 async function bridgeGet(path) {
   const r = await fetch(`http://127.0.0.1:8766${path}`, {
@@ -491,6 +517,12 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           } else {
             reply({ ok: true, data });
           }
+          break;
+        }
+
+        case 'SNEAKER_CHECK': {
+          const data = await apiSneakerCheck(msg);
+          reply({ ok: !!data?.ok, data });
           break;
         }
 

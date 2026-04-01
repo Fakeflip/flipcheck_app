@@ -2239,6 +2239,123 @@ async def dhl_shipments(body: DhlShipmentBody, request: Request):
         return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
 
 
+# ── Sneaker Check (StockX + GOAT) ─────────────────────────────────────────────
+
+class SneakerCheckRequest(BaseModel):
+    sku: str
+    ek: float = 0.0
+    platform: str = "both"  # "stockx", "goat", "both"
+
+@app.post("/sneaker-check")
+async def sneaker_check_endpoint(req: SneakerCheckRequest):
+    """Check sneaker profit on StockX and/or GOAT."""
+    try:
+        from sneaker import check_stockx, check_goat, sneaker_check as _sneaker_check
+    except ImportError as e:
+        return JSONResponse({"ok": False, "error": f"Sneaker module not available: {e}"}, status_code=500)
+
+    loop = asyncio.get_event_loop()
+    try:
+        if req.platform == "stockx":
+            result = await loop.run_in_executor(None, check_stockx, req.sku, req.ek)
+        elif req.platform == "goat":
+            result = await loop.run_in_executor(None, check_goat, req.sku, req.ek, "")
+        else:
+            result = await loop.run_in_executor(None, _sneaker_check, req.sku, req.ek)
+    except Exception as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+
+    return result
+
+
+# ── Unified API v1 ────────────────────────────────────────────────────────────
+# Single endpoint for all marketplace checks — for external integrations,
+# other checkers, or any tool that wants to query Flipcheck.
+#
+# POST /api/v1/check
+# { "market": "ebay|amazon|kaufland|stockx|goat|sneaker",
+#   "ean": "...", "sku": "...", "asin": "...",
+#   "ek": 25.50, ... }
+
+class UnifiedCheckRequest(BaseModel):
+    market: str                         # ebay, amazon, kaufland, stockx, goat, sneaker
+    ean: Optional[str] = None
+    sku: Optional[str] = None
+    asin: Optional[str] = None
+    ek: float = 0.0
+    mode: str = "mid"
+    category: str = "sonstiges"
+    shipping_in: float = 0.0
+    shipping_out: float = 0.0
+    vat_mode: str = "no_vat"
+    ek_mode: str = "gross"
+    ship_mode: str = "gross"
+    trends_day_range: int = 30
+    sell_custom: Optional[float] = None
+    # Amazon-specific
+    method: str = "fba"
+    prep_fee: float = 0.0
+    # Sneaker-specific
+    platform: str = "both"              # stockx, goat, both (only for sneaker)
+
+@app.post("/api/v1/check")
+async def unified_check(request: Request, body: UnifiedCheckRequest):
+    """Unified check endpoint — routes to any marketplace."""
+    market = body.market.strip().lower()
+
+    if market in ("ebay", "kaufland"):
+        # Re-use existing /flipcheck logic
+        fake_body = {
+            "ean": body.ean or "", "ek": body.ek, "mode": body.mode,
+            "category": body.category, "shipping_in": body.shipping_in,
+            "shipping_out": body.shipping_out, "vat_mode": body.vat_mode,
+            "ek_mode": body.ek_mode, "ship_mode": body.ship_mode,
+            "market": market, "trends_day_range": body.trends_day_range,
+            "sell_custom": body.sell_custom,
+        }
+        # Build a fake Request-like scope so we can call flipcheck internally
+        from starlette.testclient import TestClient
+        async with httpx.AsyncClient(app=app, base_url="http://internal") as client:
+            resp = await client.post("/flipcheck", json=fake_body)
+            result = resp.json()
+            result["market"] = market
+            return result
+
+    elif market == "amazon":
+        if not body.asin and not body.ean:
+            return JSONResponse({"ok": False, "error": "ASIN oder EAN benötigt für Amazon"}, status_code=400)
+        result = await _amazon_check(
+            asin=body.asin or "", ean=body.ean or "", ek=body.ek,
+            mode=body.mode, method=body.method, ship_in=body.shipping_in,
+            category=body.category, prep_fee=body.prep_fee,
+            vat_mode=body.vat_mode, ek_mode=body.ek_mode, ship_mode=body.ship_mode,
+            sell_custom=body.sell_custom,
+        )
+        result["market"] = "amazon"
+        return result
+
+    elif market in ("stockx", "goat", "sneaker"):
+        if not body.sku:
+            return JSONResponse({"ok": False, "error": "SKU benötigt für Sneaker-Check"}, status_code=400)
+        try:
+            from sneaker import check_stockx, check_goat, sneaker_check as _sneaker_check
+        except ImportError as e:
+            return JSONResponse({"ok": False, "error": f"Sneaker module: {e}"}, status_code=500)
+
+        loop = asyncio.get_event_loop()
+        if market == "stockx":
+            result = await loop.run_in_executor(None, check_stockx, body.sku, body.ek)
+        elif market == "goat":
+            result = await loop.run_in_executor(None, check_goat, body.sku, body.ek, "")
+        else:
+            result = await loop.run_in_executor(None, _sneaker_check, body.sku, body.ek)
+        result["market"] = market
+        return result
+
+    else:
+        return JSONResponse({"ok": False, "error": f"Unbekannter Marktplatz: {market}"}, status_code=400)
+
+
 if __name__ == "__main__":
     import os
     import uvicorn

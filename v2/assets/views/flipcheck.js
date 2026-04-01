@@ -178,7 +178,7 @@ const FlipcheckView = (() => {
   }
 
   // ─── State ────────────────────────────────────────────────────────────────
-  let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland"
+  let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland" | "sneaker"
   let _vatMode   = "no_vat";
   let _ekMode    = "gross";
   let _shipMode  = "gross";
@@ -270,6 +270,10 @@ const FlipcheckView = (() => {
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 13V7l5-4 5 4v6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="6" y="9" width="4" height="4" rx=".5" stroke="currentColor" stroke-width="1.3"/></svg>
           Kaufland
         </button>
+        <button class="btn btn-sm ${selectedMarket==="sneaker"?"btn-primary":"btn-ghost"}" id="mktSneaker" style="gap:6px">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 11l1-4c.3-1 1.2-1.5 2.2-1.5h3.6c1 0 1.5.3 2.2 1l3 3c.4.4.4 1 0 1.4l-1 1c-.5.5-1.3.5-1.8 0L9.5 10H5l-2 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Sneaker
+        </button>
       </div>
     `;
   }
@@ -289,6 +293,7 @@ const FlipcheckView = (() => {
 
     const isAmz = selectedMarket === "amazon";
     const isKl  = selectedMarket === "kaufland";
+    const isSnk = selectedMarket === "sneaker";
     return `
       <div class="page-header">
         <div class="page-header-left">
@@ -307,12 +312,12 @@ const FlipcheckView = (() => {
 
           <div class="col gap-12">
             <div class="input-group">
-              <label class="input-label">${isAmz ? "ASIN / EAN" : "EAN"}</label>
+              <label class="input-label">${isSnk ? "SKU" : isAmz ? "ASIN / EAN" : "EAN"}</label>
               <div style="display:flex;gap:6px">
                 <input id="fcEan" class="input" type="text"
-                  placeholder="${isAmz ? I18N.t('fc.form.ean_placeholder_amz') : I18N.t('fc.form.ean_placeholder')}"
+                  placeholder="${isSnk ? "z.B. FV5029-500" : isAmz ? I18N.t('fc.form.ean_placeholder_amz') : I18N.t('fc.form.ean_placeholder')}"
                   value="${esc(state.ean||"")}" autocomplete="off" style="flex:1" />
-                ${!isAmz ? `<button class="btn btn-ghost btn-sm" id="fcScanBtn" title="Handy-Scanner öffnen" style="flex-shrink:0;font-size:16px;padding:0 10px">📷</button>` : ""}
+                ${!isAmz && !isSnk ? `<button class="btn btn-ghost btn-sm" id="fcScanBtn" title="Handy-Scanner öffnen" style="flex-shrink:0;font-size:16px;padding:0 10px">📷</button>` : ""}
               </div>
               ${isAmz ? `
               <div id="fcConverterBox" style="display:none;margin-top:6px;padding:8px 10px;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r-sm)">
@@ -341,8 +346,8 @@ const FlipcheckView = (() => {
               </div>
             </div>
 
-            <!-- eBay / Kaufland category field (hidden for Amazon) -->
-            <div id="fcEbayFields" style="display:${isAmz?"none":"contents"}">
+            <!-- eBay / Kaufland category field (hidden for Amazon/Sneaker) -->
+            <div id="fcEbayFields" style="display:${isAmz||isSnk?"none":"contents"}">
               <div class="input-group">
                 <label class="input-label">${isKl ? I18N.t('fc.form.kl_category') : I18N.t('fc.form.ebay_category')}</label>
                 <select id="fcCategory" class="select">
@@ -442,8 +447,8 @@ const FlipcheckView = (() => {
               </div>
             </div>
 
-            <!-- VK Custom (optional override) — all markets -->
-            <div class="input-group">
+            <!-- VK Custom (optional override) — all markets except sneaker -->
+            <div class="input-group" style="display:${isSnk?"none":""}">
               <label class="input-label">VK Custom <span class="text-xs text-muted">(optional)</span></label>
               <div class="input-prefix-wrap">
                 <span class="prefix">€</span>
@@ -479,9 +484,112 @@ const FlipcheckView = (() => {
     </div>`;
   }
 
+  // ─── Sneaker result rendering ─────────────────────────────────────────────
+  function _renderSizeTable(platform, sizes, ek) {
+    if (!sizes?.length) return `<div class="text-muted text-xs" style="padding:12px">Keine Daten</div>`;
+    let html = `<div style="overflow-x:auto">
+      <table class="table-compact" style="width:100%;font-size:11px;border-collapse:collapse">
+        <thead><tr style="border-bottom:1px solid var(--border2)">
+          <th style="text-align:right;padding:4px 8px">Size</th>
+          <th style="text-align:right;padding:4px 8px">Ask</th>
+          <th style="text-align:right;padding:4px 8px">Bid</th>
+          <th style="text-align:right;padding:4px 8px">Last</th>
+          <th style="text-align:right;padding:4px 8px">Payout</th>
+          <th style="text-align:right;padding:4px 8px">Profit</th>
+          <th style="text-align:right;padding:4px 8px">30d</th>
+        </tr></thead><tbody>`;
+    for (const s of sizes) {
+      const profitColor = s.profit > 0 ? "var(--green)" : s.profit < 0 ? "var(--red)" : "var(--text2)";
+      const profitSign = s.profit > 0 ? "+" : "";
+      html += `<tr style="border-bottom:1px solid var(--border1)">
+        <td style="text-align:right;padding:4px 8px;font-weight:600">${esc(String(s.size))}</td>
+        <td style="text-align:right;padding:4px 8px">${s.ask ? s.ask.toFixed(0) + "€" : "—"}</td>
+        <td style="text-align:right;padding:4px 8px">${s.bid ? s.bid.toFixed(0) + "€" : "—"}</td>
+        <td style="text-align:right;padding:4px 8px">${s.last_sale ? s.last_sale.toFixed(0) + "€" : "—"}</td>
+        <td style="text-align:right;padding:4px 8px">${s.payout ? s.payout.toFixed(0) + "€" : "—"}</td>
+        <td style="text-align:right;padding:4px 8px;color:${profitColor};font-weight:600">${s.profit != null ? profitSign + s.profit.toFixed(0) + "€" : "—"}</td>
+        <td style="text-align:right;padding:4px 8px">${s.sales_30d || 0}</td>
+      </tr>`;
+    }
+    html += `</tbody></table></div>`;
+    return html;
+  }
+
+  function renderResultSneaker(data, sku, ek) {
+    const title = esc(data.title || sku);
+    const sx = data.stockx;
+    const gt = data.goat;
+
+    let statsHtml = "";
+    if (sx) {
+      statsHtml += `<div class="fc-market-row mb-8" style="gap:8px;flex-wrap:wrap">
+        <div class="fc-market-chip"><span class="fc-market-chip-l">90d Sales</span><span class="fc-market-chip-v">${sx.sales_90d ?? "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">72h Sales</span><span class="fc-market-chip-v">${sx.sales_72h ?? "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">Avg 90d</span><span class="fc-market-chip-v">${sx.avg_price_90d ? sx.avg_price_90d.toFixed(0) + "€" : "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">Range</span><span class="fc-market-chip-v">${sx.range_low ? sx.range_low.toFixed(0) + "–" + (sx.range_high||0).toFixed(0) + "€" : "—"}</span></div>
+      </div>`;
+    }
+
+    // Count profitable sizes across both platforms
+    const sxProfit = (sx?.sizes || []).filter(s => s.profit > 0);
+    const gtProfit = (gt?.sizes || []).filter(s => s.profit > 0);
+    const totalProfit = sxProfit.length + gtProfit.length;
+    const totalSizes = (sx?.sizes?.length || 0) + (gt?.sizes?.length || 0);
+    const bestProfit = Math.max(
+      ...sxProfit.map(s => s.profit || 0),
+      ...gtProfit.map(s => s.profit || 0),
+      0
+    );
+
+    const verdictClass = bestProfit >= 15 ? "fc-verdict--buy" : bestProfit > 0 ? "fc-verdict--hold" : "fc-verdict--skip";
+    const verdictText = bestProfit >= 15 ? "PROFITABLE" : bestProfit > 0 ? "MARGINAL" : "SKIP";
+
+    return `
+      <div class="fc-result">
+        <div class="fc-result-head">
+          <div>
+            <div class="fc-result-title">${title}</div>
+            <div class="text-xs text-muted mt-2">SKU: ${esc(sku)} &nbsp;|&nbsp; EK: ${ek.toFixed(2)}€ (netto: ${(ek/1.19).toFixed(2)}€)</div>
+          </div>
+          <div class="fc-verdict ${verdictClass}" style="font-size:18px">${verdictText}</div>
+        </div>
+
+        <div class="fc-market-row mb-8" style="gap:8px">
+          <div class="fc-market-chip"><span class="fc-market-chip-l">Profitable Sizes</span><span class="fc-market-chip-v" style="color:var(--green)">${totalProfit} / ${totalSizes}</span></div>
+          <div class="fc-market-chip"><span class="fc-market-chip-l">Best Profit</span><span class="fc-market-chip-v" style="color:var(--green)">${bestProfit > 0 ? "+" + bestProfit.toFixed(0) + "€" : "—"}</span></div>
+        </div>
+        ${statsHtml}
+
+        ${sx ? `
+        <div class="panel mb-12" style="padding:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-weight:700;font-size:13px;color:var(--text)">StockX</span>
+            <span class="text-xs text-muted">${esc(sx.fees_label || "")}</span>
+          </div>
+          ${_renderSizeTable("stockx", sx.sizes, ek)}
+        </div>` : data.errors?.find(e => e.includes("StockX")) ? `<div class="panel mb-12" style="padding:12px"><span class="text-xs" style="color:var(--red)">StockX: ${esc(data.errors.find(e => e.includes("StockX")))}</span></div>` : ""}
+
+        ${gt ? `
+        <div class="panel mb-12" style="padding:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+            <span style="font-weight:700;font-size:13px;color:var(--text)">GOAT / Alias</span>
+            <span class="text-xs text-muted">${esc(gt.fees_label || "")}</span>
+            ${gt.retail_price ? `<span class="text-xs text-muted">Retail: ${gt.retail_price.toFixed(0)}€</span>` : ""}
+          </div>
+          ${_renderSizeTable("goat", gt.sizes, ek)}
+        </div>` : data.errors?.find(e => e.includes("GOAT")) ? `<div class="panel mb-12" style="padding:12px"><span class="text-xs" style="color:var(--red)">GOAT: ${esc(data.errors.find(e => e.includes("GOAT")))}</span></div>` : ""}
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-ghost btn-sm" id="btnReset">Zurücksetzen</button>
+        </div>
+      </div>
+    `;
+  }
+
   function renderLoading(market = "ebay") {
     const label = market === "amazon"   ? I18N.t('fc.loading.amazon')
                 : market === "kaufland" ? I18N.t('fc.loading.kaufland')
+                : market === "sneaker" ? "StockX + GOAT werden abgefragt…"
                 :                        I18N.t('fc.loading.ebay');
     return `<div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
       <div class="spinner"></div>
@@ -1571,6 +1679,7 @@ const FlipcheckView = (() => {
     container.querySelector("#mktEbay")?.addEventListener("click", () => _switchMarket("ebay"));
     container.querySelector("#mktAmazon")?.addEventListener("click", () => _switchMarket("amazon"));
     container.querySelector("#mktKaufland")?.addEventListener("click", () => _switchMarket("kaufland"));
+    container.querySelector("#mktSneaker")?.addEventListener("click", () => _switchMarket("sneaker"));
 
     // Amazon method toggle
     container.querySelectorAll("#fcAmzMethodSeg .seg-btn").forEach(btn => {
@@ -1770,6 +1879,25 @@ const FlipcheckView = (() => {
         return;
       }
 
+      // ── Sneaker branch ──────────────────────────────────────────────────
+      if (selectedMarket === "sneaker") {
+        const sku = identifier.trim();
+        if (!sku) { Toast.error("SKU fehlt", "Gib eine Sneaker-SKU ein (z.B. FV5029-500)"); if (btn) btn.disabled = false; return; }
+
+        const { ok, data } = await API.sneakerCheck(sku, ek);
+        if (!ok || !data?.ok) {
+          resultEl.innerHTML = renderErrorCard("Sneaker nicht gefunden", data?.error || "Backend nicht erreichbar");
+          if (btn) btn.disabled = false;
+          return;
+        }
+
+        lastResult = data; lastEan = sku; lastEk = ek;
+        resultEl.innerHTML = renderResultSneaker(data, sku, ek);
+        resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
+        if (btn) btn.disabled = false;
+        return;
+      }
+
       // ── Kaufland branch ──────────────────────────────────────────────────
       if (selectedMarket === "kaufland") {
         // Auto-resolve ASIN → EAN if user typed an ASIN
@@ -1921,6 +2049,8 @@ const FlipcheckView = (() => {
             resultEl.innerHTML = renderResultAmazon(cached.data, identifier, cached.ek || ek, 0);
           } else if (selectedMarket === "kaufland") {
             resultEl.innerHTML = renderResultKaufland(cached.data, identifier, cached.ek || ek);
+          } else if (selectedMarket === "sneaker") {
+            resultEl.innerHTML = renderResultSneaker(cached.data, identifier, cached.ek || ek);
           } else {
             resultEl.innerHTML = renderResult(cached.data, identifier, cached.ek || ek, "sonstiges", 0, 0, 0);
           }

@@ -642,6 +642,7 @@
             <button class="fc-mkt-btn active" data-market="ebay">eBay</button>
             <button class="fc-mkt-btn" data-market="amazon">Amazon</button>
             <button class="fc-mkt-btn" data-market="kaufland">Kaufland</button>
+            <button class="fc-mkt-btn" data-market="sneaker">Sneaker</button>
           </div>
           <div class="fc-hdr-btns">
             <button class="fc-btn-icon" id="fcSettingsBtn" title="Einstellungen">⚙</button>
@@ -1037,7 +1038,7 @@
 
     connectedCallback() {
       const dm = this.dataset?.market;
-      if (dm && ['ebay','amazon','kaufland'].includes(dm) && dm !== this._market) {
+      if (dm && ['ebay','amazon','kaufland','sneaker'].includes(dm) && dm !== this._market) {
         this._market = dm;
         this._shadow.querySelectorAll('.fc-mkt-btn').forEach(b =>
           b.classList.toggle('active', b.dataset.market === dm));
@@ -1298,9 +1299,9 @@
       }
 
       s.querySelectorAll('.fc-mkt-btn').forEach(b => b.classList.toggle('active', b.dataset.market === market));
-      const vkLabels    = { amazon: 'Ø Buy Box 30T', kaufland: 'Günstigster Neu', ebay: 'Median VK' };
-      const feeLabels   = { amazon: 'Ref + FBA', kaufland: 'KL Gebühr', ebay: 'eBay Gebühr' };
-      const salesLabels = { amazon: 'Est. Verk./Mo', kaufland: 'Vol. (Cross-Mkt)', ebay: 'Verk./30d' };
+      const vkLabels    = { amazon: 'Ø Buy Box 30T', kaufland: 'Günstigster Neu', sneaker: 'Lowest Ask', ebay: 'Median VK' };
+      const feeLabels   = { amazon: 'Ref + FBA', kaufland: 'KL Gebühr', sneaker: 'Plattform Fees', ebay: 'eBay Gebühr' };
+      const salesLabels = { amazon: 'Est. Verk./Mo', kaufland: 'Vol. (Cross-Mkt)', sneaker: 'Sales 90d', ebay: 'Verk./30d' };
       s.getElementById('kvVkLabel').textContent     = vkLabels[market]    || vkLabels.ebay;
       s.getElementById('kvFeeLabel').textContent    = feeLabels[market]   || feeLabels.ebay;
       s.getElementById('kvSalesLabel').textContent  = salesLabels[market] || salesLabels.ebay;
@@ -1410,7 +1411,14 @@
       if (!isNaN(ekVal)) this._lastEk = ekVal;
       this._disableDataTabs();
 
-      if (this._market === 'amazon') {
+      if (this._market === 'sneaker') {
+        chrome.runtime.sendMessage({
+          type:'SNEAKER_CHECK', sku:this._identifier, ek:this._lastEk,
+        }, res => {
+          if (chrome.runtime.lastError) { this._setState('error'); return; }
+          this._handleApiResponse(res);
+        });
+      } else if (this._market === 'amazon') {
         const prepVal = parseFloat(s.getElementById('fcPrepInp')?.value) || 0;
         chrome.runtime.sendMessage({
           type:'AMAZON_CHECK', asin:this._identifier, ean:this._identifier,
@@ -2417,7 +2425,7 @@
         if (!d) return;
         this._defaults = { market: d.market||'ebay', shipOut: d.shipOut||0, catId: d.catId||'sonstiges' };
         const injectorMarket = this.dataset?.market;
-        const marketLocked   = injectorMarket && ['ebay','amazon','kaufland'].includes(injectorMarket);
+        const marketLocked   = injectorMarket && ['ebay','amazon','kaufland','sneaker'].includes(injectorMarket);
         if (d.market && d.market !== this._market && !this._identifier && !marketLocked) {
           this._setMarket(d.market, false);
         }

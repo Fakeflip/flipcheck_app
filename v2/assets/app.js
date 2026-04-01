@@ -329,6 +329,17 @@ const API = {
     return this.call("/amazon-check", { method: "POST", body });
   },
 
+  /**
+   * Run a Sneaker check (StockX + GOAT).
+   * @param {string} sku        - Sneaker SKU (e.g. "FV5029-500")
+   * @param {number} ek         - Purchase price in EUR
+   * @param {string} [platform] - "stockx", "goat", or "both"
+   * @returns {Promise<FC_ApiResponse>}
+   */
+  async sneakerCheck(sku, ek, platform = "both") {
+    return this.call("/sneaker-check", { method: "POST", body: { sku, ek, platform } });
+  },
+
   /** @returns {Promise<FC_ApiResponse>} */
   async health() {
     return this.call("/health");
