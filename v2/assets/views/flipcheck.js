@@ -178,7 +178,7 @@ const FlipcheckView = (() => {
   }
 
   // ─── State ────────────────────────────────────────────────────────────────
-  let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland" | "sneaker"
+  let selectedMarket = "ebay";   // "ebay" | "amazon" | "kaufland" | "stockx" | "goat"
   let _vatMode   = "no_vat";
   let _ekMode    = "gross";
   let _shipMode  = "gross";
@@ -270,9 +270,13 @@ const FlipcheckView = (() => {
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 13V7l5-4 5 4v6" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><rect x="6" y="9" width="4" height="4" rx=".5" stroke="currentColor" stroke-width="1.3"/></svg>
           Kaufland
         </button>
-        <button class="btn btn-sm ${selectedMarket==="sneaker"?"btn-primary":"btn-ghost"}" id="mktSneaker" style="gap:6px">
+        <button class="btn btn-sm ${selectedMarket==="stockx"?"btn-primary":"btn-ghost"}" id="mktStockx" style="gap:6px">
           <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 11l1-4c.3-1 1.2-1.5 2.2-1.5h3.6c1 0 1.5.3 2.2 1l3 3c.4.4.4 1 0 1.4l-1 1c-.5.5-1.3.5-1.8 0L9.5 10H5l-2 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          Sneaker
+          StockX
+        </button>
+        <button class="btn btn-sm ${selectedMarket==="goat"?"btn-primary":"btn-ghost"}" id="mktGoat" style="gap:6px">
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M2 11l1-4c.3-1 1.2-1.5 2.2-1.5h3.6c1 0 1.5.3 2.2 1l3 3c.4.4.4 1 0 1.4l-1 1c-.5.5-1.3.5-1.8 0L9.5 10H5l-2 2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          GOAT
         </button>
       </div>
     `;
@@ -293,7 +297,7 @@ const FlipcheckView = (() => {
 
     const isAmz = selectedMarket === "amazon";
     const isKl  = selectedMarket === "kaufland";
-    const isSnk = selectedMarket === "sneaker";
+    const isSnk = selectedMarket === "stockx" || selectedMarket === "goat";
     return `
       <div class="page-header">
         <div class="page-header-left">
@@ -484,102 +488,109 @@ const FlipcheckView = (() => {
     </div>`;
   }
 
-  // ─── Sneaker result rendering ─────────────────────────────────────────────
-  function _renderSizeTable(platform, sizes, ek) {
-    if (!sizes?.length) return `<div class="text-muted text-xs" style="padding:12px">Keine Daten</div>`;
-    let html = `<div style="overflow-x:auto">
-      <table class="table-compact" style="width:100%;font-size:11px;border-collapse:collapse">
-        <thead><tr style="border-bottom:1px solid var(--border2)">
-          <th style="text-align:right;padding:4px 8px">Size</th>
-          <th style="text-align:right;padding:4px 8px">Ask</th>
-          <th style="text-align:right;padding:4px 8px">Bid</th>
-          <th style="text-align:right;padding:4px 8px">Last</th>
-          <th style="text-align:right;padding:4px 8px">Payout</th>
-          <th style="text-align:right;padding:4px 8px">Profit</th>
-          <th style="text-align:right;padding:4px 8px">30d</th>
-        </tr></thead><tbody>`;
+  // ─── Sneaker result rendering (StockX / GOAT — separate views) ──────────
+
+  function _renderSneakerSizeGrid(sizes) {
+    if (!sizes?.length) return `<div class="text-muted text-xs" style="padding:16px;text-align:center">Keine Daten verfügbar</div>`;
+
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(105px, 1fr));gap:6px;padding:4px 0">`;
     for (const s of sizes) {
-      const profitColor = s.profit > 0 ? "var(--green)" : s.profit < 0 ? "var(--red)" : "var(--text2)";
+      const profitColor = s.profit > 0 ? "var(--green)" : s.profit < 0 ? "var(--red)" : "var(--text-muted)";
       const profitSign = s.profit > 0 ? "+" : "";
-      html += `<tr style="border-bottom:1px solid var(--border1)">
-        <td style="text-align:right;padding:4px 8px;font-weight:600">${esc(String(s.size))}</td>
-        <td style="text-align:right;padding:4px 8px">${s.ask ? s.ask.toFixed(0) + "€" : "—"}</td>
-        <td style="text-align:right;padding:4px 8px">${s.bid ? s.bid.toFixed(0) + "€" : "—"}</td>
-        <td style="text-align:right;padding:4px 8px">${s.last_sale ? s.last_sale.toFixed(0) + "€" : "—"}</td>
-        <td style="text-align:right;padding:4px 8px">${s.payout ? s.payout.toFixed(0) + "€" : "—"}</td>
-        <td style="text-align:right;padding:4px 8px;color:${profitColor};font-weight:600">${s.profit != null ? profitSign + s.profit.toFixed(0) + "€" : "—"}</td>
-        <td style="text-align:right;padding:4px 8px">${s.sales_30d || 0}</td>
-      </tr>`;
+      const hasSales = (s.sales_30d || 0) > 0;
+      const askStr = s.ask ? s.ask.toFixed(0) + "€" : "—";
+      const bidStr = s.bid ? s.bid.toFixed(0) + "€" : "—";
+      const payoutStr = s.payout ? s.payout.toFixed(0) + "€" : "";
+      const profitStr = s.profit != null ? profitSign + s.profit.toFixed(0) + "€" : "—";
+
+      html += `
+        <div style="background:var(--surface2);border:1px solid ${s.profit > 0 ? 'var(--green-sub, rgba(34,197,94,.15))' : 'var(--border1)'};border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px;transition:border-color .15s">
+          <div style="display:flex;justify-content:space-between;align-items:baseline">
+            <span style="font-weight:700;font-size:13px;color:var(--text)">${esc(String(s.size))}</span>
+            ${hasSales ? `<span style="font-size:9px;color:var(--text-muted);background:var(--surface3, var(--border1));padding:1px 5px;border-radius:9px">${s.sales_30d}/mo</span>` : ""}
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:3px">
+            <div style="display:flex;flex-direction:column;align-items:flex-start">
+              <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Ask</span>
+              <span style="font-size:12px;font-weight:500;color:var(--text)">${askStr}</span>
+              ${payoutStr ? `<span style="font-size:10px;color:var(--green)">${payoutStr}</span>` : ""}
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:flex-end">
+              <span style="font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em">Bid</span>
+              <span style="font-size:12px;font-weight:500;color:var(--text)">${bidStr}</span>
+            </div>
+          </div>
+          <div style="text-align:center;margin-top:4px;padding-top:4px;border-top:1px solid var(--border1)">
+            <span style="font-size:13px;font-weight:700;color:${profitColor}">${profitStr}</span>
+          </div>
+        </div>`;
     }
-    html += `</tbody></table></div>`;
+    html += `</div>`;
     return html;
   }
 
-  function renderResultSneaker(data, sku, ek) {
-    const title = esc(data.title || sku);
-    const sx = data.stockx;
-    const gt = data.goat;
-
-    let statsHtml = "";
-    if (sx) {
-      statsHtml += `<div class="fc-market-row mb-8" style="gap:8px;flex-wrap:wrap">
-        <div class="fc-market-chip"><span class="fc-market-chip-l">90d Sales</span><span class="fc-market-chip-v">${sx.sales_90d ?? "—"}</span></div>
-        <div class="fc-market-chip"><span class="fc-market-chip-l">72h Sales</span><span class="fc-market-chip-v">${sx.sales_72h ?? "—"}</span></div>
-        <div class="fc-market-chip"><span class="fc-market-chip-l">Avg 90d</span><span class="fc-market-chip-v">${sx.avg_price_90d ? sx.avg_price_90d.toFixed(0) + "€" : "—"}</span></div>
-        <div class="fc-market-chip"><span class="fc-market-chip-l">Range</span><span class="fc-market-chip-v">${sx.range_low ? sx.range_low.toFixed(0) + "–" + (sx.range_high||0).toFixed(0) + "€" : "—"}</span></div>
+  function renderResultSneakerSingle(data, sku, ek, platform) {
+    // Backend returns platform data directly when queried individually (not wrapped)
+    const pData = data.platform ? data : (data[platform] || data);
+    if (!pData?.ok) {
+      const errMsg = pData?.error || data?.error || data?.errors?.find(e => e.includes(platform === "stockx" ? "StockX" : "GOAT")) || "Nicht gefunden";
+      return `<div class="fc-result">
+        <div style="padding:24px;text-align:center">
+          <div style="font-size:14px;font-weight:600;color:var(--red);margin-bottom:6px">${platform === "stockx" ? "StockX" : "GOAT"} — Fehler</div>
+          <div class="text-xs text-muted">${esc(errMsg)}</div>
+        </div>
+        <div style="display:flex;gap:8px;padding:0 12px 12px"><button class="btn btn-ghost btn-sm" id="btnReset">Zurücksetzen</button></div>
       </div>`;
     }
 
-    // Count profitable sizes across both platforms
-    const sxProfit = (sx?.sizes || []).filter(s => s.profit > 0);
-    const gtProfit = (gt?.sizes || []).filter(s => s.profit > 0);
-    const totalProfit = sxProfit.length + gtProfit.length;
-    const totalSizes = (sx?.sizes?.length || 0) + (gt?.sizes?.length || 0);
-    const bestProfit = Math.max(
-      ...sxProfit.map(s => s.profit || 0),
-      ...gtProfit.map(s => s.profit || 0),
-      0
-    );
-
+    const title = esc(pData.title || data.title || sku);
+    const sizes = pData.sizes || [];
+    const profitable = sizes.filter(s => s.profit > 0);
+    const bestProfit = Math.max(...profitable.map(s => s.profit || 0), 0);
     const verdictClass = bestProfit >= 15 ? "fc-verdict--buy" : bestProfit > 0 ? "fc-verdict--hold" : "fc-verdict--skip";
     const verdictText = bestProfit >= 15 ? "PROFITABLE" : bestProfit > 0 ? "MARGINAL" : "SKIP";
+    const platformLabel = platform === "stockx" ? "StockX" : "GOAT";
+    const platformColor = platform === "stockx" ? "#00875a" : "#8b5cf6";
+
+    let statsHtml = "";
+    if (platform === "stockx" && pData.sales_90d != null) {
+      statsHtml = `<div class="fc-market-row mb-12" style="gap:6px;flex-wrap:wrap">
+        <div class="fc-market-chip"><span class="fc-market-chip-l">90d Sales</span><span class="fc-market-chip-v">${pData.sales_90d ?? "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">72h Sales</span><span class="fc-market-chip-v">${pData.sales_72h ?? "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">Avg 90d</span><span class="fc-market-chip-v">${pData.avg_price_90d ? pData.avg_price_90d.toFixed(0) + "€" : "—"}</span></div>
+        <div class="fc-market-chip"><span class="fc-market-chip-l">Range</span><span class="fc-market-chip-v">${pData.range_low ? pData.range_low.toFixed(0) + "–" + (pData.range_high||0).toFixed(0) + "€" : "—"}</span></div>
+      </div>`;
+    }
+    if (platform === "goat" && pData.retail_price) {
+      statsHtml = `<div class="fc-market-row mb-12" style="gap:6px;flex-wrap:wrap">
+        <div class="fc-market-chip"><span class="fc-market-chip-l">Retail</span><span class="fc-market-chip-v">${pData.retail_price.toFixed(0)}€</span></div>
+      </div>`;
+    }
 
     return `
       <div class="fc-result">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+          <span style="font-weight:800;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:${platformColor};background:${platformColor}15;padding:3px 8px;border-radius:6px">${platformLabel}</span>
+          <span class="text-xs text-muted">${esc(pData.fees_label || "")}</span>
+        </div>
+
         <div class="fc-result-head">
           <div>
             <div class="fc-result-title">${title}</div>
-            <div class="text-xs text-muted mt-2">SKU: ${esc(sku)} &nbsp;|&nbsp; EK: ${ek.toFixed(2)}€ (netto: ${(ek/1.19).toFixed(2)}€)</div>
+            <div class="text-xs text-muted mt-2">SKU: ${esc(pData.sku || sku)} &nbsp;|&nbsp; EK: ${ek.toFixed(2)}€ (netto: ${(ek/1.19).toFixed(2)}€)</div>
           </div>
           <div class="fc-verdict ${verdictClass}" style="font-size:18px">${verdictText}</div>
         </div>
 
         <div class="fc-market-row mb-8" style="gap:8px">
-          <div class="fc-market-chip"><span class="fc-market-chip-l">Profitable Sizes</span><span class="fc-market-chip-v" style="color:var(--green)">${totalProfit} / ${totalSizes}</span></div>
+          <div class="fc-market-chip"><span class="fc-market-chip-l">Profitable</span><span class="fc-market-chip-v" style="color:var(--green)">${profitable.length} / ${sizes.length}</span></div>
           <div class="fc-market-chip"><span class="fc-market-chip-l">Best Profit</span><span class="fc-market-chip-v" style="color:var(--green)">${bestProfit > 0 ? "+" + bestProfit.toFixed(0) + "€" : "—"}</span></div>
         </div>
         ${statsHtml}
 
-        ${sx ? `
-        <div class="panel mb-12" style="padding:12px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-weight:700;font-size:13px;color:var(--text)">StockX</span>
-            <span class="text-xs text-muted">${esc(sx.fees_label || "")}</span>
-          </div>
-          ${_renderSizeTable("stockx", sx.sizes, ek)}
-        </div>` : data.errors?.find(e => e.includes("StockX")) ? `<div class="panel mb-12" style="padding:12px"><span class="text-xs" style="color:var(--red)">StockX: ${esc(data.errors.find(e => e.includes("StockX")))}</span></div>` : ""}
+        ${_renderSneakerSizeGrid(sizes)}
 
-        ${gt ? `
-        <div class="panel mb-12" style="padding:12px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
-            <span style="font-weight:700;font-size:13px;color:var(--text)">GOAT / Alias</span>
-            <span class="text-xs text-muted">${esc(gt.fees_label || "")}</span>
-            ${gt.retail_price ? `<span class="text-xs text-muted">Retail: ${gt.retail_price.toFixed(0)}€</span>` : ""}
-          </div>
-          ${_renderSizeTable("goat", gt.sizes, ek)}
-        </div>` : data.errors?.find(e => e.includes("GOAT")) ? `<div class="panel mb-12" style="padding:12px"><span class="text-xs" style="color:var(--red)">GOAT: ${esc(data.errors.find(e => e.includes("GOAT")))}</span></div>` : ""}
-
-        <div style="display:flex;gap:8px;margin-top:8px">
+        <div style="display:flex;gap:8px;margin-top:12px">
           <button class="btn btn-ghost btn-sm" id="btnReset">Zurücksetzen</button>
         </div>
       </div>
@@ -589,7 +600,8 @@ const FlipcheckView = (() => {
   function renderLoading(market = "ebay") {
     const label = market === "amazon"   ? I18N.t('fc.loading.amazon')
                 : market === "kaufland" ? I18N.t('fc.loading.kaufland')
-                : market === "sneaker" ? "StockX + GOAT werden abgefragt…"
+                : market === "stockx" ? "StockX wird abgefragt…"
+                : market === "goat" ? "GOAT wird abgefragt…"
                 :                        I18N.t('fc.loading.ebay');
     return `<div style="display:flex;align-items:center;justify-content:center;padding:60px;gap:12px">
       <div class="spinner"></div>
@@ -1679,7 +1691,8 @@ const FlipcheckView = (() => {
     container.querySelector("#mktEbay")?.addEventListener("click", () => _switchMarket("ebay"));
     container.querySelector("#mktAmazon")?.addEventListener("click", () => _switchMarket("amazon"));
     container.querySelector("#mktKaufland")?.addEventListener("click", () => _switchMarket("kaufland"));
-    container.querySelector("#mktSneaker")?.addEventListener("click", () => _switchMarket("sneaker"));
+    container.querySelector("#mktStockx")?.addEventListener("click", () => _switchMarket("stockx"));
+    container.querySelector("#mktGoat")?.addEventListener("click", () => _switchMarket("goat"));
 
     // Amazon method toggle
     container.querySelectorAll("#fcAmzMethodSeg .seg-btn").forEach(btn => {
@@ -1879,20 +1892,20 @@ const FlipcheckView = (() => {
         return;
       }
 
-      // ── Sneaker branch ──────────────────────────────────────────────────
-      if (selectedMarket === "sneaker") {
+      // ── StockX / GOAT branch ────────────────────────────────────────────
+      if (selectedMarket === "stockx" || selectedMarket === "goat") {
         const sku = identifier.trim();
         if (!sku) { Toast.error("SKU fehlt", "Gib eine Sneaker-SKU ein (z.B. FV5029-500)"); if (btn) btn.disabled = false; return; }
 
-        const { ok, data } = await API.sneakerCheck(sku, ek);
+        const { ok, data } = await API.sneakerCheck(sku, ek, selectedMarket);
         if (!ok || !data?.ok) {
-          resultEl.innerHTML = renderErrorCard("Sneaker nicht gefunden", data?.error || "Backend nicht erreichbar");
+          resultEl.innerHTML = renderErrorCard(selectedMarket === "stockx" ? "StockX Fehler" : "GOAT Fehler", data?.error || "Backend nicht erreichbar");
           if (btn) btn.disabled = false;
           return;
         }
 
         lastResult = data; lastEan = sku; lastEk = ek;
-        resultEl.innerHTML = renderResultSneaker(data, sku, ek);
+        resultEl.innerHTML = renderResultSneakerSingle(data, sku, ek, selectedMarket);
         resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
         if (btn) btn.disabled = false;
         return;
@@ -2049,8 +2062,8 @@ const FlipcheckView = (() => {
             resultEl.innerHTML = renderResultAmazon(cached.data, identifier, cached.ek || ek, 0);
           } else if (selectedMarket === "kaufland") {
             resultEl.innerHTML = renderResultKaufland(cached.data, identifier, cached.ek || ek);
-          } else if (selectedMarket === "sneaker") {
-            resultEl.innerHTML = renderResultSneaker(cached.data, identifier, cached.ek || ek);
+          } else if (selectedMarket === "stockx" || selectedMarket === "goat") {
+            resultEl.innerHTML = renderResultSneakerSingle(cached.data, identifier, cached.ek || ek, selectedMarket);
           } else {
             resultEl.innerHTML = renderResult(cached.data, identifier, cached.ek || ek, "sonstiges", 0, 0, 0);
           }

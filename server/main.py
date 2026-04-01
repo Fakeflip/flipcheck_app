@@ -764,7 +764,6 @@ async def stripe_webhook(request: Request):
     # ── Stripe signature verification ─────────────────────────────────────────
     if STRIPE_WEBHOOK_SECRET:
         sig_header = request.headers.get("stripe-signature", "")
-        # Parse timestamp and signatures from header (t=...,v1=...)
         ts_str, sig_v1 = "", ""
         for part in sig_header.split(","):
             k, _, v = part.partition("=")
@@ -779,6 +778,7 @@ async def stripe_webhook(request: Request):
             hashlib.sha256,
         ).hexdigest()
         if not hmac.compare_digest(sig_v1, expected):
+            print(f"[STRIPE] Signature mismatch — rejecting webhook")
             raise HTTPException(status_code=401, detail="Invalid Stripe webhook signature")
 
     try:
@@ -789,41 +789,59 @@ async def stripe_webhook(request: Request):
     event_type = payload.get("type", "")
     obj        = payload.get("data", {}).get("object", {})
 
+    # ── IMPORTANT: Always return 200 to Stripe. Unhandled exceptions cause 500,
+    #    Stripe retries → eventually disables the webhook. Wrap everything in try/except.
+    try:
+        await _handle_stripe_event(event_type, obj)
+    except Exception as e:
+        # Log the error but still return 200 so Stripe doesn't disable the webhook
+        print(f"[STRIPE] ERROR handling {event_type}: {e}")
+        import traceback
+        traceback.print_exc()
+
+    return {"ok": True, "type": event_type}
+
+
+async def _handle_stripe_event(event_type: str, obj: dict) -> None:
+    """Process a Stripe webhook event. Exceptions are caught by the caller."""
+
     # ── checkout.session.completed → activate license ─────────────────────────
     if event_type == "checkout.session.completed":
         discord_id       = (obj.get("metadata") or {}).get("discord_id", "").strip()
         stripe_customer  = obj.get("customer", "")
-        # payment_status == "no_payment_required" means a free trial was started
         payment_status   = obj.get("payment_status", "paid")
         lic_status       = "trialing" if payment_status == "no_payment_required" else "active"
         if not discord_id:
             print(f"[STRIPE] checkout.session.completed — no discord_id in metadata")
-            return {"ok": True, "skipped": "no discord_id in metadata"}
+            return
         profile = await sb_admin_get_profile(discord_id)
         if profile is None:
-            print(f"[STRIPE] Profile not found: {discord_id}")
-            return {"ok": True, "skipped": "profile not found"}
+            print(f"[STRIPE] Profile not found: {discord_id} — creating it")
+            profile = await sb_admin_create_profile(discord_id, plan="pro")
         await sb_admin_update_profile(discord_id, {
             "plan":               "pro",
             "license_status":     lic_status,
             "stripe_customer_id": stripe_customer,
         })
-        print(f"[STRIPE] ✓ {discord_id} → license={lic_status} (checkout.session.completed)")
-        await discord_add_paid_role(discord_id)
+        print(f"[STRIPE] {discord_id} -> license={lic_status} (checkout.session.completed)")
+        try:
+            await discord_add_paid_role(discord_id)
+        except Exception as e:
+            print(f"[STRIPE] Discord role assign failed (non-fatal): {e}")
         username = (profile or {}).get("discord_username") or discord_id
         if lic_status == "trialing":
             await discord_notify({
-                "title": "🎉  Trial gestartet",
+                "title": "Trial gestartet",
                 "description": f"**{username}** hat den 7-Tage-Trial aktiviert.",
-                "color": 16753920,  # orange
-                "footer": {"text": "checkout.session.completed · trialing"},
+                "color": 16753920,
+                "footer": {"text": "checkout.session.completed / trialing"},
             })
         else:
             await discord_notify({
-                "title": "💰  Mitgliedschaft abgeschlossen",
+                "title": "Mitgliedschaft abgeschlossen",
                 "description": f"**{username}** hat Flipcheck Pro gekauft.",
-                "color": 5763719,  # green
-                "footer": {"text": "checkout.session.completed · active"},
+                "color": 5763719,
+                "footer": {"text": "checkout.session.completed / active"},
             })
 
     # ── subscription deleted/cancelled → deactivate ───────────────────────────
@@ -835,14 +853,17 @@ async def stripe_webhook(request: Request):
                 "plan":           "free",
                 "license_status": "inactive",
             })
-            print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (subscription.deleted)")
+            print(f"[STRIPE] customer={stripe_customer} -> license=inactive (subscription.deleted)")
             if profile:
-                await discord_remove_paid_role(profile.get("user_id", ""))
+                try:
+                    await discord_remove_paid_role(profile.get("user_id", ""))
+                except Exception as e:
+                    print(f"[STRIPE] Discord role remove failed (non-fatal): {e}")
             username = (profile or {}).get("discord_username") or stripe_customer
             await discord_notify({
-                "title": "❌  Abo gekündigt",
+                "title": "Abo gekuendigt",
                 "description": f"**{username}** hat das Abo beendet.",
-                "color": 15548997,  # red
+                "color": 15548997,
                 "footer": {"text": "customer.subscription.deleted"},
             })
 
@@ -857,50 +878,57 @@ async def stripe_webhook(request: Request):
                     "plan":           "pro",
                     "license_status": "active",
                 })
-                print(f"[STRIPE] ✓ customer={stripe_customer} → license=active (subscription.updated)")
+                print(f"[STRIPE] customer={stripe_customer} -> license=active (subscription.updated)")
                 if profile:
-                    await discord_add_paid_role(profile.get("user_id", ""))
+                    try:
+                        await discord_add_paid_role(profile.get("user_id", ""))
+                    except Exception:
+                        pass
                 username = (profile or {}).get("discord_username") or stripe_customer
                 await discord_notify({
-                    "title": "✅  Zahlung erfolgreich",
-                    "description": f"**{username}** — Abo verlängert, Pro aktiv.",
-                    "color": 5763719,  # green
-                    "footer": {"text": "customer.subscription.updated · active"},
+                    "title": "Zahlung erfolgreich",
+                    "description": f"**{username}** — Abo verlaengert, Pro aktiv.",
+                    "color": 5763719,
+                    "footer": {"text": "customer.subscription.updated / active"},
                 })
             elif status == "trialing":
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "pro",
                     "license_status": "trialing",
                 })
-                print(f"[STRIPE] ~ customer={stripe_customer} → license=trialing (subscription.updated)")
+                print(f"[STRIPE] customer={stripe_customer} -> license=trialing (subscription.updated)")
                 if profile:
-                    await discord_add_paid_role(profile.get("user_id", ""))
+                    try:
+                        await discord_add_paid_role(profile.get("user_id", ""))
+                    except Exception:
+                        pass
                 username = (profile or {}).get("discord_username") or stripe_customer
                 await discord_notify({
-                    "title": "🎉  Trial gestartet",
+                    "title": "Trial gestartet",
                     "description": f"**{username}** hat den 7-Tage-Trial aktiviert.",
-                    "color": 16753920,  # orange
-                    "footer": {"text": "customer.subscription.updated · trialing"},
+                    "color": 16753920,
+                    "footer": {"text": "customer.subscription.updated / trialing"},
                 })
             elif status in ("canceled", "unpaid", "past_due", "paused"):
                 await sb_admin_update_profile_by_stripe(stripe_customer, {
                     "plan":           "free",
                     "license_status": "inactive",
                 })
-                print(f"[STRIPE] ✗ customer={stripe_customer} → license=inactive (status={status})")
+                print(f"[STRIPE] customer={stripe_customer} -> license=inactive (status={status})")
                 if profile:
-                    await discord_remove_paid_role(profile.get("user_id", ""))
+                    try:
+                        await discord_remove_paid_role(profile.get("user_id", ""))
+                    except Exception:
+                        pass
                 username = (profile or {}).get("discord_username") or stripe_customer
                 await discord_notify({
-                    "title": "⚠️  Zahlung fehlgeschlagen",
+                    "title": "Zahlung fehlgeschlagen",
                     "description": f"**{username}** — Status: `{status}`",
-                    "color": 15105570,  # yellow-orange
-                    "footer": {"text": f"customer.subscription.updated · {status}"},
+                    "color": 15105570,
+                    "footer": {"text": f"customer.subscription.updated / {status}"},
                 })
     else:
         print(f"[STRIPE] Unhandled event: {event_type}")
-
-    return {"ok": True, "type": event_type}
 
 
 # =========================================================
@@ -914,7 +942,7 @@ async def sb_admin_get_profile(user_id: str) -> Optional[Dict[str, Any]]:
         r = await client.get(url, headers=SUPABASE_ADMIN_HEADERS, params=params)
         if r.status_code >= 400:
             print("[SB-ERR][get_profile]", r.status_code, r.text, "params=", params)
-        r.raise_for_status()
+            return None
         rows = r.json()
         return rows[0] if rows else None
 
