@@ -564,25 +564,55 @@ class GoatClient:
             return {}
 
     def find_product(self, sku: str, product_name: str = "") -> tuple:
-        """Find product. Tries: 1) show_v2 API (returns slug+product directly)  2) DDG/Google + get-product.
-        Returns (slug, product) or (None, None)."""
+        """Find product. Returns (slug, product) or (None, None).
+        Strategy: 1) DDG/Google → show_v2  2) show_v2 slug candidates  3) get-product fallback."""
         sku_slug = sku.lower().replace(" ", "-")
         log.info("[GOAT] Finding product: sku=%s name=%s", sku, product_name[:60] if product_name else "")
 
-        # 1) Try show_v2 — returns full product data, no auth needed
-        slug, product = self._find_via_show_v2(sku_slug, product_name)
-        if slug and product:
-            return slug, product
-
-        # 2) DDG/Google fallback → get-product (auth required)
+        # 1) DDG/Google to find slug (works without product name!)
         ddg_slug = self._search_web(sku)
         if ddg_slug:
             log.info("[GOAT] Web search found slug: %s", ddg_slug)
+            # Verify via show_v2 (get full product data)
+            slug, product = self._show_v2_single(ddg_slug)
+            if slug and product:
+                return slug, product
+            # Fallback: try get-product
             product = self._try_product(ddg_slug)
             if product:
                 return ddg_slug, product
 
+        # 2) show_v2 with slug candidates (needs product_name for good slugs)
+        slug, product = self._find_via_show_v2(sku_slug, product_name)
+        if slug and product:
+            return slug, product
+
         log.warning("[GOAT] Product not found: %s", sku)
+        return None, None
+
+    def _show_v2_single(self, slug: str) -> tuple:
+        """Fetch a single slug via show_v2. Returns (slug, product) or (None, None)."""
+        try:
+            import cloudscraper as cs
+            s = cs.create_scraper()
+            px = self._proxy_dict()
+            r = s.get(f"https://www.goat.com/api/v1/product_templates/{slug}/show_v2?countryCode=DE",
+                headers={"user-agent": "GOAT/2.80.2 (iPhone; iOS 18.7.1)", "accept": "application/json"},
+                timeout=5, proxies=px)
+            if r.status_code == 200:
+                data = r.json()
+                if data.get("name"):
+                    real_slug = data.get("slug", slug)
+                    product = {
+                        "name": data.get("name", ""),
+                        "sku": data.get("sku", ""),
+                        "slug": real_slug,
+                        "retail_price_cents": data.get("retailPriceCents") or data.get("retail_price_cents"),
+                    }
+                    log.info("[GOAT] show_v2 verified: %s → %s", slug, data["name"][:50])
+                    return real_slug, product
+        except Exception:
+            pass
         return None, None
 
     def _find_via_show_v2(self, sku_slug: str, product_name: str = "") -> tuple:
@@ -694,15 +724,14 @@ class GoatClient:
             return None
 
     def _search_web(self, sku: str) -> Optional[str]:
-        """Search DDG + Google for GOAT product slug."""
+        """Search DDG + Google for GOAT product slug. Uses direct connection (no proxy — DDG blocks proxies)."""
         sku_lower = sku.lower().replace(" ", "-")
-        # DDG
+        # DDG (no proxy — like sneaker-api)
         try:
-            _px = GoatClient._proxy_dict()
             r = plain_requests.get(
                 f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}",
                 headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10, proxies=_px)
+                timeout=10)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
@@ -712,13 +741,12 @@ class GoatClient:
                     return slugs[0]
         except Exception:
             pass
-        # Google fallback
+        # Google fallback (no proxy)
         try:
-            _px = GoatClient._proxy_dict()
             r = plain_requests.get(
                 f"https://www.google.com/search?q=site:goat.com/sneakers+{sku}",
                 headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10, proxies=_px)
+                timeout=10)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
