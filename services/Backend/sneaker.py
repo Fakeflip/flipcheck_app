@@ -459,15 +459,15 @@ class GoatClient:
         return self.scraper.post(f"{self.BASE}{path}", data=data, headers=headers, timeout=15, proxies=px)
 
     def _auth(self):
-        """Authenticate via cloudscraper. Tries: 1) refresh_token 2) email+password."""
+        """Authenticate via cloudscraper. Tries: 1) refresh_token 2) email+password (form) 3) email+password (json)."""
         log.info("[GOAT] Authenticating (Cloudflare bypass)...")
         login_headers = {
             "content-type": "application/x-www-form-urlencoded",
             "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
             "accept": "application/json",
         }
-        # Try refresh token first
-        if self.refresh_token:
+        # Try refresh token first (skip placeholder values)
+        if self.refresh_token and self.refresh_token not in ("dein_refresh_token_hier", ""):
             r = self.scraper.post(f"{self.BASE}/api/v1/unstable/users/login",
                                   data=f"grant_type=refresh_token&refresh_token={self.refresh_token}",
                                   headers=login_headers, timeout=15, proxies=self._proxy_dict())
@@ -477,6 +477,7 @@ class GoatClient:
                 self._save()
                 log.info("[GOAT] Session ready (refresh token)")
                 return
+            log.warning("[GOAT] Refresh token failed: %d", r.status_code)
 
         # Fallback: email + password
         email = os.getenv("GOAT_EMAIL", "")
@@ -485,16 +486,26 @@ class GoatClient:
             log.error("[GOAT] GOAT_REFRESH_TOKEN expired and no GOAT_EMAIL/GOAT_PASSWORD in .env")
             return
 
-        log.info("[GOAT] Password login...")
+        # Try 1: form-urlencoded (like refresh token endpoint)
+        log.info("[GOAT] Password login (form-encoded)...")
         r = self.scraper.post(f"{self.BASE}/api/v1/unstable/users/login",
-                              json={"grant_type": "password", "username": email, "password": pw},
-                              headers={
-                                  "content-type": "application/json",
-                                  "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
-                                  "accept": "application/json",
-                              }, timeout=15, proxies=self._proxy_dict())
+                              data=f"grant_type=password&username={email}&password={pw}",
+                              headers=login_headers, timeout=15, proxies=self._proxy_dict())
+        if r.status_code == 200:
+            log.info("[GOAT] Form-encoded login succeeded")
+        else:
+            log.warning("[GOAT] Form login: %d — trying JSON...", r.status_code)
+            # Try 2: JSON body
+            r = self.scraper.post(f"{self.BASE}/api/v1/unstable/users/login",
+                                  json={"grant_type": "password", "username": email, "password": pw},
+                                  headers={
+                                      "content-type": "application/json",
+                                      "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
+                                      "accept": "application/json",
+                                  }, timeout=15, proxies=self._proxy_dict())
+
         if r.status_code != 200:
-            log.error("[GOAT] Login failed: %d — %s", r.status_code, r.text[:200])
+            log.error("[GOAT] Login failed: %d — %s", r.status_code, r.text[:300])
             return
 
         data = r.json()
