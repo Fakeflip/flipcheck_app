@@ -571,9 +571,16 @@ const FlipcheckView = (() => {
 
         <!-- Price Chart -->
         ${chart.length >= 3 ? `
-        <div style="margin-bottom:16px;padding:12px;background:var(--surface2);border-radius:10px;border:1px solid var(--border1)">
-          <div style="font-size:10px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:8px">Preisverlauf</div>
-          <canvas id="sneakerChart" height="120"></canvas>
+        <div style="margin-bottom:16px;padding:14px 16px" class="panel">
+          <div class="row-between mb-12">
+            <div class="row gap-8" style="align-items:center">
+              <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 9,10 15,3" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              <span class="text-xs font-semibold text-secondary uppercase">Preisverlauf — 365 Tage</span>
+            </div>
+          </div>
+          <div style="height:110px;position:relative">
+            <canvas id="sneakerChart"></canvas>
+          </div>
         </div>` : ""}
 
         <!-- Size Table -->
@@ -599,26 +606,52 @@ const FlipcheckView = (() => {
       byDate[pt.date].push(pt.price);
     }
     const dates = Object.keys(byDate).sort();
-    const last90 = dates.slice(-90);
-    const labels = last90.map(d => d.slice(5)); // MM-DD
-    const prices = last90.map(d => {
+    const last365 = dates.slice(-365);
+    const labels = last365.map(d => {
+      const [, m, day] = d.split("-");
+      return `${day}.${m}.`;
+    });
+    const prices = last365.map(d => {
       const arr = byDate[d];
       return Math.round(arr.reduce((a, b) => a + b, 0) / arr.length);
     });
+
+    // Stats for header
+    const minP = Math.min(...prices);
+    const maxP = Math.max(...prices);
+    const pctChange = prices[0] > 0 ? ((prices[prices.length - 1] - prices[0]) / prices[0] * 100) : 0;
+    const trendDir = pctChange > 1.5 ? "up" : pctChange < -1.5 ? "down" : "flat";
+    const trendColor = trendDir === "up" ? "var(--green)" : trendDir === "down" ? "var(--red)" : "var(--text-muted)";
+    const trendLabel = trendDir === "flat" ? "Stabil" : `${pctChange > 0 ? "+" : ""}${pctChange.toFixed(1)}%`;
+
+    // Inject stats into header
+    const headerRow = container.querySelector("#sneakerChart")?.closest(".panel")?.querySelector(".row-between");
+    if (headerRow) {
+      const statsDiv = document.createElement("div");
+      statsDiv.className = "row gap-12";
+      statsDiv.style.alignItems = "center";
+      statsDiv.innerHTML = `
+        <span class="text-xs text-muted">Min: <strong style="color:var(--green)">${minP}€</strong></span>
+        <span class="text-xs text-muted">Max: <strong style="color:var(--red)">${maxP}€</strong></span>
+        <span class="text-xs font-semibold" style="color:${trendColor}">${trendLabel}</span>
+      `;
+      headerRow.appendChild(statsDiv);
+    }
 
     new Chart(canvas, {
       type: "line",
       data: {
         labels,
         datasets: [{
+          label: "Ø Preis",
           data: prices,
-          borderColor: "rgba(99,102,241,.8)",
-          backgroundColor: "rgba(99,102,241,.08)",
+          borderColor: "#6366F1",
+          backgroundColor: "rgba(99,102,241,0.06)",
           fill: true,
           tension: 0.3,
           borderWidth: 1.5,
           pointRadius: 0,
-          pointHitRadius: 6,
+          pointHoverRadius: 3,
         }],
       },
       options: {
@@ -634,14 +667,12 @@ const FlipcheckView = (() => {
         },
         scales: {
           x: {
-            display: true,
-            grid: { display: false },
-            ticks: { maxTicksLimit: 6, font: { size: 9 }, color: "var(--text-muted)" },
+            grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+            ticks: { font: { size: 9 }, color: "#475569", maxTicksLimit: 8, maxRotation: 0 },
           },
           y: {
-            display: true,
-            grid: { color: "rgba(128,128,128,.1)" },
-            ticks: { callback: v => v + "€", font: { size: 9 }, color: "var(--text-muted)" },
+            grid: { color: "rgba(30,30,46,0.5)", drawBorder: false },
+            ticks: { callback: v => v + "€", font: { size: 9 }, color: "#475569", maxTicksLimit: 4 },
           },
         },
         interaction: { mode: "nearest", axis: "x", intersect: false },

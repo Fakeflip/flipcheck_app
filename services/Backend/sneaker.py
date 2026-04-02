@@ -476,7 +476,8 @@ class GoatClient:
         email = os.getenv("GOAT_EMAIL", "")
         pw = os.getenv("GOAT_PASSWORD", "")
         if not email or not pw:
-            raise RuntimeError("GOAT_REFRESH_TOKEN expired and no GOAT_EMAIL/GOAT_PASSWORD in .env")
+            log.error("[GOAT] GOAT_REFRESH_TOKEN expired and no GOAT_EMAIL/GOAT_PASSWORD in .env")
+            return
 
         log.info("[GOAT] Password login...")
         r = self.scraper.post(f"{self.BASE}/api/v1/unstable/users/login",
@@ -487,7 +488,8 @@ class GoatClient:
                                   "accept": "application/json",
                               }, timeout=15)
         if r.status_code != 200:
-            raise RuntimeError(f"GOAT login failed: {r.status_code}")
+            log.error("[GOAT] Login failed: %d — %s", r.status_code, r.text[:200])
+            return
 
         data = r.json()
         self.access_token = data["auth_token"]["access_token"]
@@ -774,10 +776,14 @@ def _get_stockx() -> StockXClient:
     return _stockx_client
 
 
-def _get_goat() -> GoatClient:
+def _get_goat() -> Optional[GoatClient]:
     global _goat_client
     if _goat_client is None:
-        _goat_client = GoatClient()
+        try:
+            _goat_client = GoatClient()
+        except Exception as e:
+            log.error("[GOAT] Failed to init client: %s", e)
+            return None
     return _goat_client
 
 
@@ -880,6 +886,8 @@ def check_stockx(sku: str, ek: float) -> dict:
 def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     """Check a sneaker on GOAT/Alias. Returns normalized result dict."""
     goat = _get_goat()
+    if not goat or not goat.access_token:
+        return {"ok": False, "error": "GOAT nicht verfügbar (Auth fehlgeschlagen)"}
     slug, product = goat.find_product(sku, product_name)
     if not product:
         return {"ok": False, "error": f"SKU '{sku}' nicht auf GOAT gefunden"}

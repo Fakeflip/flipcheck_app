@@ -2263,7 +2263,9 @@ async def sneaker_check_endpoint(req: SneakerCheckRequest):
         else:
             result = await loop.run_in_executor(None, _sneaker_check, req.sku, req.ek)
     except Exception as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=500)
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"ok": False, "error": str(e)})
 
     return result
 
