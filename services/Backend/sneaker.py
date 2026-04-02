@@ -280,6 +280,7 @@ class StockXClient:
             query FetchStandardProduct($productId: String!) {
               product(id: $productId) {
                 id brand primaryTitle secondaryTitle title
+                media { imageUrl smallImageUrl }
                 traits { name value }
                 variants {
                   id hidden
@@ -502,13 +503,26 @@ class GoatClient:
             json.dump({"access_token": self.access_token, "created_at": time.time()}, f)
 
     def _post(self, path: str, data: dict) -> dict:
-        r = self._raw_post(path, data)
+        try:
+            r = self._raw_post(path, data)
+        except Exception as e:
+            log.error("[GOAT] Request failed: %s", e)
+            return {}
         if r.status_code == 403:
             log.warning("[GOAT] 403 — re-authenticating")
-            self._auth()
-            r = self._raw_post(path, data)
-        r.raise_for_status()
-        return r.json()
+            try:
+                self._auth()
+                r = self._raw_post(path, data)
+            except Exception as e:
+                log.error("[GOAT] Re-auth failed: %s", e)
+                return {}
+        if r.status_code >= 400:
+            log.error("[GOAT] HTTP %d on %s: %s", r.status_code, path, r.text[:200])
+            return {}
+        try:
+            return r.json()
+        except Exception:
+            return {}
 
     def find_product(self, sku: str, product_name: str = "") -> tuple:
         """Find product. Tries: 1) show_v2 API  2) slug candidates  3) DDG/Google search.
@@ -800,6 +814,9 @@ def check_stockx(sku: str, ek: float) -> dict:
         if size:
             size_map.append({"id": v["id"], "size": size})
 
+    # Image
+    image_url = full.get("media", {}).get("imageUrl", "") or full.get("media", {}).get("smallImageUrl", "")
+
     raw_prices = sx.get_all_variant_prices([sv["id"] for sv in size_map])
     stats = sx.get_market_stats(pid)
     l90 = stats.get("last90Days", {})
@@ -811,6 +828,14 @@ def check_stockx(sku: str, ek: float) -> dict:
         vid = s.get("associatedVariant", {}).get("id", "")
         sales_by_vid[vid].append(s)
     cutoff_30d = datetime.utcnow() - timedelta(days=30)
+
+    # Chart data: extract price + date from all sales
+    chart_data = []
+    for s in sales:
+        dt = s.get("createdAt", "")
+        amount = s.get("amount")
+        if dt and amount:
+            chart_data.append({"date": dt[:10] if len(dt) >= 10 else dt, "price": amount})
 
     ek_netto = ek / 1.19
     sizes = []
@@ -843,12 +868,11 @@ def check_stockx(sku: str, ek: float) -> dict:
         "sku": sku_display,
         "title": name,
         "product_id": pid,
+        "image": image_url,
         "sales_90d": l90.get("salesCount"),
         "sales_72h": l72.get("salesCount"),
-        "avg_price_90d": l90.get("averagePrice"),
-        "range_low": l90.get("rangeLow"),
-        "range_high": l90.get("rangeHigh"),
         "fees_label": "9% TX + 3% Processing + 4.50\u20ac Shipping",
+        "chart": chart_data,
         "sizes": sizes,
     }
 
@@ -865,9 +889,20 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     retail_cents = product.get("retail_price_cents")
     retail = int(retail_cents) / 100 if retail_cents else None
 
+    # Image via public show_v2 API (no auth needed)
+    image_url = ""
+    try:
+        import cloudscraper as _cs
+        _s = _cs.create_scraper()
+        _r = _s.get(f"https://www.goat.com/api/v1/product_templates/{slug}/show_v2?countryCode=DE",
+            headers={"user-agent": "GOAT/2.80.2 (iPhone; iOS 18.7.1)", "accept": "application/json"}, timeout=5)
+        if _r.status_code == 200:
+            image_url = _r.json().get("mainPictureUrl", "")
+    except Exception:
+        pass
+
     availabilities = goat.get_all_sizes(slug)
     if not availabilities:
-        # Retry with DDG slug
         ddg_slug = goat._search_web(sku)
         if ddg_slug and ddg_slug != slug:
             availabilities = goat.get_all_sizes(ddg_slug)
@@ -904,15 +939,36 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
 
     active_sizes = {k: v for k, v in size_map.items() if v["ask"] or v["bid"] or v["last_sale"]}
 
-    # Monthly sales (parallel)
-    def _fetch_monthly(sz):
-        return sz, goat.get_monthly_sales(slug, sz)
+    # Monthly sales + chart data (parallel)
+    chart_data: List[dict] = []
+
+    def _fetch_monthly_and_chart(sz):
+        monthly = goat.get_monthly_sales(slug, sz)
+        # Also fetch chart points from historical-sales
+        points = []
+        try:
+            data = goat._post("/api/v1/analytics/products/historical-sales", {
+                "variant": {"id": slug, "size": sz, "product_condition": 1, "packaging_condition": 1, "region_id": "2"}
+            })
+            for d in data.get("daily_365", []):
+                if not d.get("no_sales_made") and d.get("average_price_cents"):
+                    points.append({
+                        "date": d["start_date"][:10] if d.get("start_date") else "",
+                        "price": int(d["average_price_cents"]) / 100,
+                    })
+        except Exception:
+            pass
+        return sz, monthly, points
 
     with ThreadPoolExecutor(max_workers=8) as pool:
-        for future in as_completed({pool.submit(_fetch_monthly, sz): sz for sz in active_sizes}):
-            sz, count = future.result()
+        for future in as_completed({pool.submit(_fetch_monthly_and_chart, sz): sz for sz in active_sizes}):
+            sz, count, points = future.result()
             if sz in active_sizes:
                 active_sizes[sz]["sales_30d"] = count
+            chart_data.extend(points)
+
+    # Sort chart data by date
+    chart_data.sort(key=lambda x: x.get("date", ""))
 
     ek_netto = ek / 1.19
     sizes = []
@@ -935,8 +991,10 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
         "sku": goat_sku,
         "title": goat_name,
         "slug": slug,
+        "image": image_url,
         "retail_price": retail,
         "fees_label": "9.5% Commission + 5\u20ac Seller Fee",
+        "chart": chart_data,
         "sizes": sizes,
     }
 
