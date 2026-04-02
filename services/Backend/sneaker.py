@@ -441,6 +441,11 @@ class GoatClient:
         except Exception:
             return False
 
+    @staticmethod
+    def _proxy_dict() -> dict:
+        p = _next_proxy()
+        return {"http": p, "https": p} if p else {}
+
     def _raw_post(self, path: str, data: dict, ct: str = "application/json"):
         headers = {
             "authorization": f"Bearer {self.access_token}",
@@ -448,9 +453,10 @@ class GoatClient:
             "accept": "application/json",
             "content-type": ct,
         }
+        px = self._proxy_dict()
         if ct == "application/json":
-            return self.scraper.post(f"{self.BASE}{path}", json=data, headers=headers, timeout=15)
-        return self.scraper.post(f"{self.BASE}{path}", data=data, headers=headers, timeout=15)
+            return self.scraper.post(f"{self.BASE}{path}", json=data, headers=headers, timeout=15, proxies=px)
+        return self.scraper.post(f"{self.BASE}{path}", data=data, headers=headers, timeout=15, proxies=px)
 
     def _auth(self):
         """Authenticate via cloudscraper. Tries: 1) refresh_token 2) email+password."""
@@ -464,7 +470,7 @@ class GoatClient:
         if self.refresh_token:
             r = self.scraper.post(f"{self.BASE}/api/v1/unstable/users/login",
                                   data=f"grant_type=refresh_token&refresh_token={self.refresh_token}",
-                                  headers=login_headers, timeout=15)
+                                  headers=login_headers, timeout=15, proxies=self._proxy_dict())
             if r.status_code == 200:
                 data = r.json()
                 self.access_token = data["auth_token"]["access_token"]
@@ -486,7 +492,7 @@ class GoatClient:
                                   "content-type": "application/json",
                                   "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
                                   "accept": "application/json",
-                              }, timeout=15)
+                              }, timeout=15, proxies=self._proxy_dict())
         if r.status_code != 200:
             log.error("[GOAT] Login failed: %d — %s", r.status_code, r.text[:200])
             return
@@ -639,9 +645,10 @@ class GoatClient:
 
         for slug in unique:
             try:
+                px = self._proxy_dict()
                 r = s.get(f"https://www.goat.com/api/v1/product_templates/{slug}/show_v2?countryCode=DE",
                     headers={"user-agent": "GOAT/2.80.2 (iPhone; iOS 18.7.1)", "accept": "application/json"},
-                    timeout=5)
+                    timeout=5, proxies=px)
                 if r.status_code == 200:
                     data = r.json()
                     real_slug = data.get("slug", "")
@@ -691,10 +698,11 @@ class GoatClient:
         sku_lower = sku.lower().replace(" ", "-")
         # DDG
         try:
+            _px = GoatClient._proxy_dict()
             r = plain_requests.get(
                 f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}",
                 headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10)
+                timeout=10, proxies=_px)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
@@ -706,10 +714,11 @@ class GoatClient:
             pass
         # Google fallback
         try:
+            _px = GoatClient._proxy_dict()
             r = plain_requests.get(
                 f"https://www.google.com/search?q=site:goat.com/sneakers+{sku}",
                 headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10)
+                timeout=10, proxies=_px)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
@@ -902,8 +911,9 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     try:
         import cloudscraper as _cs
         _s = _cs.create_scraper()
+        _px = GoatClient._proxy_dict()
         _r = _s.get(f"https://www.goat.com/api/v1/product_templates/{slug}/show_v2?countryCode=DE",
-            headers={"user-agent": "GOAT/2.80.2 (iPhone; iOS 18.7.1)", "accept": "application/json"}, timeout=5)
+            headers={"user-agent": "GOAT/2.80.2 (iPhone; iOS 18.7.1)", "accept": "application/json"}, timeout=5, proxies=_px)
         if _r.status_code == 200:
             image_url = _r.json().get("mainPictureUrl", "")
     except Exception:
