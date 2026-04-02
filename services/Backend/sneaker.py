@@ -564,83 +564,36 @@ class GoatClient:
             return {}
 
     def find_product(self, sku: str, product_name: str = "") -> tuple:
-        """Find product. Tries: 1) show_v2 API  2) slug candidates  3) DDG/Google search.
+        """Find product. Tries: 1) show_v2 API (returns slug+product directly)  2) DDG/Google + get-product.
         Returns (slug, product) or (None, None)."""
         sku_slug = sku.lower().replace(" ", "-")
+        log.info("[GOAT] Finding product: sku=%s name=%s", sku, product_name[:60] if product_name else "")
 
-        # 1) Try GOAT public show_v2 with generated slugs (fast, no auth)
-        goat_slug = self._find_slug_via_show_v2(sku_slug, product_name)
-        if goat_slug:
-            product = self._try_product(goat_slug)
-            if product:
-                return goat_slug, product
+        # 1) Try show_v2 — returns full product data, no auth needed
+        slug, product = self._find_via_show_v2(sku_slug, product_name)
+        if slug and product:
+            return slug, product
 
-        # 2) DDG/Google fallback
+        # 2) DDG/Google fallback → get-product (auth required)
         ddg_slug = self._search_web(sku)
         if ddg_slug:
+            log.info("[GOAT] Web search found slug: %s", ddg_slug)
             product = self._try_product(ddg_slug)
             if product:
                 return ddg_slug, product
 
-        # 3) Generate slug candidates from StockX name
-        candidates = []
-        if product_name:
-            name = product_name.lower()
-            is_wmns = False
-            for rm in ["(damen)", "(women's)", "(wmns)", "(w)"]:
-                if rm in name:
-                    name = name.replace(rm, "").strip()
-                    is_wmns = True
-            for rm in ["(herren)", "(men's)", "(gs)", "(td)", "(ps)", "(kids)"]:
-                name = name.replace(rm, "").strip()
-            name_nb = name
-            for brand in ["nike ", "adidas ", "new balance ", "puma ", "asics ", "reebok "]:
-                if name.startswith(brand):
-                    name_nb = name[len(brand):]
-                    break
-            names = [name, name_nb]
-            if is_wmns:
-                names += [f"wmns {name}", f"wmns {name_nb}", f"w {name_nb}"]
-            expanded = []
-            for n in names:
-                expanded.append(n)
-                for word in ["og ", "big bubble ", "rosa ", "retro "]:
-                    if word in n:
-                        expanded.append(n.replace(word, ""))
-            for n in expanded:
-                candidates.append(_make_slug(n, sku_slug))
-            words = name_nb.split()
-            for i in range(2, min(len(words), 6)):
-                partial = " ".join(words[:i])
-                candidates.append(_make_slug(partial, sku_slug))
-                if is_wmns:
-                    candidates.append(_make_slug("wmns " + partial, sku_slug))
-
-        candidates.append(sku_slug)
-
-        seen = set()
-        for c in candidates:
-            c = re.sub(r"-+", "-", c).strip("-")
-            if c in seen:
-                continue
-            seen.add(c)
-            prod = self._try_product(c)
-            if prod:
-                avail = self.get_all_sizes(c)
-                if avail:
-                    return c, prod
-
+        log.warning("[GOAT] Product not found: %s", sku)
         return None, None
 
-    def _find_slug_via_show_v2(self, sku_slug: str, product_name: str = "") -> Optional[str]:
-        """Use GOAT public show_v2 API to find real slug. No auth needed."""
+    def _find_via_show_v2(self, sku_slug: str, product_name: str = "") -> tuple:
+        """Use GOAT public show_v2 API to find slug + product data. No auth needed.
+        Returns (slug, product_dict) or (None, None)."""
         import cloudscraper as cs
         s = cs.create_scraper()
         candidates = []
 
         if product_name:
             name = product_name.lower()
-            # Translate German StockX words to English
             for de, en in DE_TO_EN.items():
                 name = re.sub(r'\b' + de + r'\b', en, name)
             for rm in ["(damen)", "(herren)", "(gs)", "(td)", "(ps)", "(women's)", "(men's)", "(kids)", "(wmns)"]:
@@ -666,6 +619,9 @@ class GoatClient:
                 if is_wmns:
                     candidates.append(_make_slug("wmns " + short, sku_slug))
 
+        # Also try raw SKU slug
+        candidates.append(sku_slug)
+
         seen = set()
         unique = []
         for c in candidates:
@@ -682,12 +638,20 @@ class GoatClient:
                     timeout=5, proxies=px)
                 if r.status_code == 200:
                     data = r.json()
-                    real_slug = data.get("slug", "")
-                    if real_slug and real_slug != sku_slug:
-                        return real_slug
+                    real_slug = data.get("slug", slug)
+                    if data.get("name"):
+                        log.info("[GOAT] show_v2 hit: %s → %s", slug, data.get("name", "")[:50])
+                        # Build product dict from show_v2 data (same fields as get-product)
+                        product = {
+                            "name": data.get("name", ""),
+                            "sku": data.get("sku", ""),
+                            "slug": real_slug,
+                            "retail_price_cents": data.get("retailPriceCents") or data.get("retail_price_cents"),
+                        }
+                        return real_slug, product
             except Exception:
                 pass
-        return None
+        return None, None
 
     def get_all_sizes(self, slug: str) -> list:
         data = self._post("/api/v1/analytics/list-variant-availabilities", {
@@ -720,7 +684,12 @@ class GoatClient:
     def _try_product(self, slug: str) -> Optional[dict]:
         try:
             data = self._post("/api/v1/listings/get-product", {"id": slug})
-            return data.get("product", data)
+            if not data:
+                return None
+            product = data.get("product", data)
+            if product and product.get("name"):
+                log.info("[GOAT] Found product via get-product: %s → %s", slug, product.get("name", "")[:60])
+            return product if product and product.get("name") else None
         except Exception:
             return None
 
