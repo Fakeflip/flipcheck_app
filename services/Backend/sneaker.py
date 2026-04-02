@@ -724,29 +724,48 @@ class GoatClient:
             return None
 
     def _search_web(self, sku: str) -> Optional[str]:
-        """Search DDG + Google for GOAT product slug. Uses direct connection (no proxy — DDG blocks proxies)."""
+        """Search for GOAT product slug. Tries: Startpage → DDG → Google."""
         sku_lower = sku.lower().replace(" ", "-")
-        # DDG (no proxy — like sneaker-api)
+        ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+
+        # 1) Startpage (works on datacenter IPs, unlike DDG)
         try:
             r = plain_requests.get(
-                f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}",
-                headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10)
+                f"https://www.startpage.com/do/search?q=site:goat.com/sneakers+{sku}",
+                headers={"user-agent": ua}, timeout=10)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
                     if sku_lower in s:
+                        log.info("[GOAT] Startpage found: %s", s)
+                        return s
+                if slugs:
+                    log.info("[GOAT] Startpage found (first): %s", slugs[0])
+                    return slugs[0]
+        except Exception as e:
+            log.debug("[GOAT] Startpage failed: %s", e)
+
+        # 2) DDG fallback
+        try:
+            r = plain_requests.get(
+                f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}",
+                headers={"user-agent": ua}, timeout=10)
+            if r.status_code == 200:
+                slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
+                for s in slugs:
+                    if sku_lower in s:
+                        log.info("[GOAT] DDG found: %s", s)
                         return s
                 if slugs:
                     return slugs[0]
         except Exception:
             pass
-        # Google fallback (no proxy)
+
+        # 3) Google fallback
         try:
             r = plain_requests.get(
                 f"https://www.google.com/search?q=site:goat.com/sneakers+{sku}",
-                headers={"user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"},
-                timeout=10)
+                headers={"user-agent": ua}, timeout=10)
             if r.status_code == 200:
                 slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
                 for s in slugs:
