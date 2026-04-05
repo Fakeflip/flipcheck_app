@@ -684,10 +684,40 @@ class GoatClient:
         return None, None
 
     def get_all_sizes(self, slug: str) -> list:
-        data = self._post("/api/v1/analytics/list-variant-availabilities", {
+        """Fetch sizes with full pricing: ask, bid, last_sale + global indicator.
+        Makes two calls: with region_id (global indicator) and without (ask/bid/last)."""
+        # Call 1: with region_id → high_demand_price_cents_v2 (global indicator)
+        data_region = self._post("/api/v1/analytics/list-variant-availabilities", {
             "variant": {"id": slug, "packaging_condition": 1, "region_id": "2"}
         })
-        return data.get("availability", [])
+        # Call 2: without region_id → lowest_price_cents, highest_offer_cents, last_sold_price_cents
+        data_detail = self._post("/api/v1/analytics/list-variant-availabilities", {
+            "variant": {"id": slug, "packaging_condition": 1}
+        })
+
+        # Merge: use detail data as base, add global indicator from region data
+        detail_by_size = {}
+        for a in data_detail.get("availability", []):
+            sz = a.get("variant", {}).get("size")
+            if sz is not None:
+                detail_by_size[sz] = a
+
+        result = []
+        region_avails = data_region.get("availability", [])
+        # If region call returned nothing, use detail only
+        if not region_avails:
+            return data_detail.get("availability", [])
+
+        for a in region_avails:
+            sz = a.get("variant", {}).get("size")
+            merged = dict(a)
+            if sz in detail_by_size:
+                # Add detailed pricing (ask/bid/last)
+                for k in ("lowest_price_cents", "highest_offer_cents", "last_sold_price_cents", "last_sold_at"):
+                    if k in detail_by_size[sz]:
+                        merged[k] = detail_by_size[sz][k]
+            result.append(merged)
+        return result
 
     def get_monthly_sales(self, slug: str, size: str) -> int:
         try:
@@ -946,14 +976,19 @@ def check_stockx(sku: str, ek: float) -> dict:
         ask = state.get("lowestAsk", {}).get("amount") if state.get("lowestAsk") else None
         bid = state.get("highestBid", {}).get("amount") if state.get("highestBid") else None
         last = mstats.get("lastSale", {}).get("amount") if mstats.get("lastSale") else None
+        guidance = vdata.get("pricingGuidance", {}).get("sellingGuidance", {})
+        sell_faster = guidance.get("sellFaster")
 
-        payout_info = StockXClient.calc_payout(ask) if ask else {"payout": None, "fees": None}
+        # Use sellFaster for profit calc (instant sale price), fallback to ask
+        sell_price = sell_faster or ask
+        payout_info = StockXClient.calc_payout(sell_price) if sell_price else {"payout": None, "fees": None}
         profit = round(payout_info["payout"] - ek_netto, 2) if payout_info["payout"] else None
         monthly = sum(1 for s in sales_by_vid.get(vid, []) if _parse_dt(s.get("createdAt", "")) and _parse_dt(s["createdAt"]) > cutoff_30d)
 
         sizes.append({
             "size": sv["size"],
             "ask": ask, "bid": bid, "last_sale": last,
+            "sell_faster": sell_faster,
             "payout": payout_info["payout"],
             "fees": payout_info["fees"],
             "profit": profit,
@@ -1023,9 +1058,11 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
         ask_c = a.get("lowest_price_cents")
         bid_c = a.get("highest_offer_cents")
         last_c = a.get("last_sold_price_cents")
+        gi_c = a.get("high_demand_price_cents_v2") or a.get("high_demand_price_cents")
         ask = int(ask_c) / 100 if ask_c else None
         bid = int(bid_c) / 100 if bid_c else None
         last = int(last_c) / 100 if last_c else None
+        gi = int(gi_c) / 100 if gi_c else None
         key = str(size)
         if key in size_map:
             ex = size_map[key]
@@ -1035,8 +1072,10 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
                 ex["bid"] = bid
             if last and not ex["last_sale"]:
                 ex["last_sale"] = last
+            if gi and not ex.get("global_indicator"):
+                ex["global_indicator"] = gi
         else:
-            size_map[key] = {"size": size, "ask": ask, "bid": bid, "last_sale": last}
+            size_map[key] = {"size": size, "ask": ask, "bid": bid, "last_sale": last, "global_indicator": gi}
 
     active_sizes = {k: v for k, v in size_map.items() if v["ask"] or v["bid"] or v["last_sale"]}
 
@@ -1075,11 +1114,16 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     sizes = []
     for s in sorted(active_sizes.values(), key=lambda x: _size_sort(x["size"])):
         ask = s.get("ask")
-        payout_info = GoatClient.calc_payout(ask) if ask else {"payout": None, "fees": None}
+        bid = s.get("bid")
+        gi = s.get("global_indicator")
+        # Use global indicator for profit — GOAT's recommended sell price
+        sell_price = gi or bid or ask
+        payout_info = GoatClient.calc_payout(sell_price) if sell_price else {"payout": None, "fees": None}
         profit = round(payout_info["payout"] - ek_netto, 2) if payout_info["payout"] else None
         sizes.append({
             "size": s["size"],
-            "ask": ask, "bid": s.get("bid"), "last_sale": s.get("last_sale"),
+            "ask": ask, "bid": bid, "last_sale": s.get("last_sale"),
+            "global_indicator": gi,
             "payout": payout_info["payout"],
             "fees": payout_info["fees"],
             "profit": profit,

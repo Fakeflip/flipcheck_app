@@ -185,6 +185,7 @@ const FlipcheckView = (() => {
   let lastResult = null;
   let lastEan    = null;
   let lastEk     = null;
+  let _sneakerCache = null; // { sku, ek, stockx: {...}, goat: {...} } for instant switching
   let _miniChart = null;   // Chart.js instance for the inline price sparkline
   let _visibleFields = { ship_in: true, ship_out: true, packaging: false, ad_rate: false };
 
@@ -490,24 +491,31 @@ const FlipcheckView = (() => {
 
   // ─── Sneaker result rendering (StockX / GOAT — separate views) ──────────
 
-  function _renderSneakerTable(sizes) {
+  function _renderSneakerTable(sizes, platform) {
     if (!sizes?.length) return `<div class="text-muted text-xs" style="padding:16px;text-align:center">Keine Daten</div>`;
+    const th = `style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em"`;
+    const isGoat = platform === "goat";
+    // StockX: Sell Faster column; GOAT: Global Indicator column
+    const sellColLabel = isGoat ? "GI" : "Sell Fast";
     let html = `<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
       <thead><tr style="border-bottom:2px solid var(--border2)">
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Size</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Ask</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Bid</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Last</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Payout</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">Profit</th>
-        <th style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em">30d</th>
+        <th ${th}>Size</th>
+        <th ${th}>${sellColLabel}</th>
+        <th ${th}>Ask</th>
+        <th ${th}>Bid</th>
+        <th ${th}>Last</th>
+        <th ${th}>Payout</th>
+        <th ${th}>Profit</th>
+        <th ${th}>30d</th>
       </tr></thead><tbody>`;
     for (const s of sizes) {
       const profitColor = s.profit > 0 ? "var(--green)" : s.profit < 0 ? "var(--red)" : "var(--text-muted)";
       const profitSign = s.profit > 0 ? "+" : "";
       const rowBg = s.profit > 0 ? "rgba(34,197,94,.04)" : "transparent";
+      const sellVal = isGoat ? s.global_indicator : s.sell_faster;
       html += `<tr style="border-bottom:1px solid var(--border1);background:${rowBg}">
         <td style="text-align:right;padding:5px 10px;font-weight:700">${esc(String(s.size))}</td>
+        <td style="text-align:right;padding:5px 10px;font-weight:600;color:#6366F1">${sellVal ? sellVal.toFixed(0) + "€" : "—"}</td>
         <td style="text-align:right;padding:5px 10px">${s.ask ? s.ask.toFixed(0) + "€" : "—"}</td>
         <td style="text-align:right;padding:5px 10px">${s.bid ? s.bid.toFixed(0) + "€" : "—"}</td>
         <td style="text-align:right;padding:5px 10px;color:var(--text-muted)">${s.last_sale ? s.last_sale.toFixed(0) + "€" : "—"}</td>
@@ -551,27 +559,50 @@ const FlipcheckView = (() => {
       chipsHtml = `<div class="fc-market-chip"><span class="fc-market-chip-l">Retail</span><span class="fc-market-chip-v">${pData.retail_price.toFixed(0)}€</span></div>`;
     }
 
+    // Best profit size summary
+    const profitable = sizes.filter(s => s.profit > 0).sort((a, b) => b.profit - a.profit);
+    const bestSize = profitable[0];
+    const totalProfitable = profitable.length;
+    const otherPlatform = platform === "stockx" ? "goat" : "stockx";
+    const otherLabel = platform === "stockx" ? "GOAT" : "StockX";
+    const hasOtherCached = _sneakerCache && _sneakerCache[otherPlatform]?.ok;
+
     return `
       <div class="fc-result">
-        <!-- Header: Platform badge + fees -->
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
-          <span style="font-weight:800;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:${platformColor};background:${platformColor}15;padding:3px 10px;border-radius:6px">${platformLabel}</span>
+        <!-- Header: Platform tabs + fees -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+          <div style="display:flex;gap:4px">
+            <button class="btn btn-sm ${platform==="stockx"?"btn-primary":"btn-ghost"}" id="snkTabStockx" style="font-size:11px;padding:4px 12px;font-weight:700">StockX</button>
+            <button class="btn btn-sm ${platform==="goat"?"btn-primary":"btn-ghost"}" id="snkTabGoat" style="font-size:11px;padding:4px 12px;font-weight:700">GOAT</button>
+          </div>
           <span class="text-xs text-muted">${esc(pData.fees_label || "")}</span>
         </div>
 
-        <!-- Product: Image + Title -->
-        <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:16px">
-          ${image ? `<img src="${esc(image)}" alt="" style="width:120px;height:auto;border-radius:10px;background:var(--surface2);object-fit:contain;flex-shrink:0" />` : ""}
+        <!-- Product: Image + Title + Stats -->
+        <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:14px">
+          ${image ? `<img src="${esc(image)}" alt="" style="width:110px;height:auto;border-radius:10px;background:var(--surface2);object-fit:contain;flex-shrink:0" />` : ""}
           <div style="flex:1;min-width:0">
-            <div class="fc-result-title" style="font-size:16px;line-height:1.3">${title}</div>
-            <div class="text-xs text-muted mt-4">SKU: ${esc(pData.sku || sku)} &nbsp;|&nbsp; EK: ${ek.toFixed(2)}€ (netto: ${(ek/1.19).toFixed(2)}€)</div>
-            ${chipsHtml ? `<div class="fc-market-row mt-8" style="gap:6px;flex-wrap:wrap">${chipsHtml}</div>` : ""}
+            <div class="fc-result-title" style="font-size:15px;line-height:1.3;margin-bottom:4px">${title}</div>
+            <div class="text-xs text-muted">SKU: ${esc(pData.sku || sku)} &nbsp;|&nbsp; EK: ${ek.toFixed(2)}€ (netto: ${(ek/1.19).toFixed(2)}€)</div>
+            ${chipsHtml ? `<div class="fc-market-row mt-6" style="gap:6px;flex-wrap:wrap">${chipsHtml}</div>` : ""}
+            ${bestSize ? `
+            <div style="margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.15);display:inline-flex;gap:12px;align-items:center">
+              <span class="text-xs" style="color:var(--green);font-weight:700">Best: EU ${esc(String(bestSize.size))}</span>
+              <span class="text-xs" style="color:var(--green)">+${bestSize.profit.toFixed(0)}€</span>
+              <span class="text-xs text-muted">${totalProfitable} profitable</span>
+            </div>` : `
+            <div style="margin-top:8px;padding:6px 10px;border-radius:8px;background:rgba(239,68,68,.06);border:1px solid rgba(239,68,68,.12);display:inline-block">
+              <span class="text-xs" style="color:var(--red);font-weight:600">Keine profitable Größe</span>
+            </div>`}
           </div>
         </div>
 
+        <!-- Size Table (above chart) -->
+        ${_renderSneakerTable(sizes, platform)}
+
         <!-- Price Chart -->
         ${chart.length >= 3 ? `
-        <div style="margin-bottom:16px;padding:14px 16px" class="panel">
+        <div style="margin-top:12px;margin-bottom:12px;padding:14px 16px" class="panel">
           <div class="row-between mb-12">
             <div class="row gap-8" style="align-items:center">
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><polyline points="1,12 5,7 9,10 15,3" stroke="#6366F1" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
@@ -583,10 +614,7 @@ const FlipcheckView = (() => {
           </div>
         </div>` : ""}
 
-        <!-- Size Table -->
-        ${_renderSneakerTable(sizes)}
-
-        <div style="display:flex;gap:8px;margin-top:12px">
+        <div style="display:flex;gap:8px;margin-top:8px">
           <button class="btn btn-ghost btn-sm" id="btnReset">Zurücksetzen</button>
         </div>
       </div>
@@ -678,6 +706,21 @@ const FlipcheckView = (() => {
         interaction: { mode: "nearest", axis: "x", intersect: false },
       },
     });
+  }
+
+  function _wireUpSneakerResult(resultEl, platform) {
+    resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); _sneakerCache = null; });
+    // Platform tab switching inside result card
+    const switchTo = (target) => {
+      if (target === platform) return;
+      if (!_sneakerCache || !_sneakerCache[target]?.ok) return;
+      const d = _sneakerCache[target];
+      resultEl.innerHTML = renderResultSneakerSingle(d, _sneakerCache.sku, _sneakerCache.ek, target);
+      _initSneakerChart(resultEl, d?.chart || []);
+      _wireUpSneakerResult(resultEl, target);
+    };
+    resultEl.querySelector("#snkTabStockx")?.addEventListener("click", () => switchTo("stockx"));
+    resultEl.querySelector("#snkTabGoat")?.addEventListener("click", () => switchTo("goat"));
   }
 
   function renderLoading(market = "ebay") {
@@ -1759,6 +1802,7 @@ const FlipcheckView = (() => {
     // Market toggle
     const _switchMarket = (newMarket) => {
       if (selectedMarket === newMarket) return;
+      const oldMarket = selectedMarket;
       // Preserve current field values
       const curState = {
         ean:          container.querySelector("#fcEan")?.value || "",
@@ -1770,6 +1814,20 @@ const FlipcheckView = (() => {
       selectedMarket = newMarket;
       container.innerHTML = renderForm(curState);
       attachEvents(container);
+
+      // Instant switch between StockX ↔ GOAT using cached background result
+      const isSnkSwitch = (oldMarket === "stockx" || oldMarket === "goat") && (newMarket === "stockx" || newMarket === "goat");
+      if (isSnkSwitch && _sneakerCache) {
+        const cached = _sneakerCache[newMarket];
+        if (cached?.ok) {
+          const resultEl = container.querySelector("#fcResult");
+          if (resultEl) {
+            resultEl.innerHTML = renderResultSneakerSingle(cached, _sneakerCache.sku, _sneakerCache.ek, newMarket);
+            _initSneakerChart(resultEl, cached?.chart || []);
+            _wireUpSneakerResult(resultEl, newMarket);
+          }
+        }
+      }
     };
     container.querySelector("#mktEbay")?.addEventListener("click", () => _switchMarket("ebay"));
     container.querySelector("#mktAmazon")?.addEventListener("click", () => _switchMarket("amazon"));
@@ -1987,10 +2045,13 @@ const FlipcheckView = (() => {
           return;
         }
 
+        // Cache both platform results for instant switching
+        _sneakerCache = { sku, ek, stockx: data._stockx || null, goat: data._goat || null };
+
         lastResult = data; lastEan = sku; lastEk = ek;
         resultEl.innerHTML = renderResultSneakerSingle(data, sku, ek, selectedMarket);
         _initSneakerChart(resultEl, data?.chart || []);
-        resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
+        _wireUpSneakerResult(resultEl, selectedMarket);
         if (btn) btn.disabled = false;
         return;
       }
@@ -2149,6 +2210,7 @@ const FlipcheckView = (() => {
           } else if (selectedMarket === "stockx" || selectedMarket === "goat") {
             resultEl.innerHTML = renderResultSneakerSingle(cached.data, identifier, cached.ek || ek, selectedMarket);
             _initSneakerChart(resultEl, cached.data?.chart || []);
+            _wireUpSneakerResult(resultEl, selectedMarket);
           } else {
             resultEl.innerHTML = renderResult(cached.data, identifier, cached.ek || ek, "sonstiges", 0, 0, 0);
           }

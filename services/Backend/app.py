@@ -2258,24 +2258,34 @@ class SneakerCheckRequest(BaseModel):
 
 @app.post("/sneaker-check")
 async def sneaker_check_endpoint(req: SneakerCheckRequest):
-    """Check sneaker profit on StockX and/or GOAT."""
+    """Check sneaker profit — always runs both StockX + GOAT in parallel."""
     try:
-        from sneaker import check_stockx, check_goat, sneaker_check as _sneaker_check
+        from sneaker import check_stockx, check_goat
     except ImportError as e:
         return JSONResponse({"ok": False, "error": f"Sneaker module not available: {e}"}, status_code=500)
 
     loop = asyncio.get_event_loop()
-    try:
-        if req.platform == "stockx":
-            result = await loop.run_in_executor(None, check_stockx, req.sku, req.ek)
-        elif req.platform == "goat":
-            result = await loop.run_in_executor(None, check_goat, req.sku, req.ek, "")
-        else:
-            result = await loop.run_in_executor(None, _sneaker_check, req.sku, req.ek)
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return JSONResponse({"ok": False, "error": str(e)})
+
+    # Always run both platforms in parallel
+    async def _sx():
+        try:
+            return await loop.run_in_executor(None, check_stockx, req.sku, req.ek)
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    async def _goat():
+        try:
+            return await loop.run_in_executor(None, check_goat, req.sku, req.ek, "")
+        except Exception as e:
+            return {"ok": False, "error": str(e)}
+
+    sx_result, goat_result = await asyncio.gather(_sx(), _goat())
+
+    # Return the requested platform as top-level, but include both
+    primary = req.platform or "stockx"
+    result = dict(sx_result if primary == "stockx" else goat_result)
+    result["_stockx"] = sx_result
+    result["_goat"] = goat_result
 
     return result
 
