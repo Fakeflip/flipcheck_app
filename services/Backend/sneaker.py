@@ -724,55 +724,43 @@ class GoatClient:
             return None
 
     def _search_web(self, sku: str) -> Optional[str]:
-        """Search for GOAT product slug. Tries: Startpage → DDG → Google."""
+        """Search for GOAT product slug. Tries multiple search engines.
+        Uses residential proxy for engines that block datacenter IPs."""
         sku_lower = sku.lower().replace(" ", "-")
         ua = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
-        # 1) Startpage (works on datacenter IPs, unlike DDG)
-        try:
-            r = plain_requests.get(
-                f"https://www.startpage.com/do/search?q=site:goat.com/sneakers+{sku}",
-                headers={"user-agent": ua}, timeout=10)
-            if r.status_code == 200:
-                slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
-                for s in slugs:
-                    if sku_lower in s:
-                        log.info("[GOAT] Startpage found: %s", s)
-                        return s
-                if slugs:
-                    log.info("[GOAT] Startpage found (first): %s", slugs[0])
-                    return slugs[0]
-        except Exception as e:
-            log.debug("[GOAT] Startpage failed: %s", e)
+        def _extract(text: str) -> Optional[str]:
+            slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", text)
+            for s in slugs:
+                if sku_lower in s:
+                    return s
+            return slugs[0] if slugs else None
 
-        # 2) DDG fallback
-        try:
-            r = plain_requests.get(
-                f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}",
-                headers={"user-agent": ua}, timeout=10)
-            if r.status_code == 200:
-                slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
-                for s in slugs:
-                    if sku_lower in s:
-                        log.info("[GOAT] DDG found: %s", s)
-                        return s
-                if slugs:
-                    return slugs[0]
-        except Exception:
-            pass
+        # Search engines: (name, url, use_proxy)
+        engines = [
+            ("Startpage", f"https://www.startpage.com/do/search?q=site:goat.com/sneakers+{sku}", False),
+            ("Startpage+proxy", f"https://www.startpage.com/do/search?q=site:goat.com/sneakers+{sku}", True),
+            ("Bing", f"https://www.bing.com/search?q=site:goat.com/sneakers+{sku}", False),
+            ("Bing+proxy", f"https://www.bing.com/search?q=site:goat.com/sneakers+{sku}", True),
+            ("DDG", f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}", False),
+            ("DDG+proxy", f"https://html.duckduckgo.com/html/?q=site:goat.com/sneakers/+{sku}", True),
+            ("Google", f"https://www.google.com/search?q=site:goat.com/sneakers+{sku}", False),
+        ]
 
-        # 3) Google fallback
-        try:
-            r = plain_requests.get(
-                f"https://www.google.com/search?q=site:goat.com/sneakers+{sku}",
-                headers={"user-agent": ua}, timeout=10)
-            if r.status_code == 200:
-                slugs = re.findall(r"goat\.com/sneakers/([a-z0-9-]+)", r.text)
-                for s in slugs:
-                    if sku_lower in s:
-                        return s
-        except Exception:
-            pass
+        for name, url, use_proxy in engines:
+            try:
+                px = self._proxy_dict() if use_proxy else {}
+                r = plain_requests.get(url, headers={"user-agent": ua}, timeout=8, proxies=px)
+                if r.status_code == 200:
+                    slug = _extract(r.text)
+                    if slug:
+                        log.info("[GOAT] %s found: %s", name, slug)
+                        return slug
+                    log.debug("[GOAT] %s → 200 but no slug found", name)
+                else:
+                    log.debug("[GOAT] %s → %d", name, r.status_code)
+            except Exception as e:
+                log.debug("[GOAT] %s → error: %s", name, e)
         return None
 
 
@@ -904,12 +892,35 @@ def check_stockx(sku: str, ek: float) -> dict:
     # Image
     image_url = full.get("media", {}).get("imageUrl", "") or full.get("media", {}).get("smallImageUrl", "")
 
-    raw_prices = sx.get_all_variant_prices([sv["id"] for sv in size_map])
-    stats = sx.get_market_stats(pid)
+    # Fetch prices, stats, and sales IN PARALLEL (was sequential — huge speed boost)
+    _prices_result = {}
+    _stats_result = {}
+    _sales_result = []
+
+    def _fetch_prices():
+        nonlocal _prices_result
+        _prices_result = sx.get_all_variant_prices([sv["id"] for sv in size_map])
+
+    def _fetch_stats():
+        nonlocal _stats_result
+        _stats_result = sx.get_market_stats(pid)
+
+    def _fetch_sales():
+        nonlocal _sales_result
+        _sales_result = sx.get_sales(pid, max_pages=3)  # 3 pages max (was 10!) — enough for chart
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        pool.submit(_fetch_prices)
+        pool.submit(_fetch_stats)
+        f3 = pool.submit(_fetch_sales)
+        f3.result()  # wait for all
+
+    raw_prices = _prices_result
+    stats = _stats_result
     l90 = stats.get("last90Days", {})
     l72 = stats.get("last72Hours", {})
 
-    sales = sx.get_sales(pid, max_pages=10)
+    sales = _sales_result
     sales_by_vid = defaultdict(list)
     for s in sales:
         vid = s.get("associatedVariant", {}).get("id", "")
