@@ -823,6 +823,7 @@ def _update_env(key: str, value: str):
 
 _stockx_client: Optional[StockXClient] = None
 _goat_client: Optional[GoatClient] = None
+_init_done = False
 
 
 def _get_stockx() -> StockXClient:
@@ -841,6 +842,30 @@ def _get_goat() -> Optional[GoatClient]:
             log.error("[GOAT] Failed to init client: %s", e)
             return None
     return _goat_client
+
+
+def warm_up():
+    """Pre-init StockX + GOAT sessions in background thread. Call at server startup."""
+    global _init_done
+    if _init_done:
+        return
+    _init_done = True
+
+    def _init():
+        log.info("[Sneaker] Warming up sessions...")
+        try:
+            _get_stockx()
+            log.info("[Sneaker] StockX session ready")
+        except Exception as e:
+            log.error("[Sneaker] StockX warm-up failed: %s", e)
+        try:
+            _get_goat()
+            log.info("[Sneaker] GOAT session ready")
+        except Exception as e:
+            log.error("[Sneaker] GOAT warm-up failed: %s", e)
+
+    import threading
+    threading.Thread(target=_init, daemon=True).start()
 
 
 def check_stockx(sku: str, ek: float) -> dict:

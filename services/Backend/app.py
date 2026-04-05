@@ -78,6 +78,16 @@ BASE_DIR = Path(__file__).resolve().parent
 templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
+@app.on_event("startup")
+async def _startup_warm_sessions():
+    """Pre-init StockX + GOAT sessions so first check is fast."""
+    try:
+        from sneaker import warm_up
+        warm_up()
+    except ImportError:
+        pass
+
+
 # ---------------- Thresholds / Decision ----------------
 
 from fastapi import FastAPI, Request
