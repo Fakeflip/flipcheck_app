@@ -388,7 +388,7 @@ class StockXClient:
         """
         cutoff = datetime.utcnow() - timedelta(days=days)
         for _ in range(max_pages):
-            v = {"id": product_id, "first": 50, "viewerContext": "SELLER",
+            v = {"id": product_id, "first": 250, "viewerContext": "SELLER",
                  "currencyCode": STOCKX_CURRENCY, "market": STOCKX_MARKET}
             if cursor:
                 v["after"] = cursor
@@ -398,7 +398,7 @@ class StockXClient:
                 break
             all_sales.extend(e["node"] for e in edges)
             cursor = data.get("product", {}).get("market", {}).get("sales", {}).get("pageInfo", {}).get("endCursor")
-            if not cursor or len(edges) < 50:
+            if not cursor or len(edges) < 250:
                 break
             last_dt = _parse_dt(edges[-1]["node"].get("createdAt", ""))
             if last_dt and last_dt < cutoff:
@@ -742,10 +742,10 @@ class GoatClient:
         return None, None
 
     def get_all_sizes(self, slug: str) -> list:
-        """Fetch sizes with full pricing: ask, bid, last_sale + global indicator.
-        1) list-variant-availabilities (no region) → ask/bid/last for all sizes
-        2) variants/availability per size (with region_id=2) → high_demand_price_cents (global indicator)"""
-        # Call 1: bulk fetch ask/bid/last
+        """Fetch sizes with EU-regional pricing (region_id=2).
+        1) list-variant-availabilities (no region) → discover available sizes
+        2) variants/availability per size (region_id=2) → EU ask/bid/last/GI prices"""
+        # Call 1: bulk fetch to discover which sizes exist
         data_detail = self._post("/api/v1/analytics/list-variant-availabilities", {
             "variant": {"id": slug, "packaging_condition": 1}
         })
@@ -756,42 +756,53 @@ class GoatClient:
         # Filter to sizes that have any pricing
         active = [a for a in avails if a.get("lowest_price_cents") or a.get("highest_offer_cents") or a.get("last_sold_price_cents")]
 
-        # Call 2: fetch global indicator per active size (parallel)
-        def _fetch_gi(size_val):
+        # Call 2: fetch EU-regional prices per active size (parallel)
+        def _fetch_regional(size_val):
             data = self._post("/api/v1/analytics/variants/availability", {
                 "variant": {"id": slug, "size": size_val, "product_condition": 1, "packaging_condition": 1, "consigned": False, "region_id": "2"}
             })
-            return size_val, data.get("high_demand_price_cents"), data.get("high_demand_price_cents_v2")
+            return size_val, data
 
-        gi_map = {}
-        with ThreadPoolExecutor(max_workers=6) as pool:
-            futures = {pool.submit(_fetch_gi, a["variant"]["size"]): a["variant"]["size"] for a in active if a.get("variant", {}).get("size") is not None}
+        regional_map = {}
+        with ThreadPoolExecutor(max_workers=12) as pool:
+            futures = {pool.submit(_fetch_regional, a["variant"]["size"]): a["variant"]["size"] for a in active if a.get("variant", {}).get("size") is not None}
             for future in as_completed(futures):
-                sz, gi_v1, gi_v2 = future.result()
-                if gi_v1 or gi_v2:
-                    gi_map[sz] = {"high_demand_price_cents": gi_v1, "high_demand_price_cents_v2": gi_v2}
+                sz, data = future.result()
+                if data:
+                    regional_map[sz] = data
 
-        # Merge GI data into availabilities
+        # Build result: use regional prices where available, fallback to global
         result = []
         for a in avails:
             merged = dict(a)
             sz = a.get("variant", {}).get("size")
-            if sz in gi_map:
-                merged.update(gi_map[sz])
+            if sz in regional_map:
+                rd = regional_map[sz]
+                # Override with EU-regional prices (all in USD cents)
+                if rd.get("lowest_price_cents"):
+                    merged["lowest_price_cents"] = rd["lowest_price_cents"]
+                if rd.get("highest_offer_cents"):
+                    merged["highest_offer_cents"] = rd["highest_offer_cents"]
+                if rd.get("last_sold_price_cents"):
+                    merged["last_sold_price_cents"] = rd["last_sold_price_cents"]
+                if rd.get("high_demand_price_cents"):
+                    merged["high_demand_price_cents"] = rd["high_demand_price_cents"]
+                if rd.get("high_demand_price_cents_v2"):
+                    merged["high_demand_price_cents_v2"] = rd["high_demand_price_cents_v2"]
             result.append(merged)
         return result
 
-    def get_monthly_sales(self, slug: str, size: str) -> int:
+    def get_monthly_sales(self, slug: str, size) -> int:
+        """Get 30-day sales count using orders/recent endpoint (more accurate)."""
         try:
-            data = self._post("/api/v1/analytics/products/historical-sales", {
-                "variant": {"id": slug, "size": size, "product_condition": 1, "packaging_condition": 1, "region_id": "2"}
+            data = self._post("/api/v1/analytics/orders/recent", {
+                "count": "200",
+                "variant": {"id": slug, "size": float(size) if size else 0, "product_condition": 1, "packaging_condition": 1, "region_id": "2"}
             })
             cutoff = datetime.utcnow() - timedelta(days=30)
             count = 0
-            for d in data.get("daily_365", []):
-                if d.get("no_sales_made"):
-                    continue
-                dt = _parse_dt(d.get("start_date", ""))
+            for sale in data.get("recent_sales", []):
+                dt = _parse_dt(sale.get("purchased_at", ""))
                 if dt and dt > cutoff:
                     count += 1
             return count
@@ -815,21 +826,21 @@ class GoatClient:
         return {"payout": round(sell_eur - fees, 2), "fees": round(fees, 2)}
 
     def _usd_eur_rate(self) -> float:
-        """Get USD→EUR rate from a single earnings call. Cached."""
+        """Get USD→EUR rate from a single earnings call. Cached.
+        Uses final_cash_out_amount_cents (USD after all fees) vs localized EUR
+        to get a pure exchange rate without fees baked in."""
         if hasattr(self, "_cached_rate") and self._cached_rate:
             return self._cached_rate
         data = self._get("/api/v1/listing-actions/earnings?quantity=0&selling_price_cents=10000")
         loc = data.get("localized_final_cash_out_amount_cents", {})
         if loc.get("currency") == "EUR" and loc.get("amount_cents"):
-            # selling=10000 ($100) → localized gives EUR after fees
-            # We need gross rate, not after-fees. Use selling vs earnings ratio
-            earnings_usd = int(data.get("earnings_cents", 0))
-            earnings_eur = int(loc["amount_cents"])
-            if earnings_usd > 0:
-                self._cached_rate = earnings_eur / earnings_usd
+            cashout_usd = int(data.get("final_cash_out_amount_cents", 0))
+            cashout_eur = int(loc["amount_cents"])
+            if cashout_usd > 0:
+                self._cached_rate = cashout_eur / cashout_usd
                 log.info("[GOAT] USD→EUR rate: %.4f", self._cached_rate)
                 return self._cached_rate
-        self._cached_rate = 0.86  # fallback
+        self._cached_rate = 0.88  # fallback
         return self._cached_rate
 
     @staticmethod
@@ -1034,7 +1045,7 @@ def check_stockx(sku: str, ek: float) -> dict:
 
     def _fetch_sales():
         nonlocal _sales_result
-        _sales_result = sx.get_sales(pid, max_pages=3, days=370)  # 365d chart, 3 pages (150 sales)
+        _sales_result = sx.get_sales(pid, max_pages=50, days=370)  # 365d, 250/page = up to 12500 sales
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         pool.submit(_fetch_prices)
@@ -1182,7 +1193,8 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
 
     active_sizes = {k: v for k, v in size_map.items() if v["ask"] or v["bid"] or v["last_sale"]}
 
-    # Pre-compute sell prices for earnings API
+    # Pre-compute sell prices for earnings API (payout based on Global Indicator)
+    # Priority: GI (recommended sell price) > BID > ASK
     sell_prices_map: Dict[str, int] = {}
     for k, s in active_sizes.items():
         cents = s.get("_gi_cents") or s.get("_bid_cents") or s.get("_ask_cents")
@@ -1242,7 +1254,7 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
                 _, cents, result = r
                 earnings_cache[cents] = result
 
-    rate = rate_box[0] or 0.86
+    rate = rate_box[0] or 0.88
 
     # Sort chart data by date and convert USD→EUR
     chart_data.sort(key=lambda x: x.get("date", ""))
