@@ -338,16 +338,41 @@ class StockXClient:
         return data.get("variant", {})
 
     def get_all_variant_prices(self, variant_ids: list, max_workers: int = 8) -> dict:
+        """Fetch pricing for all variants using batched GraphQL aliases (max 10 per query)."""
         results = {}
-        def _fetch(vid):
+        BATCH = 10
+
+        def _fetch_batch(batch):
+            # Build a single GraphQL query with aliases for up to 10 variants
+            parts = []
+            for i, vid in enumerate(batch):
+                parts.append(f"""
+                    v{i}: variant(id: "{vid}") {{
+                        id
+                        pricingGuidance(currencyCode: $cc, country: $co, market: $mkt) {{
+                            sellingGuidance {{ earnMore sellFaster }}
+                        }}
+                        market(currencyCode: $cc) {{
+                            state(market: $mkt, country: $co) {{ highestBid {{ amount }} lowestAsk {{ amount }} }}
+                            statistics(market: $mkt, viewerContext: SELLER) {{ lastSale {{ amount }} }}
+                        }}
+                    }}
+                """)
+            query = f"""query BatchVariants($cc: CurrencyCode, $co: String, $mkt: String) {{ {"".join(parts)} }}"""
             try:
-                return vid, self.get_variant_price(vid)
-            except Exception:
-                return vid, {}
+                data = self.graphql(query, {"cc": STOCKX_CURRENCY, "co": STOCKX_COUNTRY, "mkt": STOCKX_MARKET})
+                batch_results = {}
+                for i, vid in enumerate(batch):
+                    batch_results[vid] = data.get(f"v{i}", {})
+                return batch_results
+            except Exception as e:
+                log.error("[StockX] Batch variant fetch failed: %s", e)
+                return {vid: {} for vid in batch}
+
+        batches = [variant_ids[i:i+BATCH] for i in range(0, len(variant_ids), BATCH)]
         with ThreadPoolExecutor(max_workers=max_workers) as pool:
-            for future in as_completed({pool.submit(_fetch, v): v for v in variant_ids}):
-                vid, data = future.result()
-                results[vid] = data
+            for future in as_completed({pool.submit(_fetch_batch, b): b for b in batches}):
+                results.update(future.result())
         return results
 
     def get_sales(self, product_id: str, max_pages: int = 10, days: int = 35) -> list:
@@ -1009,7 +1034,7 @@ def check_stockx(sku: str, ek: float) -> dict:
 
     def _fetch_sales():
         nonlocal _sales_result
-        _sales_result = sx.get_sales(pid, max_pages=10, days=370)  # 365d chart data
+        _sales_result = sx.get_sales(pid, max_pages=3, days=370)  # 365d chart, 3 pages (150 sales)
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         pool.submit(_fetch_prices)
@@ -1157,12 +1182,21 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
 
     active_sizes = {k: v for k, v in size_map.items() if v["ask"] or v["bid"] or v["last_sale"]}
 
-    # Monthly sales + chart data (parallel)
+    # Pre-compute sell prices for earnings API
+    sell_prices_map: Dict[str, int] = {}
+    for k, s in active_sizes.items():
+        cents = s.get("_gi_cents") or s.get("_bid_cents") or s.get("_ask_cents")
+        if cents:
+            sell_prices_map[k] = cents
+
+    # === ALL secondary fetches in ONE parallel block ===
     chart_data: List[dict] = []
+    earnings_cache: Dict[int, dict] = {}
+    rate_box = [None]  # mutable container for rate
 
     def _fetch_monthly_and_chart(sz):
+        """Fetch monthly sales count + chart points for one size."""
         monthly = goat.get_monthly_sales(slug, sz)
-        # Also fetch chart points from historical-sales
         points = []
         try:
             data = goat._post("/api/v1/analytics/products/historical-sales", {
@@ -1176,17 +1210,39 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
                     })
         except Exception:
             pass
-        return sz, monthly, points
+        return ("chart", sz, monthly, points)
 
-    with ThreadPoolExecutor(max_workers=8) as pool:
-        for future in as_completed({pool.submit(_fetch_monthly_and_chart, sz): sz for sz in active_sizes}):
-            sz, count, points = future.result()
-            if sz in active_sizes:
-                active_sizes[sz]["sales_30d"] = count
-            chart_data.extend(points)
+    def _fetch_earnings(usd_cents: int):
+        return ("earnings", usd_cents, goat.calc_payout_via_api(usd_cents))
 
-    # USD→EUR conversion rate (cached after first call)
-    rate = goat._usd_eur_rate()
+    def _fetch_rate():
+        rate_box[0] = goat._usd_eur_rate()
+        return ("rate",)
+
+    # Only fetch chart for max 3 popular sizes (biggest ask or bid activity)
+    chart_sizes = sorted(active_sizes.keys(), key=lambda k: (active_sizes[k].get("bid") or 0) + (active_sizes[k].get("ask") or 0), reverse=True)[:3]
+
+    unique_prices = set(sell_prices_map.values())
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        futures = []
+        futures.append(pool.submit(_fetch_rate))
+        for sz in active_sizes:
+            futures.append(pool.submit(_fetch_monthly_and_chart, sz))
+        for p in unique_prices:
+            futures.append(pool.submit(_fetch_earnings, p))
+        for future in as_completed(futures):
+            r = future.result()
+            if r[0] == "chart":
+                _, sz, count, points = r
+                if sz in active_sizes:
+                    active_sizes[sz]["sales_30d"] = count
+                if sz in chart_sizes:
+                    chart_data.extend(points)
+            elif r[0] == "earnings":
+                _, cents, result = r
+                earnings_cache[cents] = result
+
+    rate = rate_box[0] or 0.86
 
     # Sort chart data by date and convert USD→EUR
     chart_data.sort(key=lambda x: x.get("date", ""))
@@ -1194,31 +1250,8 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
         if pt.get("price"):
             pt["price"] = round(pt["price"] * rate, 2)
 
-    # Fetch real EUR payouts from GOAT earnings API in parallel
     ek_netto = ek / 1.19
     sorted_sizes = sorted(active_sizes.values(), key=lambda x: _size_sort(x["size"]))
-
-    # Build list of sell prices (USD cents) for earnings API calls
-    earnings_cache: Dict[int, dict] = {}
-
-    def _fetch_earnings(usd_cents: int):
-        return usd_cents, goat.calc_payout_via_api(usd_cents)
-
-    # Collect unique sell prices to batch-fetch
-    sell_prices_map: Dict[str, int] = {}  # size_key -> sell_price_usd_cents
-    for s in sorted_sizes:
-        gi_c = s.get("_gi_cents")
-        bid_c = s.get("_bid_cents")
-        ask_c = s.get("_ask_cents")
-        cents = gi_c or bid_c or ask_c
-        if cents:
-            sell_prices_map[str(s["size"])] = cents
-
-    unique_prices = set(sell_prices_map.values())
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        for future in as_completed({pool.submit(_fetch_earnings, p): p for p in unique_prices}):
-            cents, result = future.result()
-            earnings_cache[cents] = result
 
     sizes = []
     for s in sorted_sizes:
