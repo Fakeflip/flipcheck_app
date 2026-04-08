@@ -350,7 +350,7 @@ class StockXClient:
                 results[vid] = data
         return results
 
-    def get_sales(self, product_id: str, max_pages: int = 10) -> list:
+    def get_sales(self, product_id: str, max_pages: int = 10, days: int = 35) -> list:
         all_sales: list = []
         cursor = None
         q = """
@@ -361,7 +361,7 @@ class StockXClient:
               } } }
             }
         """
-        cutoff = datetime.utcnow() - timedelta(days=35)
+        cutoff = datetime.utcnow() - timedelta(days=days)
         for _ in range(max_pages):
             v = {"id": product_id, "first": 50, "viewerContext": "SELLER",
                  "currencyCode": STOCKX_CURRENCY, "market": STOCKX_MARKET}
@@ -937,7 +937,7 @@ def check_stockx(sku: str, ek: float) -> dict:
 
     def _fetch_sales():
         nonlocal _sales_result
-        _sales_result = sx.get_sales(pid, max_pages=3)  # 3 pages max (was 10!) — enough for chart
+        _sales_result = sx.get_sales(pid, max_pages=10, days=370)  # 365d chart data
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         pool.submit(_fetch_prices)
