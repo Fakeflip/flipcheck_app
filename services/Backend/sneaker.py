@@ -541,6 +541,39 @@ class GoatClient:
         with open(GOAT_CACHE, "w") as f:
             json.dump({"access_token": self.access_token, "created_at": time.time()}, f)
 
+    def _get(self, path: str) -> dict:
+        """Authenticated GET request."""
+        headers = {
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
+            "accept": "application/json",
+        }
+        try:
+            r = self.scraper.get(f"{self.BASE}{path}", headers=headers, timeout=15, proxies=self._proxy_dict())
+        except Exception as e:
+            log.error("[GOAT] GET failed: %s", e)
+            return {}
+        if r.status_code >= 400:
+            log.error("[GOAT] GET %d on %s", r.status_code, path)
+            return {}
+        try:
+            return r.json()
+        except Exception:
+            return {}
+
+    def get_earnings_eur(self, sell_price_cents: int) -> Optional[dict]:
+        """Get real EUR payout from GOAT's earnings API. Returns {payout_eur, fees_eur} or None."""
+        data = self._get(f"/api/v1/listing-actions/earnings?quantity=0&selling_price_cents={sell_price_cents}")
+        loc = data.get("localized_final_cash_out_amount_cents", {})
+        if loc.get("currency") == "EUR" and loc.get("amount_cents"):
+            eur_cents = int(loc["amount_cents"])
+            sell_eur = eur_cents / 100
+            commission = int(data.get("commission_cents", 0)) / 100
+            seller_fee = int(data.get("seller_fee_cents", 0)) / 100
+            cashout_fee = int(data.get("cash_out_fee_cents", 0)) / 100
+            return {"payout": sell_eur, "fees": round(commission + seller_fee + cashout_fee, 2)}
+        return None
+
     def _post(self, path: str, data: dict) -> dict:
         try:
             r = self._raw_post(path, data)
@@ -685,37 +718,41 @@ class GoatClient:
 
     def get_all_sizes(self, slug: str) -> list:
         """Fetch sizes with full pricing: ask, bid, last_sale + global indicator.
-        Makes two calls: with region_id (global indicator) and without (ask/bid/last)."""
-        # Call 1: with region_id → high_demand_price_cents_v2 (global indicator)
-        data_region = self._post("/api/v1/analytics/list-variant-availabilities", {
-            "variant": {"id": slug, "packaging_condition": 1, "region_id": "2"}
-        })
-        # Call 2: without region_id → lowest_price_cents, highest_offer_cents, last_sold_price_cents
+        1) list-variant-availabilities (no region) → ask/bid/last for all sizes
+        2) variants/availability per size (with region_id=2) → high_demand_price_cents (global indicator)"""
+        # Call 1: bulk fetch ask/bid/last
         data_detail = self._post("/api/v1/analytics/list-variant-availabilities", {
             "variant": {"id": slug, "packaging_condition": 1}
         })
+        avails = data_detail.get("availability", [])
+        if not avails:
+            return []
 
-        # Merge: use detail data as base, add global indicator from region data
-        detail_by_size = {}
-        for a in data_detail.get("availability", []):
-            sz = a.get("variant", {}).get("size")
-            if sz is not None:
-                detail_by_size[sz] = a
+        # Filter to sizes that have any pricing
+        active = [a for a in avails if a.get("lowest_price_cents") or a.get("highest_offer_cents") or a.get("last_sold_price_cents")]
 
+        # Call 2: fetch global indicator per active size (parallel)
+        def _fetch_gi(size_val):
+            data = self._post("/api/v1/analytics/variants/availability", {
+                "variant": {"id": slug, "size": size_val, "product_condition": 1, "packaging_condition": 1, "consigned": False, "region_id": "2"}
+            })
+            return size_val, data.get("high_demand_price_cents"), data.get("high_demand_price_cents_v2")
+
+        gi_map = {}
+        with ThreadPoolExecutor(max_workers=6) as pool:
+            futures = {pool.submit(_fetch_gi, a["variant"]["size"]): a["variant"]["size"] for a in active if a.get("variant", {}).get("size") is not None}
+            for future in as_completed(futures):
+                sz, gi_v1, gi_v2 = future.result()
+                if gi_v1 or gi_v2:
+                    gi_map[sz] = {"high_demand_price_cents": gi_v1, "high_demand_price_cents_v2": gi_v2}
+
+        # Merge GI data into availabilities
         result = []
-        region_avails = data_region.get("availability", [])
-        # If region call returned nothing, use detail only
-        if not region_avails:
-            return data_detail.get("availability", [])
-
-        for a in region_avails:
-            sz = a.get("variant", {}).get("size")
+        for a in avails:
             merged = dict(a)
-            if sz in detail_by_size:
-                # Add detailed pricing (ask/bid/last)
-                for k in ("lowest_price_cents", "highest_offer_cents", "last_sold_price_cents", "last_sold_at"):
-                    if k in detail_by_size[sz]:
-                        merged[k] = detail_by_size[sz][k]
+            sz = a.get("variant", {}).get("size")
+            if sz in gi_map:
+                merged.update(gi_map[sz])
             result.append(merged)
         return result
 
@@ -736,8 +773,43 @@ class GoatClient:
         except Exception:
             return 0
 
+    def calc_payout_via_api(self, sell_price_usd_cents: int) -> dict:
+        """Use GOAT's real earnings API for EUR payout. Falls back to estimate."""
+        data = self._get(f"/api/v1/listing-actions/earnings?quantity=0&selling_price_cents={sell_price_usd_cents}")
+        loc = data.get("localized_final_cash_out_amount_cents", {})
+        if loc.get("currency") == "EUR" and loc.get("amount_cents"):
+            payout_eur = int(loc["amount_cents"]) / 100
+            commission = int(data.get("commission_cents", 0)) / 100
+            seller_fee = int(data.get("seller_fee_cents", 0)) / 100
+            cashout_fee = int(data.get("cash_out_fee_cents", 0)) / 100
+            total_fees_usd = commission + seller_fee + cashout_fee
+            return {"payout": payout_eur, "fees": round(total_fees_usd / 100, 2)}
+        # Fallback: estimate with static conversion
+        sell_eur = sell_price_usd_cents / 100 * self._usd_eur_rate()
+        fees = sell_eur * GOAT_COMMISSION + GOAT_SELLER_FEE
+        return {"payout": round(sell_eur - fees, 2), "fees": round(fees, 2)}
+
+    def _usd_eur_rate(self) -> float:
+        """Get USD→EUR rate from a single earnings call. Cached."""
+        if hasattr(self, "_cached_rate") and self._cached_rate:
+            return self._cached_rate
+        data = self._get("/api/v1/listing-actions/earnings?quantity=0&selling_price_cents=10000")
+        loc = data.get("localized_final_cash_out_amount_cents", {})
+        if loc.get("currency") == "EUR" and loc.get("amount_cents"):
+            # selling=10000 ($100) → localized gives EUR after fees
+            # We need gross rate, not after-fees. Use selling vs earnings ratio
+            earnings_usd = int(data.get("earnings_cents", 0))
+            earnings_eur = int(loc["amount_cents"])
+            if earnings_usd > 0:
+                self._cached_rate = earnings_eur / earnings_usd
+                log.info("[GOAT] USD→EUR rate: %.4f", self._cached_rate)
+                return self._cached_rate
+        self._cached_rate = 0.86  # fallback
+        return self._cached_rate
+
     @staticmethod
     def calc_payout(sell_price: float) -> dict:
+        """Legacy static payout calc (USD, no conversion)."""
         fees = sell_price * GOAT_COMMISSION + GOAT_SELLER_FEE
         return {"payout": round(sell_price - fees, 2), "fees": round(fees, 2)}
 
@@ -1048,34 +1120,40 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     if not availabilities:
         return {"ok": False, "error": "Keine Gr\u00f6\u00dfen-Daten auf GOAT"}
 
-    # Merge sizes (deduplicate)
+    # Merge sizes (deduplicate) — prices stored in USD (raw from API)
     size_map: Dict[str, dict] = {}
     for a in availabilities:
         v = a.get("variant", {})
         size = v.get("size")
         if not size:
             continue
-        ask_c = a.get("lowest_price_cents")
-        bid_c = a.get("highest_offer_cents")
-        last_c = a.get("last_sold_price_cents")
-        gi_c = a.get("high_demand_price_cents_v2") or a.get("high_demand_price_cents")
-        ask = int(ask_c) / 100 if ask_c else None
-        bid = int(bid_c) / 100 if bid_c else None
-        last = int(last_c) / 100 if last_c else None
-        gi = int(gi_c) / 100 if gi_c else None
+        ask_c = int(a["lowest_price_cents"]) if a.get("lowest_price_cents") else None
+        bid_c = int(a["highest_offer_cents"]) if a.get("highest_offer_cents") else None
+        last_c = int(a["last_sold_price_cents"]) if a.get("last_sold_price_cents") else None
+        gi_c = int(a.get("high_demand_price_cents") or a.get("high_demand_price_cents_v2") or 0) or None
+        ask = ask_c / 100 if ask_c else None
+        bid = bid_c / 100 if bid_c else None
+        last = last_c / 100 if last_c else None
+        gi = gi_c / 100 if gi_c else None
         key = str(size)
         if key in size_map:
             ex = size_map[key]
             if ask and (not ex["ask"] or ask < ex["ask"]):
                 ex["ask"] = ask
+                ex["_ask_cents"] = ask_c
             if bid and (not ex["bid"] or bid > ex["bid"]):
                 ex["bid"] = bid
+                ex["_bid_cents"] = bid_c
             if last and not ex["last_sale"]:
                 ex["last_sale"] = last
             if gi and not ex.get("global_indicator"):
                 ex["global_indicator"] = gi
+                ex["_gi_cents"] = gi_c
         else:
-            size_map[key] = {"size": size, "ask": ask, "bid": bid, "last_sale": last, "global_indicator": gi}
+            size_map[key] = {
+                "size": size, "ask": ask, "bid": bid, "last_sale": last, "global_indicator": gi,
+                "_ask_cents": ask_c, "_bid_cents": bid_c, "_gi_cents": gi_c,
+            }
 
     active_sizes = {k: v for k, v in size_map.items() if v["ask"] or v["bid"] or v["last_sale"]}
 
@@ -1107,28 +1185,68 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
                 active_sizes[sz]["sales_30d"] = count
             chart_data.extend(points)
 
-    # Sort chart data by date
-    chart_data.sort(key=lambda x: x.get("date", ""))
+    # USD→EUR conversion rate (cached after first call)
+    rate = goat._usd_eur_rate()
 
+    # Sort chart data by date and convert USD→EUR
+    chart_data.sort(key=lambda x: x.get("date", ""))
+    for pt in chart_data:
+        if pt.get("price"):
+            pt["price"] = round(pt["price"] * rate, 2)
+
+    # Fetch real EUR payouts from GOAT earnings API in parallel
     ek_netto = ek / 1.19
+    sorted_sizes = sorted(active_sizes.values(), key=lambda x: _size_sort(x["size"]))
+
+    # Build list of sell prices (USD cents) for earnings API calls
+    earnings_cache: Dict[int, dict] = {}
+
+    def _fetch_earnings(usd_cents: int):
+        return usd_cents, goat.calc_payout_via_api(usd_cents)
+
+    # Collect unique sell prices to batch-fetch
+    sell_prices_map: Dict[str, int] = {}  # size_key -> sell_price_usd_cents
+    for s in sorted_sizes:
+        gi_c = s.get("_gi_cents")
+        bid_c = s.get("_bid_cents")
+        ask_c = s.get("_ask_cents")
+        cents = gi_c or bid_c or ask_c
+        if cents:
+            sell_prices_map[str(s["size"])] = cents
+
+    unique_prices = set(sell_prices_map.values())
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        for future in as_completed({pool.submit(_fetch_earnings, p): p for p in unique_prices}):
+            cents, result = future.result()
+            earnings_cache[cents] = result
+
     sizes = []
-    for s in sorted(active_sizes.values(), key=lambda x: _size_sort(x["size"])):
-        ask = s.get("ask")
-        bid = s.get("bid")
-        gi = s.get("global_indicator")
-        # Use global indicator for profit — GOAT's recommended sell price
-        sell_price = gi or bid or ask
-        payout_info = GoatClient.calc_payout(sell_price) if sell_price else {"payout": None, "fees": None}
+    for s in sorted_sizes:
+        # Convert USD prices to EUR for display
+        ask_usd = s.get("ask")
+        bid_usd = s.get("bid")
+        last_usd = s.get("last_sale")
+        gi_usd = s.get("global_indicator")
+        ask = round(ask_usd * rate, 2) if ask_usd else None
+        bid = round(bid_usd * rate, 2) if bid_usd else None
+        last = round(last_usd * rate, 2) if last_usd else None
+        gi = round(gi_usd * rate, 2) if gi_usd else None
+
+        sell_cents = sell_prices_map.get(str(s["size"]))
+        payout_info = earnings_cache.get(sell_cents, {"payout": None, "fees": None}) if sell_cents else {"payout": None, "fees": None}
         profit = round(payout_info["payout"] - ek_netto, 2) if payout_info["payout"] else None
         sizes.append({
             "size": s["size"],
-            "ask": ask, "bid": bid, "last_sale": s.get("last_sale"),
+            "ask": ask, "bid": bid, "last_sale": last,
             "global_indicator": gi,
             "payout": payout_info["payout"],
             "fees": payout_info["fees"],
             "profit": profit,
             "sales_30d": s.get("sales_30d", 0),
         })
+
+    # Convert retail to EUR too
+    retail_eur = round(retail * rate, 2) if retail else None
 
     return {
         "ok": True,
@@ -1137,8 +1255,8 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
         "title": goat_name,
         "slug": slug,
         "image": image_url,
-        "retail_price": retail,
-        "fees_label": "9.5% Commission + 5\u20ac Seller Fee",
+        "retail_price": retail_eur,
+        "fees_label": "9.5% Commission + 5\u20ac Seller Fee + 2.9% Cash Out",
         "chart": chart_data,
         "sizes": sizes,
     }
