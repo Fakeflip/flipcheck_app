@@ -344,6 +344,7 @@ class StockXClient:
 
         def _fetch_batch(batch):
             # Build a single GraphQL query with aliases for up to 10 variants
+            # Includes per-variant sales for accurate 30D counts (no separate pagination needed)
             parts = []
             for i, vid in enumerate(batch):
                 parts.append(f"""
@@ -355,6 +356,9 @@ class StockXClient:
                         market(currencyCode: $cc) {{
                             state(market: $mkt, country: $co) {{ highestBid {{ amount }} lowestAsk {{ amount }} }}
                             statistics(market: $mkt, viewerContext: SELLER) {{ lastSale {{ amount }} }}
+                            sales(first: 100, market: $mkt, viewerContext: SELLER) {{
+                                edges {{ node {{ createdAt }} }}
+                            }}
                         }}
                     }}
                 """)
@@ -1072,7 +1076,7 @@ def check_stockx(sku: str, ek: float) -> dict:
 
     def _fetch_sales():
         nonlocal _sales_result
-        _sales_result = sx.get_sales(pid, max_pages=200, days=370)  # 365d, 100/page
+        _sales_result = sx.get_sales(pid, max_pages=30, days=370)  # chart only (30D from batched variant query)
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         pool.submit(_fetch_prices)
@@ -1086,10 +1090,6 @@ def check_stockx(sku: str, ek: float) -> dict:
     l72 = stats.get("last72Hours", {})
 
     sales = _sales_result
-    sales_by_vid = defaultdict(list)
-    for s in sales:
-        vid = s.get("associatedVariant", {}).get("id", "")
-        sales_by_vid[vid].append(s)
     cutoff_30d = datetime.utcnow() - timedelta(days=30)
 
     # Chart data: extract price + date from all sales
@@ -1118,7 +1118,9 @@ def check_stockx(sku: str, ek: float) -> dict:
         sell_price = sell_faster or ask
         payout_info = StockXClient.calc_payout(sell_price) if sell_price else {"payout": None, "fees": None}
         profit = round(payout_info["payout"] - ek_netto, 2) if payout_info["payout"] else None
-        monthly = sum(1 for s in sales_by_vid.get(vid, []) if _parse_dt(s.get("createdAt", "")) and _parse_dt(s["createdAt"]) > cutoff_30d)
+        # Per-variant 30D sales from batched query (no pagination needed)
+        variant_sales = vdata.get("market", {}).get("sales", {}).get("edges", [])
+        monthly = sum(1 for e in variant_sales if _parse_dt(e.get("node", {}).get("createdAt", "")) and _parse_dt(e["node"]["createdAt"]) > cutoff_30d)
 
         sizes.append({
             "size": sv["size"],
