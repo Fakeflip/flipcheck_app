@@ -388,7 +388,7 @@ class StockXClient:
         """
         cutoff = datetime.utcnow() - timedelta(days=days)
         for _ in range(max_pages):
-            v = {"id": product_id, "first": 250, "viewerContext": "SELLER",
+            v = {"id": product_id, "first": 100, "viewerContext": "SELLER",
                  "currencyCode": STOCKX_CURRENCY, "market": STOCKX_MARKET}
             if cursor:
                 v["after"] = cursor
@@ -398,7 +398,7 @@ class StockXClient:
                 break
             all_sales.extend(e["node"] for e in edges)
             cursor = data.get("product", {}).get("market", {}).get("sales", {}).get("pageInfo", {}).get("endCursor")
-            if not cursor or len(edges) < 250:
+            if not cursor or len(edges) < 100:
                 break
             last_dt = _parse_dt(edges[-1]["node"].get("createdAt", ""))
             if last_dt and last_dt < cutoff:
@@ -435,6 +435,7 @@ class GoatClient:
     """GOAT/Alias Sell API client with Cloudflare bypass."""
 
     BASE = "https://sell-api.goat.com"
+    GATEWAY = "https://gateway.alias.org"
 
     def __init__(self, headless=True):
         self.access_token: Optional[str] = None
@@ -621,6 +622,27 @@ class GoatClient:
         except Exception:
             return {}
 
+    def _post_gateway(self, path: str, data: dict) -> dict:
+        """POST to gateway.alias.org (pricing-insights etc.)."""
+        headers = {
+            "authorization": f"Bearer {self.access_token}",
+            "user-agent": "alias/1.48.1 (iPad; iOS 18.7.1; Scale/2.00) Locale/de",
+            "accept": "application/json",
+            "content-type": "application/json",
+        }
+        try:
+            r = self.scraper.post(f"{self.GATEWAY}{path}", json=data, headers=headers, timeout=15, proxies=self._proxy_dict())
+        except Exception as e:
+            log.error("[GOAT] Gateway request failed: %s", e)
+            return {}
+        if r.status_code >= 400:
+            log.error("[GOAT] Gateway HTTP %d on %s", r.status_code, path)
+            return {}
+        try:
+            return r.json()
+        except Exception:
+            return {}
+
     def find_product(self, sku: str, product_name: str = "") -> tuple:
         """Find product. Returns (slug, product) or (None, None).
         Strategy: 1) DDG/Google → show_v2  2) show_v2 slug candidates  3) get-product fallback."""
@@ -756,20 +778,24 @@ class GoatClient:
         # Filter to sizes that have any pricing
         active = [a for a in avails if a.get("lowest_price_cents") or a.get("highest_offer_cents") or a.get("last_sold_price_cents")]
 
-        # Call 2: fetch EU-regional prices per active size (parallel)
+        # Call 2: fetch EU-regional prices + pricing-insights per active size (parallel)
         def _fetch_regional(size_val):
-            data = self._post("/api/v1/analytics/variants/availability", {
+            # Both calls for this size
+            avail_data = self._post("/api/v1/analytics/variants/availability", {
                 "variant": {"id": slug, "size": size_val, "product_condition": 1, "packaging_condition": 1, "consigned": False, "region_id": "2"}
             })
-            return size_val, data
+            insights = self._post_gateway("/api/v1/pricing-insights/pricing", {
+                "variant": {"product_id": slug, "region_id": "2", "size_us": size_val, "product_condition": 1, "packaging_condition": 1, "consigned": False}
+            })
+            return size_val, avail_data, insights
 
         regional_map = {}
         with ThreadPoolExecutor(max_workers=12) as pool:
             futures = {pool.submit(_fetch_regional, a["variant"]["size"]): a["variant"]["size"] for a in active if a.get("variant", {}).get("size") is not None}
             for future in as_completed(futures):
-                sz, data = future.result()
-                if data:
-                    regional_map[sz] = data
+                sz, avail_data, insights = future.result()
+                if avail_data or insights:
+                    regional_map[sz] = (avail_data or {}, insights or {})
 
         # Build result: use regional prices where available, fallback to global
         result = []
@@ -777,7 +803,7 @@ class GoatClient:
             merged = dict(a)
             sz = a.get("variant", {}).get("size")
             if sz in regional_map:
-                rd = regional_map[sz]
+                rd, ins = regional_map[sz]
                 # Override with EU-regional prices (all in USD cents)
                 if rd.get("lowest_price_cents"):
                     merged["lowest_price_cents"] = rd["lowest_price_cents"]
@@ -785,19 +811,20 @@ class GoatClient:
                     merged["highest_offer_cents"] = rd["highest_offer_cents"]
                 if rd.get("last_sold_price_cents"):
                     merged["last_sold_price_cents"] = rd["last_sold_price_cents"]
-                if rd.get("high_demand_price_cents"):
-                    merged["high_demand_price_cents"] = rd["high_demand_price_cents"]
-                if rd.get("high_demand_price_cents_v2"):
-                    merged["high_demand_price_cents_v2"] = rd["high_demand_price_cents_v2"]
+                # GI = fast_cutoff_price_cents from pricing-insights (matches Alias "Globaler Indikator")
+                # Fallback to high_demand_price_cents from availability
+                gi = ins.get("fast_cutoff_price_cents") or rd.get("high_demand_price_cents") or rd.get("high_demand_price_cents_v2")
+                if gi:
+                    merged["high_demand_price_cents"] = gi
             result.append(merged)
         return result
 
     def get_monthly_sales(self, slug: str, size) -> int:
-        """Get 30-day sales count using orders/recent endpoint (more accurate)."""
+        """Get 30-day sales count using orders/recent endpoint (global, not EU-only)."""
         try:
             data = self._post("/api/v1/analytics/orders/recent", {
                 "count": "200",
-                "variant": {"id": slug, "size": float(size) if size else 0, "product_condition": 1, "packaging_condition": 1, "region_id": "2"}
+                "variant": {"id": slug, "size": float(size) if size else 0, "product_condition": 1, "packaging_condition": 1}
             })
             cutoff = datetime.utcnow() - timedelta(days=30)
             count = 0
@@ -1045,7 +1072,7 @@ def check_stockx(sku: str, ek: float) -> dict:
 
     def _fetch_sales():
         nonlocal _sales_result
-        _sales_result = sx.get_sales(pid, max_pages=50, days=370)  # 365d, 250/page = up to 12500 sales
+        _sales_result = sx.get_sales(pid, max_pages=200, days=370)  # 365d, 100/page
 
     with ThreadPoolExecutor(max_workers=3) as pool:
         pool.submit(_fetch_prices)
