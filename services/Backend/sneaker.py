@@ -257,12 +257,13 @@ class StockXClient:
         return resp.get("data", {})
 
     def search(self, sku: str) -> Optional[dict]:
+        """Search StockX for a product by SKU. Verifies SKU match via traits."""
         data = self.graphql("""
             query FetchSearchResults($query: String, $market: String) {
               browse(query: $query, flow: SEARCH_TYPEAHEAD, market: $market, sort: {order: DESC, id: "featured"}) {
                 results { edges { node {
-                  ... on Product { id primaryTitle secondaryTitle title }
-                  ... on Variant { id product { id primaryTitle secondaryTitle title } }
+                  ... on Product { id primaryTitle secondaryTitle title traits { name value } }
+                  ... on Variant { id product { id primaryTitle secondaryTitle title traits { name value } } }
                 } objectId } }
               }
             }
@@ -270,10 +271,21 @@ class StockXClient:
         edges = data.get("browse", {}).get("results", {}).get("edges", [])
         if not edges:
             return None
+        sku_norm = sku.upper().replace(" ", "-").strip()
+        # Check all results for exact SKU match (not just first result)
+        for edge in edges:
+            node = edge.get("node", {})
+            product = node.get("product") or node
+            traits = product.get("traits", [])
+            for t in traits:
+                if t.get("name") in ("Style", "Modellnr.", "Artikelnr.") and t.get("value", "").upper().replace(" ", "-") == sku_norm:
+                    log.info("[StockX] Exact SKU match: %s → %s", sku, product.get("title", "")[:60])
+                    return product
+        # Fallback: return first result with warning
         node = edges[0]["node"]
-        if "product" in node and node["product"]:
-            return node["product"]
-        return node
+        product = node.get("product") or node
+        log.warning("[StockX] No exact SKU match for '%s', using first result: %s", sku, product.get("title", "")[:60])
+        return product
 
     def get_product(self, product_id: str) -> dict:
         data = self.graphql("""
@@ -653,6 +665,8 @@ class GoatClient:
         sku_slug = sku.lower().replace(" ", "-")
         log.info("[GOAT] Finding product: sku=%s name=%s", sku, product_name[:60] if product_name else "")
 
+        sku_norm = sku.upper().replace(" ", "-").strip()
+
         # 1) DDG/Google to find slug (works without product name!)
         ddg_slug = self._search_web(sku)
         if ddg_slug:
@@ -660,11 +674,16 @@ class GoatClient:
             # Verify via show_v2 (get full product data)
             slug, product = self._show_v2_single(ddg_slug)
             if slug and product:
-                return slug, product
+                # Verify SKU matches
+                if product.get("sku", "").upper().replace(" ", "-") == sku_norm:
+                    return slug, product
+                log.warning("[GOAT] SKU mismatch: searched '%s', found '%s'", sku, product.get("sku"))
             # Fallback: try get-product
             product = self._try_product(ddg_slug)
             if product:
-                return ddg_slug, product
+                if product.get("sku", "").upper().replace(" ", "-") == sku_norm:
+                    return ddg_slug, product
+                log.warning("[GOAT] SKU mismatch via get-product: searched '%s', found '%s'", sku, product.get("sku"))
 
         # 2) show_v2 with slug candidates (needs product_name for good slugs)
         slug, product = self._find_via_show_v2(sku_slug, product_name)
@@ -1236,15 +1255,19 @@ def check_goat(sku: str, ek: float, product_name: str = "") -> dict:
     rate_box = [None]  # mutable container for rate
 
     def _fetch_monthly_and_chart(sz):
-        """Fetch monthly sales count + chart points for one size."""
-        monthly = goat.get_monthly_sales(slug, sz)
+        """Fetch chart points + derive 30D sales count from historical-sales (no cap)."""
         points = []
+        monthly = 0
         try:
             data = goat._post("/api/v1/analytics/products/historical-sales", {
-                "variant": {"id": slug, "size": sz, "product_condition": 1, "packaging_condition": 1, "region_id": "2"}
+                "variant": {"id": slug, "size": sz, "product_condition": 1, "packaging_condition": 1}
             })
+            cutoff_30d = datetime.utcnow() - timedelta(days=30)
             for d in data.get("daily_365", []):
                 if not d.get("no_sales_made") and d.get("average_price_cents"):
+                    dt = _parse_dt(d.get("start_date", ""))
+                    if dt and dt > cutoff_30d:
+                        monthly += 1
                     points.append({
                         "date": d["start_date"][:10] if d.get("start_date") else "",
                         "price": int(d["average_price_cents"]) / 100,

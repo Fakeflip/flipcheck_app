@@ -495,13 +495,11 @@ const FlipcheckView = (() => {
     if (!sizes?.length) return `<div class="text-muted text-xs" style="padding:16px;text-align:center">Keine Daten</div>`;
     const th = `style="text-align:right;padding:6px 10px;font-weight:600;color:var(--text-muted);font-size:10px;text-transform:uppercase;letter-spacing:.04em"`;
     const isGoat = platform === "goat";
-    // StockX: Sell Fast + Ask + Bid; GOAT: GI + Bid (no Ask — ASK removed per user request)
     const sellColLabel = isGoat ? "GI" : "Sell Fast";
     let html = `<div style="overflow-x:auto"><table style="width:100%;font-size:12px;border-collapse:collapse">
       <thead><tr style="border-bottom:2px solid var(--border2)">
         <th ${th}>Size</th>
         <th ${th}>${sellColLabel}</th>
-        ${isGoat ? "" : `<th ${th}>Ask</th>`}
         <th ${th}>Bid</th>
         <th ${th}>Last</th>
         <th ${th}>Payout</th>
@@ -516,7 +514,6 @@ const FlipcheckView = (() => {
       html += `<tr style="border-bottom:1px solid var(--border1);background:${rowBg}">
         <td style="text-align:right;padding:5px 10px;font-weight:700">${esc(String(s.size))}</td>
         <td style="text-align:right;padding:5px 10px;font-weight:600;color:#6366F1">${sellVal ? sellVal.toFixed(0) + "€" : "—"}</td>
-        ${isGoat ? "" : `<td style="text-align:right;padding:5px 10px">${s.ask ? s.ask.toFixed(0) + "€" : "—"}</td>`}
         <td style="text-align:right;padding:5px 10px">${s.bid ? s.bid.toFixed(0) + "€" : "—"}</td>
         <td style="text-align:right;padding:5px 10px;color:var(--text-muted)">${s.last_sale ? s.last_sale.toFixed(0) + "€" : "—"}</td>
         <td style="text-align:right;padding:5px 10px;color:var(--green)">${s.payout ? s.payout.toFixed(0) + "€" : "—"}</td>
