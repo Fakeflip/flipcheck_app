@@ -1257,6 +1257,7 @@ const FlipcheckView = (() => {
             sales30d >= 30 ? "text-green" : sales30d >= 10 ? "text-yellow" : ""
           )}
           ${_amzMetric("Days to Cash", dtc != null ? fmtDays(dtc) : "—")}
+          ${_amzMetric("Variationen", data.variation_count > 0 ? `${data.variation_count}` : "—", data.variation_count >= 20 ? "text-yellow" : "")}
           ${_amzMetric("BB Wechsel", bbChanges > 0 ? `${bbChanges}× (${bbSellers} Seller)` : "—", bbChanges >= 10 ? "text-yellow" : "")}
         </div>
 
