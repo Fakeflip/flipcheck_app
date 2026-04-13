@@ -431,12 +431,11 @@ def _csv_to_rank_series(rank_csv: Optional[List[int]], max_points: int = 90, day
     return result
 
 
-def _count_bsr_drops(rank_csv: Optional[List[int]], days: int = 30, threshold_pct: float = 0.25) -> Dict[str, Any]:
+def _count_bsr_drops(rank_csv: Optional[List[int]], days: int = 30) -> Dict[str, Any]:
     """
-    Count significant BSR improvements (rank NUMBER drops) in the last N days.
-    A drop = rank goes from a high number to a low number by ≥ threshold_pct.
-    Each such event indicates a burst of sales activity.
-    Returns dict: drops_count, min_rank, max_rank, rank_series_30d (for chart)
+    Count BSR drops in the last N days.
+    A drop = rank goes down (any decrease = a sale signal).
+    Returns dict: drops_count, min_rank, max_rank
     """
     if not rank_csv or len(rank_csv) < 4:
         return {"drops_count": 0, "min_rank": None, "max_rank": None}
@@ -458,10 +457,8 @@ def _count_bsr_drops(rank_csv: Optional[List[int]], days: int = 30, threshold_pc
     for i in range(1, len(points)):
         prev_rank = points[i - 1][1]
         curr_rank = points[i][1]
-        if prev_rank > 0 and curr_rank > 0:
-            improvement = (prev_rank - curr_rank) / prev_rank
-            if improvement >= threshold_pct:
-                drops += 1
+        if curr_rank < prev_rank:
+            drops += 1
 
     ranks = [r for _, r in points]
     return {
