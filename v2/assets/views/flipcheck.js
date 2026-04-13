@@ -1243,8 +1243,8 @@ const FlipcheckView = (() => {
           ${_amzKpi(mtlGewinn > 0 ? fmtEur(mtlGewinn) : "—", I18N.t('fc.kpi.monthly_profit'), mtlGewinn > 0 ? "text-green" : "")}
         </div>
 
-        <!-- ── Secondary Metrics Strip ── -->
-        <div class="fc-amz-metrics mb-16">
+        <!-- ── Secondary Metrics ── -->
+        <div class="fc-amz-metrics mb-8">
           ${_amzMetric("Buy Box", buyBox != null ? fmtEur(buyBox) : "—")}
           ${_amzMetric("BSR", salesRank ? `#${Number(salesRank).toLocaleString("de-DE")}` : "—")}
           ${_amzMetric("FBA / Ges.", `${fbaCount} / ${offers}`)}
@@ -1256,9 +1256,12 @@ const FlipcheckView = (() => {
               : "—",
             sales30d >= 30 ? "text-green" : sales30d >= 10 ? "text-yellow" : ""
           )}
+        </div>
+        <div class="fc-amz-metrics mb-16">
           ${_amzMetric("Days to Cash", dtc != null ? fmtDays(dtc) : "—")}
           ${_amzMetric("Variationen", data.variation_count > 0 ? `${data.variation_count}` : "—", data.variation_count >= 20 ? "text-yellow" : "")}
-          ${_amzMetric("BB Wechsel", bbChanges > 0 ? `${bbChanges}× (${bbSellers} Seller)` : "—", bbChanges >= 10 ? "text-yellow" : "")}
+          ${_amzMetric("BB Wechsel", bbChanges > 0 ? `${bbChanges}× (${bbSellers})` : "—", bbChanges >= 10 ? "text-yellow" : "")}
+          ${data.review_count ? _amzMetric("Bewertungen", `⭐ ${(data.rating||0).toFixed(1)} (${data.review_count})`) : ""}
         </div>
 
         <!-- ── Break-Even + Net Payout ── -->
@@ -1330,17 +1333,14 @@ const FlipcheckView = (() => {
         </div>
       </div>
 
-      <!-- Keepa Price/BSR Chart -->
+      <!-- Keepa Chart -->
       <div style="margin-top:12px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)">
-        <div style="padding:8px 12px;background:var(--bg-panel);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
-          <span class="text-xs font-semibold text-secondary uppercase">Preis & BSR — 90 Tage (Keepa)</span>
-          <div class="row gap-8" style="align-items:center">
-            ${data.review_count ? `<span class="text-xs text-muted">⭐ ${(data.rating||0).toFixed(1)} (${data.review_count})</span>` : ""}
-            <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener" class="text-xs text-link" style="text-decoration:none">Keepa öffnen ↗</a>
-          </div>
+        <div style="padding:6px 12px;background:var(--bg-panel);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+          <span class="text-xs font-semibold text-secondary uppercase">Keepa — 90 Tage</span>
+          <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener" class="text-xs text-link" style="text-decoration:none">Interaktiv öffnen ↗</a>
         </div>
-        <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener" title="Interaktiven Keepa-Chart öffnen">
-          <img id="keepaChart" src="https://graph.keepa.com/pricehistory.png?asin=${esc(data.asin||identifier)}&domain=3&salesrank=1&amazon=1&new=1&used=0&fba=1&bb=1&fbm=0&range=90&width=700&height=300" style="width:100%;display:block;background:#fff" loading="lazy" alt="Keepa Chart" />
+        <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener">
+          <img src="https://graph.keepa.com/pricehistory.png?asin=${esc(data.asin||identifier)}&domain=3&salesrank=1&amazon=1&new=1&used=0&fba=1&bb=1&fbm=0&offerCount=1&range=90&width=600&height=220" style="width:100%;display:block;background:#fff" loading="lazy" alt="Keepa" />
         </a>
       </div>
     `;

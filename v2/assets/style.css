@@ -4046,7 +4046,7 @@ details.fc-accordion > summary + * { margin-top: 8px; }
 .fc-amz-metrics {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
 }
 .fc-amz-metric {
   display: flex;
@@ -4055,9 +4055,9 @@ details.fc-accordion > summary + * { margin-top: 8px; }
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
-  padding: 5px 10px;
-  flex: 1;
-  min-width: 90px;
+  padding: 4px 10px;
+  flex: 1 1 auto;
+  min-width: 110px;
 }
 .fc-amz-metric-l {
   font-size: 10px;
