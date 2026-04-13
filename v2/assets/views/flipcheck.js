@@ -127,12 +127,22 @@ const FlipcheckView = (() => {
   // Must match backend AMAZON_REFERRAL_FEES exactly
   const AMZ_REFERRAL_FEES = {
     computer_tablets: 0.07, handys: 0.07, konsolen: 0.08,
-    foto_camcorder: 0.07,   tv_video_audio: 0.07, grossgeraete: 0.07,
-    drucker: 0.07, haushaltsgeraete: 0.15,
+    foto_camcorder: 0.07, tv_video_audio: 0.07, grossgeraete: 0.07,
+    drucker: 0.07,
+    haushaltsgeraete: 0.15, kompaktgeraete: 0.15,
     handy_zubehoer: 0.15, notebook_zubehoer: 0.15,
-    kabel: 0.15, mode: 0.15, sport_freizeit: 0.15,
-    spielzeug: 0.15, buecher: 0.15,
-    garten: 0.15, beauty: 0.15, haustier: 0.15, baby: 0.15,
+    elektronik_zubehoer: 0.15, kabel: 0.15,
+    mode: 0.15, schuhe: 0.15,
+    sport_freizeit: 0.15, spielzeug: 0.15,
+    buecher: 0.15, garten: 0.15, rasenmaher: 0.15,
+    beauty: 0.15, haustier: 0.15, baby: 0.15,
+    lebensmittel: 0.15, bier_wein: 0.10,
+    baumarkt: 0.13, buerobedarf: 0.15,
+    moebel: 0.15, matratzen: 0.15,
+    schmuck: 0.20, uhren: 0.15,
+    auto_motorrad: 0.15, reifen: 0.07,
+    handmade: 0.15, nahrungsergaenzung: 0.08,
+    bildende_kunst: 0.20,
     sonstiges: 0.15,
   };
 
@@ -144,7 +154,7 @@ const FlipcheckView = (() => {
   // Auto-detect Amazon category from Keepa category tree → referral fee bracket
   // Order matters: more specific patterns FIRST, generic last
   const AMZ_CAT_MAP = [
-    // 7% categories (Elektronik, Computer, Handys)
+    // 7-8% — Elektronik, Computer, Großgeräte
     { keywords: ['computer', 'laptop', 'notebook', 'tablet', 'pc ', 'desktop', 'server', 'monitor'], cat: 'computer_tablets' },
     { keywords: ['handy', 'smartphone', 'mobiltelefon', 'iphone', 'samsung galaxy'], cat: 'handys' },
     { keywords: ['konsole', 'playstation', 'xbox', 'nintendo', 'gaming', 'videospiel', 'switch'], cat: 'konsolen' },
@@ -152,20 +162,46 @@ const FlipcheckView = (() => {
     { keywords: ['fernseher', 'tv ', 'audio', 'kopfhörer', 'lautsprecher', 'soundbar', 'receiver', 'hifi', 'beamer', 'projektor'], cat: 'tv_video_audio' },
     { keywords: ['großgerät', 'kühlschrank', 'waschmaschine', 'trockner', 'geschirrspüler', 'herd', 'backofen', 'gefrierschrank', 'spülmaschine'], cat: 'grossgeraete' },
     { keywords: ['drucker', 'scanner', 'toner', 'patrone', 'tintenstrahl', 'laser'], cat: 'drucker' },
-    // 15% categories
+    { keywords: ['reifen', 'winterreifen', 'sommerreifen', 'ganzjahresreifen', 'allwetterreifen'], cat: 'reifen' },
+    // 8% — Nahrungsergänzung
+    { keywords: ['vitamin', 'nahrungsergänzung', 'supplement', 'mineralstoff', 'protein', 'kreatin', 'omega'], cat: 'nahrungsergaenzung' },
+    // 10% — Alkohol
+    { keywords: ['bier', 'wein', 'spirituose', 'whisky', 'vodka', 'gin ', 'rum ', 'likör', 'sekt', 'champagner'], cat: 'bier_wein' },
+    // 13% — Baumarkt
+    { keywords: ['baumarkt', 'werkzeug', 'bohrer', 'schrauber', 'säge', 'schleifer', 'zange', 'hammer', 'dübel', 'silikon'], cat: 'baumarkt' },
+    // 15% — Haushalt & Küche
     { keywords: ['staubsauger', 'saugroboter', 'akkusauger', 'wischroboter', 'dampfreiniger'], cat: 'haushaltsgeraete' },
     { keywords: ['küche', 'haushalt', 'mixer', 'toaster', 'kaffeemaschine', 'wasserkocher', 'mikrowelle', 'küchenmaschine', 'heißluftfritteuse', 'airfryer', 'thermomix', 'blender', 'entsafter', 'bügeleisen', 'nähmaschine'], cat: 'haushaltsgeraete' },
+    // Zubehör
     { keywords: ['handyhülle', 'handyzubehör', 'schutzhülle', 'displayschutz', 'panzerglas', 'case'], cat: 'handy_zubehoer' },
     { keywords: ['notebookzubehör', 'laptopzubehör', 'tastatur', 'maus', 'mousepad', 'docking', 'hub'], cat: 'notebook_zubehoer' },
     { keywords: ['kabel', 'adapter', 'stecker', 'usb', 'hdmi', 'ladegerät', 'charger', 'netzteil', 'powerbank'], cat: 'kabel' },
-    { keywords: ['bekleidung', 'mode', 'kleidung', 'schuhe', 'jacke', 'hose', 'shirt', 'sneaker', 'stiefel'], cat: 'mode' },
+    // Mode, Schuhe
+    { keywords: ['schuhe', 'sneaker', 'stiefel', 'sandalen', 'koffer', 'tasche', 'handtasche', 'rucksack'], cat: 'schuhe' },
+    { keywords: ['bekleidung', 'mode', 'kleidung', 'jacke', 'hose', 'shirt', 'pullover', 'kleid'], cat: 'mode' },
+    // Sport, Spielzeug, Medien
     { keywords: ['sport', 'fitness', 'outdoor', 'fahrrad', 'yoga', 'hantel', 'laufband', 'camping', 'wandern', 'trekking'], cat: 'sport_freizeit' },
     { keywords: ['spielzeug', 'lego', 'puppe', 'puzzle', 'brettspiel', 'playmobil', 'barbie', 'nerf'], cat: 'spielzeug' },
     { keywords: ['buch', 'bücher', 'taschenbuch', 'dvd', 'blu-ray', 'musik', 'cd', 'vinyl', 'schallplatte'], cat: 'buecher' },
-    { keywords: ['garten', 'rasenmäher', 'grill', 'pflanzen', 'bewässerung', 'terrasse', 'gartengerät'], cat: 'garten' },
+    // Garten
+    { keywords: ['rasenmäher', 'schneefräse', 'rasentraktor', 'mähroboter'], cat: 'rasenmaher' },
+    { keywords: ['garten', 'grill', 'pflanzen', 'bewässerung', 'terrasse', 'gartengerät', 'gewächshaus'], cat: 'garten' },
+    // Beauty, Haustier, Baby
     { keywords: ['beauty', 'kosmetik', 'parfum', 'hautpflege', 'makeup', 'rasierer', 'haartrockner', 'föhn', 'glätteisen'], cat: 'beauty' },
     { keywords: ['haustier', 'hund', 'katze', 'tierbedarf', 'futter', 'aquarium', 'vogel'], cat: 'haustier' },
     { keywords: ['baby', 'kinderwagen', 'windel', 'babybett', 'stillkissen', 'babyfon', 'kindersitz'], cat: 'baby' },
+    // Lebensmittel
+    { keywords: ['lebensmittel', 'getränk', 'snack', 'süßigkeit', 'gewürz', 'tee', 'kaffee', 'müsli', 'nudel', 'reis'], cat: 'lebensmittel' },
+    // Möbel & Wohnen
+    { keywords: ['matratze', 'lattenrost', 'topper'], cat: 'matratzen' },
+    { keywords: ['möbel', 'regal', 'schrank', 'tisch', 'stuhl', 'sofa', 'bett', 'kommode'], cat: 'moebel' },
+    // Büro
+    { keywords: ['bürobedarf', 'ordner', 'hefter', 'locher', 'papier', 'schreibwaren', 'kugelschreiber'], cat: 'buerobedarf' },
+    // Schmuck & Uhren
+    { keywords: ['schmuck', 'ring', 'kette', 'armband', 'ohrringe', 'halskette', 'gold ', 'silber '], cat: 'schmuck' },
+    { keywords: ['uhr', 'armbanduhr', 'smartwatch', 'chronograph'], cat: 'uhren' },
+    // Auto
+    { keywords: ['auto', 'motorrad', 'kfz', 'fahrzeug', 'autopflege', 'autoradio', 'scheibenwischer'], cat: 'auto_motorrad' },
   ];
 
   function _detectAmzCategory(categoryName) {
@@ -1157,6 +1193,9 @@ const FlipcheckView = (() => {
     const marginColor = margin >= 20 ? "text-green" : margin >= 10 ? "text-yellow" : "text-red";
     const roiColor    = roiPct >= 50 ? "text-green" : roiPct >= 20 ? "text-yellow" : "text-red";
     const bsrDropColor = bsrDrops >= 10 ? "text-green" : bsrDrops >= 4 ? "text-yellow" : "";
+    const bbChanges    = data.bb_changes_30d ?? 0;
+    const bbSellers    = data.bb_unique_sellers ?? 0;
+    const bbAmazonPct  = data.bb_amazon_pct;
 
     // Count warning signals for the badge
     const warnCount = !data.signals ? 0 : [
@@ -1218,6 +1257,7 @@ const FlipcheckView = (() => {
             sales30d >= 30 ? "text-green" : sales30d >= 10 ? "text-yellow" : ""
           )}
           ${_amzMetric("Days to Cash", dtc != null ? fmtDays(dtc) : "—")}
+          ${_amzMetric("BB Wechsel", bbChanges > 0 ? `${bbChanges}× (${bbSellers} Seller)` : "—", bbChanges >= 10 ? "text-yellow" : "")}
         </div>
 
         <!-- ── Break-Even + Net Payout ── -->
@@ -1289,10 +1329,19 @@ const FlipcheckView = (() => {
         </div>
       </div>
 
-      <!-- Price chart placeholder -->
-      <div id="fcPriceChart" data-market="amazon" style="margin-top:12px"></div>
-      <!-- BSR rank chart placeholder -->
-      <div id="fcBsrChart" style="margin-top:8px"></div>
+      <!-- Keepa Price/BSR Chart -->
+      <div style="margin-top:12px;border-radius:var(--r);overflow:hidden;border:1px solid var(--border)">
+        <div style="padding:8px 12px;background:var(--bg-panel);display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border)">
+          <span class="text-xs font-semibold text-secondary uppercase">Preis & BSR — 90 Tage (Keepa)</span>
+          <div class="row gap-8" style="align-items:center">
+            ${data.review_count ? `<span class="text-xs text-muted">⭐ ${(data.rating||0).toFixed(1)} (${data.review_count})</span>` : ""}
+            <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener" class="text-xs text-link" style="text-decoration:none">Keepa öffnen ↗</a>
+          </div>
+        </div>
+        <a href="https://keepa.com/#!product/3-${esc(data.asin||identifier)}" target="_blank" rel="noopener" title="Interaktiven Keepa-Chart öffnen">
+          <img id="keepaChart" src="https://graph.keepa.com/pricehistory.png?asin=${esc(data.asin||identifier)}&domain=3&salesrank=1&amazon=1&new=1&used=0&fba=1&bb=1&fbm=0&range=90&width=700&height=300" style="width:100%;display:block;background:#fff" loading="lazy" alt="Keepa Chart" />
+        </a>
+      </div>
     `;
   }
 
@@ -2019,14 +2068,7 @@ const FlipcheckView = (() => {
         resultEl.querySelector("#btnAddToInv")?.addEventListener("click", () => addToInventory(identifier, ek, data, "amazon"));
         resultEl.querySelector("#btnReset")?.addEventListener("click", () => { resultEl.innerHTML = renderResultPlaceholder(); });
 
-        // Amazon price chart (Buy Box series from Keepa)
-        if (data.price_series?.length >= 2) {
-          loadPriceChart(identifier, resultEl, data.price_series, null, data.buy_box ?? null);
-        }
-        // Amazon BSR rank chart (Sales Rank series from Keepa)
-        if (data.rank_series?.length >= 2) {
-          loadBsrChart(resultEl, data.rank_series);
-        }
+        // Keepa chart is embedded as image — no custom chart needed for Amazon
         return;
       }
 

@@ -24,25 +24,44 @@ KEEPA_DIV = 100.0
 # Amazon DE Referral Fees 2025/2026 — Quelle: Amazon Seller Central Gebührenübersicht
 # https://sellercentral.amazon.de/help/hub/reference/G200336920
 AMAZON_REFERRAL_FEES: Dict[str, float] = {
-    "computer_tablets":    0.07,   # Computer & Zubehör (>100€)
+    # 7-8% — Elektronik / Computer / Großgeräte
+    "computer_tablets":    0.07,   # Computer & Zubehör
     "handys":              0.07,   # Handys & Smartphones
     "konsolen":            0.08,   # Konsolen & Videospiele
     "foto_camcorder":      0.07,   # Kamera & Foto
     "tv_video_audio":      0.07,   # TV, Video & Audio
-    "grossgeraete":        0.07,   # Großgeräte (Kühlschrank, Waschmaschine etc.)
+    "grossgeraete":        0.07,   # Großgeräte (Kühlschrank, Waschmaschine)
     "drucker":             0.07,   # Drucker & Scanner
-    "haushaltsgeraete":    0.15,   # Küche & Haushalt (Staubsauger, Mixer etc.)
+    # 15% — Küche, Haushalt, Zubehör, etc.
+    "haushaltsgeraete":    0.15,   # Küche, Haushalt & Wohnen
+    "kompaktgeraete":      0.15,   # Kompaktgeräte / Elektro-Kleingeräte (15% bis 300€, 8% darüber)
     "handy_zubehoer":      0.15,   # Handy-Zubehör
-    "notebook_zubehoer":   0.15,   # Notebook-Zubehör
+    "notebook_zubehoer":   0.15,   # Notebook-/Computer-Zubehör
+    "elektronik_zubehoer": 0.15,   # Elektronik-Zubehör (15% bis 100€, 8% darüber)
     "kabel":               0.15,   # Kabel & Adapter
-    "mode":                0.15,   # Bekleidung & Schuhe
+    "mode":                0.15,   # Bekleidung & Accessoires
+    "schuhe":              0.15,   # Schuhe, Koffer, Taschen
     "sport_freizeit":      0.15,   # Sport & Freizeit
     "spielzeug":           0.15,   # Spielzeug
     "buecher":             0.15,   # Bücher, Musik, DVD
     "garten":              0.15,   # Garten
-    "beauty":              0.15,   # Beauty & Gesundheit
-    "haustier":            0.15,   # Haustier
+    "rasenmaher":          0.15,   # Rasenmäher & Schneefräsen (15% bis 500€, 8% darüber)
+    "beauty":              0.15,   # Beauty, Drogerie & Körperpflege
+    "haustier":            0.15,   # Haustierbedarf
     "baby":                0.15,   # Baby
+    "lebensmittel":        0.15,   # Lebensmittel & Getränke (8% bis 10€, 15% darüber)
+    "bier_wein":           0.10,   # Bier, Wein, Spirituosen
+    "baumarkt":            0.13,   # Baumarkt & Werkzeuge
+    "buerobedarf":         0.15,   # Bürobedarf
+    "moebel":              0.15,   # Möbel (15% bis 200€, 10% darüber)
+    "matratzen":           0.15,   # Matratzen
+    "schmuck":             0.20,   # Schmuck (20% bis 250€, 5% darüber)
+    "uhren":               0.15,   # Uhren (15% bis 1500€, 3% darüber)
+    "auto_motorrad":       0.15,   # Auto & Motorrad (7-15% je nach Subkategorie)
+    "reifen":              0.07,   # Reifen
+    "handmade":            0.15,   # Handmade
+    "nahrungsergaenzung":  0.08,   # Vitamine & Nahrungsergänzung
+    "bildende_kunst":      0.20,   # Bildende Kunst (20% bis 100€, gestaffelt)
     "sonstiges":           0.15,   # Fallback
 }
 
@@ -468,6 +487,48 @@ def _count_bsr_drops(rank_csv: Optional[List[int]], days: int = 30) -> Dict[str,
     }
 
 
+def _count_buybox_changes(product: Dict[str, Any], days: int = 30) -> Dict[str, Any]:
+    """
+    Count Buy Box seller rotations in the last N days using buyBoxSellerIdHistory.
+    Returns: total_changes, unique_sellers, amazon_pct (% of time Amazon holds BB)
+    """
+    history = product.get("buyBoxSellerIdHistory") or []
+    if not history or len(history) < 2:
+        return {"bb_changes_30d": 0, "bb_unique_sellers": 0, "bb_amazon_pct": None}
+
+    KEEPA_EPOCH_OFFSET = 21564000
+    cutoff_keepa = (time.time() / 60) - KEEPA_EPOCH_OFFSET - (days * 24 * 60)
+
+    # History format: [keepa_ts, seller_id, keepa_ts, seller_id, ...]
+    points = []
+    for i in range(0, len(history) - 1, 2):
+        ts = history[i] if isinstance(history[i], (int, float)) else 0
+        seller = str(history[i + 1]) if history[i + 1] else ""
+        if ts >= cutoff_keepa and seller:
+            points.append((ts, seller))
+
+    if not points:
+        return {"bb_changes_30d": 0, "bb_unique_sellers": 0, "bb_amazon_pct": None}
+
+    changes = 0
+    sellers = set()
+    amazon_count = 0
+    for i, (ts, seller) in enumerate(points):
+        sellers.add(seller)
+        if seller.upper() in ("ATVPDKIKX0DER", "A3JWKAKR8XB7XF"):  # Amazon.com / Amazon.de
+            amazon_count += 1
+        if i > 0 and seller != points[i - 1][1]:
+            changes += 1
+
+    amazon_pct = round(amazon_count / len(points) * 100, 1) if points else None
+
+    return {
+        "bb_changes_30d": changes,
+        "bb_unique_sellers": len(sellers),
+        "bb_amazon_pct": amazon_pct,
+    }
+
+
 def _estimate_monthly_sales(sales_rank: Optional[int], category: str) -> int:
     """
     Rough sales velocity estimate from sales rank.
@@ -829,10 +890,19 @@ async def amazon_check(
         sales_30d        = _estimate_monthly_sales(rank_val, category)
         sales_30d_source = "bsr_estimate"
 
-    # Offer counts
-    offers    = product.get("offers") or []
-    fba_count = sum(1 for o in offers if o.get("isFBA") and o.get("condition") == 1)
-    new_count = sum(1 for o in offers if o.get("condition") == 1)
+    # Offer counts — use Keepa stats.current (live snapshot), NOT the offers array
+    # (offers array includes historical sellers, massively over-counts)
+    # Keepa CsvType: 11 = COUNT_NEW, 12 = COUNT_USED, 29 = COUNT_NEW_FBA_LISTINGS
+    offers        = product.get("offers") or []
+    count_new_cur = current[11] if len(current) > 11 and current[11] and current[11] > 0 else 0
+    count_fba_cur = current[29] if len(current) > 29 and current[29] and current[29] > 0 else 0
+    # Fallback to offers array only if Keepa current counts are unavailable
+    if count_new_cur > 0:
+        new_count = count_new_cur
+        fba_count = count_fba_cur
+    else:
+        fba_count = sum(1 for o in offers if o.get("isFBA") and o.get("condition") == 1)
+        new_count = sum(1 for o in offers if o.get("condition") == 1)
 
     # Variants — Keepa returns a list of ASIN strings for all variations
     variation_asins  = product.get("variations") or product.get("variationList") or []
@@ -843,6 +913,9 @@ async def amazon_check(
 
     # BSR drops in last 30 days (signals sales activity)
     bsr_info   = _count_bsr_drops(rank_csv, days=30)
+
+    # Buy Box rotation analysis
+    bb_info    = _count_buybox_changes(product, days=30)
 
     # ── 1 Drop = 1 Sale: drops replace BSR estimate ─────────────────────────
     # BSR estimates are unreliable — actual BSR drops are ground truth.
@@ -978,10 +1051,19 @@ async def amazon_check(
         # Variants
         "variation_count":   variation_count,
 
+        # Reviews & Rating (from Keepa)
+        "review_count":      product.get("reviews", {}).get("count") if isinstance(product.get("reviews"), dict) else None,
+        "rating":            (product.get("reviews", {}).get("rating") or 0) / 10.0 if isinstance(product.get("reviews"), dict) and product.get("reviews", {}).get("rating") else None,
+
         # BSR drops (buying signal)
         "bsr_drops_30d":     bsr_info["drops_count"],
         "bsr_min_30d":       bsr_info["min_rank"],
         "bsr_max_30d":       bsr_info["max_rank"],
+
+        # Buy Box rotation
+        "bb_changes_30d":    bb_info["bb_changes_30d"],
+        "bb_unique_sellers": bb_info["bb_unique_sellers"],
+        "bb_amazon_pct":     bb_info["bb_amazon_pct"],
 
         # Chart data
         "price_series":      bb_series,
