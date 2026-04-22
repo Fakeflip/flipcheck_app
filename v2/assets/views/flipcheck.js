@@ -92,22 +92,53 @@ const FlipcheckView = (() => {
   }
 
   function _buildKlCatOptions(selectedId) {
-    const cats = [
-      ["kl_elektronik",  "Elektronik / Computer (8,5 %)"],
-      ["kl_handys",      "Handys / Smartphones (8,5 %)"],
-      ["kl_gaming",      "Gaming / Konsolen (8,5 %)"],
-      ["kl_foto",        "Foto & Camcorder (8,5 %)"],
-      ["kl_haushalt_el", "Haushaltsgeräte (8,5 %)"],
-      ["kl_buecher",     "Bücher & Medien (8,5 %)"],
-      ["kl_sport",       "Sport & Freizeit (10,5 %)"],
-      ["kl_spielzeug",   "Spielzeug (10,5 %)"],
-      ["kl_haushalt",    "Haushalt & Küche (10,5 %)"],
-      ["kl_garten",      "Garten & DIY (10,5 %)"],
-      ["kl_mode",        "Kleidung & Schuhe (17,5 %)"],
-      ["kl_sonstiges",   "Sonstiges (10,5 %)"],
+    // Official Kaufland commission rates (DE/AT/CZ/SK/FR/IT) — verified April 2026.
+    // Grouped by rate with optgroups for easier selection.
+    const groups = [
+      ["7 % — Elektronik & Großgeräte", [
+        ["kl_elektronik",       "Computer & Unterhaltungselektronik"],
+        ["kl_handys",           "Handys / Smartphones"],
+        ["kl_gaming",           "Gaming / Konsolen"],
+        ["kl_foto",             "Foto & Camcorder"],
+        ["kl_haushalt_gross",   "Haushaltsgeräte (Großgeräte)"],
+      ]],
+      ["10 % — Werkzeug & Parfüm", [
+        ["kl_werkzeug",         "Werkzeug & Gartengeräte"],
+        ["kl_parfuem",          "Parfüm"],
+      ]],
+      ["13 % — Standard", [
+        ["kl_haushalt_el",      "Haushaltselektronik (Kleingeräte), PC-Zubehör, Fahrräder"],
+        ["kl_koerperpflege",    "Körperpflege, Auto & Motorrad"],
+        ["kl_baumarkt",         "Baumarkt"],
+        ["kl_moebel",           "Möbel & Wohnen, Lampen"],
+        ["kl_sport",            "Sport & Outdoor"],
+        ["kl_baby",             "Babyprodukte"],
+        ["kl_spielzeug",        "Spielwaren"],
+        ["kl_lebensmittel",     "Lebensmittel"],
+        ["kl_sonstiges",        "Sonstiges"],
+      ]],
+      ["13 % + 0,70 € — Medien", [
+        ["kl_medien",           "Bücher, Filme, Musik"],
+      ]],
+      ["14 % — Küche, Mode, Garten", [
+        ["kl_garten",           "Garten"],
+        ["kl_mode",             "Bekleidung, Taschen, Schuhe"],
+        ["kl_haushalt",         "Küche & Haushalt, Matratzen"],
+        ["kl_tier",             "Tierbedarf"],
+        ["kl_camping",          "Camping, Fitness, Paddle-Boards"],
+      ]],
+      ["16 % — Schmuck", [
+        ["kl_schmuck",          "Schmuck"],
+      ]],
     ];
-    const sel = selectedId || "kl_sonstiges";
-    return cats.map(([v, l]) => `<option value="${v}"${v === sel ? " selected" : ""}>${esc(l)}</option>`).join("");
+    // Legacy-alias mapping: old category IDs → new IDs (for inventory entries created before April 2026)
+    const ALIASES = { kl_buecher: "kl_medien" };
+    const sel = ALIASES[selectedId] || selectedId || "kl_sonstiges";
+    return groups.map(([label, cats]) =>
+      `<optgroup label="${esc(label)}">${
+        cats.map(([v, l]) => `<option value="${v}"${v === sel ? " selected" : ""}>${esc(l)}</option>`).join("")
+      }</optgroup>`
+    ).join("");
   }
 
   // ─── FBA tier table (DE, 2025 + DE-Aufschlag €0.26) ──────────────────────

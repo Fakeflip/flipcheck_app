@@ -10,16 +10,29 @@
   // ── CSS ──────────────────────────────────────────────────────────────────
   const PANEL_CSS = `
     :host {
+      /* Reset ALL inherited page styles first, then re-declare ours */
+      all: initial !important;
       position: fixed !important;
       top: 0 !important;
       right: 0 !important;
+      left: auto !important;
+      bottom: auto !important;
       height: 100vh !important;
       width: auto !important;
-      bottom: auto !important;
-      z-index: 2147483647;
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      z-index: 2147483647 !important;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
       display: block !important;
       pointer-events: none !important;
+      color-scheme: dark !important;
+      background: transparent !important;
+      color: #F1F5F9 !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      border: none !important;
+      opacity: 1 !important;
+      visibility: visible !important;
+      transform: none !important;
+      overflow: visible !important;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     button, input, select { font-family: inherit; }
@@ -993,15 +1006,38 @@
       super();
       const shadow = this.attachShadow({ mode: 'closed' });
       shadow.innerHTML = PANEL_HTML;
-      // Full-height sidebar positioning — must override any page CSS
-      this.style.setProperty('position', 'fixed',       'important');
-      this.style.setProperty('display',  'block',       'important');
-      this.style.setProperty('z-index',  '2147483647',  'important');
-      this.style.setProperty('top',      '0',           'important');
-      this.style.setProperty('right',    '0',           'important');
-      this.style.setProperty('bottom',   'auto',        'important');
-      this.style.setProperty('height',   '100vh',       'important');
-      this.style.setProperty('width',    'auto',        'important');
+      // Full-height sidebar positioning — must override any page CSS.
+      // Inline !important styles can't be beaten by external stylesheets.
+      // This fixes sites (e.g. mueller.de) whose CSS bleeds into the host element.
+      // Defensive inline styles — map used by guard to re-apply after resets
+      const _HOST_STYLES = {
+        position:'fixed', display:'block', 'z-index':'2147483647',
+        top:'0', right:'0', bottom:'auto', height:'100vh', width:'auto',
+        background:'transparent', 'color-scheme':'dark',
+        margin:'0', padding:'0', border:'none',
+        opacity:'1', visibility:'visible', transform:'none',
+        'max-width':'none', overflow:'visible', float:'none',
+        isolation:'isolate', 'pointer-events':'none',
+      };
+      const _applyAll = () => {
+        for (const [k, v] of Object.entries(_HOST_STYLES))
+          this.style.setProperty(k, v, 'important');
+      };
+      _applyAll();
+      // Guard: re-apply ALL host styles if page JS resets/wipes the style attribute
+      new MutationObserver(() => {
+        // Quick check — if any key property is wrong, re-apply everything
+        if (this.style.getPropertyValue('background') !== 'transparent' ||
+            this.style.getPropertyValue('visibility') !== 'visible' ||
+            this.style.getPropertyValue('display')    !== 'block' ||
+            this.style.getPropertyValue('position')   !== 'fixed')
+          _applyAll();
+      }).observe(this, { attributes: true, attributeFilter: ['style'] });
+      // Fallback interval for frameworks that replace the DOM node entirely
+      this._styleGuard = setInterval(() => {
+        if (!this.isConnected) { clearInterval(this._styleGuard); return; }
+        if (this.style.getPropertyValue('background') !== 'transparent') _applyAll();
+      }, 500);
       this._shadow       = shadow;
       this._market       = 'ebay';
       this._identifier   = null;
@@ -1046,6 +1082,7 @@
     }
 
     disconnectedCallback() {
+      if (this._styleGuard) clearInterval(this._styleGuard);
       this.dispatchEvent(new CustomEvent('fc-disconnected', { bubbles: false }));
     }
 

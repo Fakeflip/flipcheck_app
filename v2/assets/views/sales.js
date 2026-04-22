@@ -9,8 +9,9 @@ const SalesView = (() => {
   let _filterPlatform = "";
   let _monthlyTarget  = 0;
 
-  // Flat fees for non-eBay markets; eBay uses tiered calcEbayFee() from app.js
-  const FLAT_FEES = { amz: 0.15, kaufland: 0.105, other: 0 };
+  // Flat fees for non-eBay markets. Kaufland default = 13% ("Alle anderen Kategorien").
+  // For per-category accuracy use calcMarketFee() from app.js.
+  const FLAT_FEES = { amz: 0.15, kaufland: 0.13, other: 0 };
   const PLATFORM_LABELS = { ebay: "eBay", amz: "Amazon", kaufland: "Kaufland", other: "Sonstige" };
   const MONTH_DE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
 

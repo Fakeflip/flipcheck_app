@@ -163,7 +163,7 @@ function calcEbayFee(priceGross, catId) {
  */
 const MARKET_FEE_RATES = {
   amz:      0.15,   // Amazon: ~15% referral fee (varies by category, 15% is conservative)
-  kaufland: 0.105,  // Kaufland: ~10.5% seller commission
+  kaufland: 0.13,   // Kaufland: 13% default ("Alle anderen Kategorien") — fallback only, see KAUFLAND_FEE_CATEGORIES
   other:    0,
 };
 
@@ -179,14 +179,43 @@ const AMAZON_FEE_CATEGORIES = {
 };
 
 /**
- * Kaufland seller commission rates by category.
- * @type {Record<string, number>}
+ * Kaufland seller commission rates by category — [pct, fixed_fee_eur].
+ * Verified April 2026 against official Kaufland rate card (DE/AT/CZ/SK/FR/IT).
+ * https://www.kaufland.de/haendler-infobereich/de/so-funktionierts/preise-konditionen
+ * @type {Record<string, [number, number]>}
  */
 const KAUFLAND_FEE_CATEGORIES = {
-  kl_elektronik: 0.085, kl_handys: 0.085, kl_gaming: 0.085, kl_foto: 0.085,
-  kl_haushalt_el: 0.085, kl_buecher: 0.085,
-  kl_sport: 0.105, kl_spielzeug: 0.105, kl_haushalt: 0.105, kl_garten: 0.105,
-  kl_mode: 0.175, kl_sonstiges: 0.105,
+  // 7% — Consumer Electronics & Großgeräte
+  kl_elektronik:     [0.07, 0.00],
+  kl_handys:         [0.07, 0.00],
+  kl_gaming:         [0.07, 0.00],
+  kl_foto:           [0.07, 0.00],
+  kl_haushalt_gross: [0.07, 0.00],
+  // 10%
+  kl_werkzeug:       [0.10, 0.00],
+  kl_parfuem:        [0.10, 0.00],
+  // 13% (default for "other")
+  kl_haushalt_el:    [0.13, 0.00],  // Kleingeräte, PC/E-Zubehör, Fahrräder
+  kl_koerperpflege:  [0.13, 0.00],
+  kl_baumarkt:       [0.13, 0.00],
+  kl_moebel:         [0.13, 0.00],
+  kl_sport:          [0.13, 0.00],
+  kl_baby:           [0.13, 0.00],
+  kl_spielzeug:      [0.13, 0.00],
+  kl_lebensmittel:   [0.13, 0.00],
+  kl_sonstiges:      [0.13, 0.00],
+  // 13% + 0,70 € fixed per item (Medien)
+  kl_medien:         [0.13, 0.70],
+  kl_buecher:        [0.13, 0.70],   // legacy alias
+  // 14%
+  kl_garten:         [0.14, 0.00],
+  kl_mode:           [0.14, 0.00],
+  kl_haushalt:       [0.14, 0.00],   // Küche & Haushalt, Matratzen
+  kl_kueche:         [0.14, 0.00],
+  kl_tier:           [0.14, 0.00],
+  kl_camping:        [0.14, 0.00],
+  // 16%
+  kl_schmuck:        [0.16, 0.00],
 };
 
 /**
@@ -199,7 +228,10 @@ const KAUFLAND_FEE_CATEGORIES = {
 function calcMarketFee(vk, market, catId) {
   if (market === "ebay")     return calcEbayFee(vk, catId || "sonstiges");
   if (market === "amz")      return vk * (AMAZON_FEE_CATEGORIES[catId] ?? MARKET_FEE_RATES.amz);
-  if (market === "kaufland") return vk * (KAUFLAND_FEE_CATEGORIES[catId] ?? MARKET_FEE_RATES.kaufland);
+  if (market === "kaufland") {
+    const [pct, fixed] = KAUFLAND_FEE_CATEGORIES[catId] ?? [MARKET_FEE_RATES.kaufland, 0];
+    return vk * pct + fixed;
+  }
   return 0;
 }
 

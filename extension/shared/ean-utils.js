@@ -1043,6 +1043,9 @@ function detectPagePrice() {
     // Lidl
     '.m-price__main',
     '.pricebox .pricebox__price',
+    // Müller
+    '[class*="mu-product-price"] [class*="price"]',
+    '[class*="mu-product-price"]',
     // Rossmann / DM
     '.product__price',
     '[class*="ProductPrice"]',

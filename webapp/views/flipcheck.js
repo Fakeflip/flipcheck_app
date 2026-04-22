@@ -654,7 +654,8 @@ const FlipcheckView = (() => {
           if (vk != null) {
             if (vkCustom > 0) d.sell_price_median = vkCustom;
             d.ek = ek; d.ship_in = shipIn; d.ship_out = shipOut; d.category = cat;
-            const klFee = vk * 0.105;
+            // Use shared calcMarketFee → respects category pct + fixed fee (e.g. Medien +0.70€)
+            const klFee = calcMarketFee(vk, "kaufland", cat);
             d.profit_median = +(vk - ek - shipIn - shipOut - klFee).toFixed(2);
             d.margin_pct = vk > 0 ? +(d.profit_median / vk * 100).toFixed(1) : 0;
           }

@@ -159,11 +159,35 @@ function calcRealProfit(item) {
 }
 
 // ── Router ─────────────────────────────────────────────────────────────────
+// ── Kaufland fees by category (verified April 2026) — [pct, fixed_fee_eur]
+const KAUFLAND_FEE_CATEGORIES = {
+  // 7%
+  kl_elektronik: [0.07, 0], kl_handys: [0.07, 0], kl_gaming: [0.07, 0],
+  kl_foto: [0.07, 0], kl_haushalt_gross: [0.07, 0],
+  // 10%
+  kl_werkzeug: [0.10, 0], kl_parfuem: [0.10, 0],
+  // 13% (default)
+  kl_haushalt_el: [0.13, 0], kl_koerperpflege: [0.13, 0], kl_baumarkt: [0.13, 0],
+  kl_moebel: [0.13, 0], kl_sport: [0.13, 0], kl_baby: [0.13, 0],
+  kl_spielzeug: [0.13, 0], kl_lebensmittel: [0.13, 0], kl_sonstiges: [0.13, 0],
+  // 13% + 0.70€
+  kl_medien: [0.13, 0.70], kl_buecher: [0.13, 0.70],
+  // 14%
+  kl_garten: [0.14, 0], kl_mode: [0.14, 0], kl_haushalt: [0.14, 0],
+  kl_kueche: [0.14, 0], kl_tier: [0.14, 0], kl_camping: [0.14, 0],
+  // 16%
+  kl_schmuck: [0.16, 0],
+};
+
 // ── Market fee helper (used by Sales, Batch etc.) ──────────────────────
 function calcMarketFee(vk, market, catId) {
   if (market === "ebay" || !market) return calcEbayFee(vk, catId || "sonstiges");
-  const FLAT = { amz: 0.15, kaufland: 0.105, other: 0 };
-  return vk * (FLAT[market] || 0);
+  if (market === "amz") return vk * 0.15;
+  if (market === "kaufland") {
+    const [pct, fixed] = KAUFLAND_FEE_CATEGORIES[catId] || [0.13, 0];
+    return vk * pct + fixed;
+  }
+  return 0;
 }
 
 const VIEWS = {

@@ -202,37 +202,115 @@ def request_with_proxy(session: requests.Session, method: str, url: str, **kwarg
 
 
 # -----------------------------
-# EAN → Product ID
+# EAN → Product ID  (Strategy 1: Seller API — fast, reliable, needs creds)
 # -----------------------------
-def ean_to_product_id(session: requests.Session, ean: str, cache_ttl_s: int = 7 * 24 * 3600) -> Dict[str, Any]:
-    cache_key = f"kaufland:ean:{ean}"
+def ean_to_product_id_api(ean: str, client_key: str, secret_key: str, cache_ttl_s: int = 7 * 24 * 3600) -> Dict[str, Any]:
+    """Look up product via Kaufland Seller API — most reliable route."""
+    cache_key = f"kaufland:ean:api:{ean}"
+    cached = cache_get(cache_key, cache_ttl_s)
+    if cached:
+        return {**cached, "cached": True}
+
+    import asyncio
+    try:
+        from kaufland_seller import get_product_by_ean
+        loop = asyncio.new_event_loop()
+        result = loop.run_until_complete(get_product_by_ean(client_key, secret_key, ean))
+        loop.close()
+    except Exception as exc:
+        return {"ok": False, "product_id": None, "reason": f"API_ERROR: {exc}", "strategy": "api"}
+
+    if result.get("ok") and result.get("product_id"):
+        res = {
+            "ok": True,
+            "product_id": result["product_id"],
+            "title": result.get("title"),
+            "category_id": result.get("category_id"),
+            "category_name": result.get("category_name"),
+            "variable_fee": result.get("variable_fee"),
+            "fixed_fee": result.get("fixed_fee", 0),
+            "reason": None,
+            "strategy": "api",
+        }
+        cache_set(cache_key, res)
+        return {**res, "cached": False}
+
+    return {"ok": False, "product_id": None, "reason": result.get("error", "NOT_FOUND"), "strategy": "api"}
+
+
+# -----------------------------
+# EAN → Product ID  (Strategy 2: HTML scraping — fallback, no auth needed)
+# -----------------------------
+def ean_to_product_id_scrape(session: requests.Session, ean: str, cache_ttl_s: int = 7 * 24 * 3600) -> Dict[str, Any]:
+    """Scrape kaufland.de search results — works without seller credentials."""
+    cache_key = f"kaufland:ean:scrape:{ean}"
     cached = cache_get(cache_key, cache_ttl_s)
     if cached:
         return {**cached, "cached": True}
 
     r, meta = request_with_proxy(session, "get", f"{BASE}/s/", params={"search_value": ean})
     if not r:
-        res = {"ok": False, "product_id": None, "status": meta.status, "reason": "BLOCKED_OR_ERROR", "req": meta.__dict__}
+        res = {"ok": False, "product_id": None, "status": meta.status, "reason": "BLOCKED_OR_ERROR", "strategy": "scrape", "req": meta.__dict__}
         cache_set(cache_key, res)
         return {**res, "cached": False}
 
     html = r.text
+
+    # Strategy 2a: product link in search results
     match = re.search(r'href="/product/(\d+)', html)
     if match:
         pid = int(match.group(1))
-        res = {"ok": True, "product_id": pid, "status": r.status_code, "reason": None, "req": meta.__dict__}
+        res = {"ok": True, "product_id": pid, "status": r.status_code, "reason": None, "strategy": "scrape", "req": meta.__dict__}
         cache_set(cache_key, res)
         return {**res, "cached": False}
+
+    # Strategy 2b: JSON-LD or __NUXT__ data in HTML
+    json_match = re.search(r'"id_product"\s*:\s*(\d+)', html)
+    if json_match:
+        pid = int(json_match.group(1))
+        res = {"ok": True, "product_id": pid, "status": r.status_code, "reason": None, "strategy": "scrape_json", "req": meta.__dict__}
+        cache_set(cache_key, res)
+        return {**res, "cached": False}
+
+    # Strategy 2c: redirect to product page (kaufland sometimes redirects single-result searches)
+    if r.url and "/product/" in str(r.url):
+        redir_match = re.search(r'/product/(\d+)', str(r.url))
+        if redir_match:
+            pid = int(redir_match.group(1))
+            res = {"ok": True, "product_id": pid, "status": r.status_code, "reason": None, "strategy": "scrape_redirect", "req": meta.__dict__}
+            cache_set(cache_key, res)
+            return {**res, "cached": False}
 
     low = html.lower()
     if any(phrase in low for phrase in ("keine ergebnisse", "0 ergebnisse", "nichts gefunden")):
-        res = {"ok": False, "product_id": None, "status": r.status_code, "reason": "NOT_FOUND", "req": meta.__dict__}
+        res = {"ok": False, "product_id": None, "status": r.status_code, "reason": "NOT_FOUND", "strategy": "scrape", "req": meta.__dict__}
         cache_set(cache_key, res)
         return {**res, "cached": False}
 
-    res = {"ok": False, "product_id": None, "status": r.status_code, "reason": "NO_MATCH", "req": meta.__dict__}
+    res = {"ok": False, "product_id": None, "status": r.status_code, "reason": "NO_MATCH", "strategy": "scrape", "req": meta.__dict__}
     cache_set(cache_key, res)
     return {**res, "cached": False}
+
+
+# -----------------------------
+# EAN → Product ID  (Combined: API first → scrape fallback)
+# -----------------------------
+def ean_to_product_id(
+    session: requests.Session,
+    ean: str,
+    client_key: Optional[str] = None,
+    secret_key: Optional[str] = None,
+    cache_ttl_s: int = 7 * 24 * 3600,
+) -> Dict[str, Any]:
+    """Multi-strategy EAN lookup. Tries Seller API first (if creds available), then scraping."""
+    # Strategy 1: Seller API (fast, reliable)
+    if client_key and secret_key:
+        api_result = ean_to_product_id_api(ean, client_key, secret_key, cache_ttl_s)
+        if api_result.get("ok"):
+            return api_result
+
+    # Strategy 2: HTML scraping (fallback)
+    return ean_to_product_id_scrape(session, ean, cache_ttl_s)
 
 
 # -----------------------------
@@ -405,18 +483,19 @@ def get_bestseller(session: requests.Session, product_id: int, cache_ttl_s: int 
 # -----------------------------
 # Batch check (EANs)
 # -----------------------------
-def batch_check_ean(eans: List[str], sleep_s: float = 0.2) -> List[dict]:
+def batch_check_ean(eans: List[str], sleep_s: float = 0.2, client_key: Optional[str] = None, secret_key: Optional[str] = None) -> List[dict]:
     out: List[dict] = []
     with requests.Session() as session:
         session.headers.update(HEADERS)
 
-        # Warmup (ignore)
-        request_with_proxy(session, "get", BASE + "/")
+        # Warmup (ignore) — only needed for scraping fallback
+        if not (client_key and secret_key):
+            request_with_proxy(session, "get", BASE + "/")
 
         for ean in eans:
             t0 = time.time()
 
-            match = ean_to_product_id(session, ean)
+            match = ean_to_product_id(session, ean, client_key=client_key, secret_key=secret_key)
             if not match.get("ok"):
                 out.append({
                     "ean": ean,
@@ -483,6 +562,13 @@ def batch_check_ean(eans: List[str], sleep_s: float = 0.2) -> List[dict]:
                 "html_status": bs.get("status") or offers_new.get("status") or match.get("status"),
                 "score": score,
                 "label": label,
+                # API-enriched category data (from Seller API lookup)
+                "api_category_id": match.get("category_id"),
+                "api_category_name": match.get("category_name"),
+                "api_variable_fee": match.get("variable_fee"),   # e.g. 8.5 (%)
+                "api_fixed_fee": match.get("fixed_fee"),         # e.g. 0 (cents)
+                "api_title": match.get("title"),
+                "strategy": match.get("strategy", "scrape"),
                 "meta": {
                     "took_ms": int((time.time() - t0) * 1000),
                     "search_req": match.get("req"),
@@ -507,8 +593,8 @@ def batch_check_ean(eans: List[str], sleep_s: float = 0.2) -> List[dict]:
 # -----------------------------
 # Single checks
 # -----------------------------
-def check_ean(ean: str) -> dict:
-    return batch_check_ean([ean])[0]
+def check_ean(ean: str, client_key: Optional[str] = None, secret_key: Optional[str] = None) -> dict:
+    return batch_check_ean([ean], client_key=client_key, secret_key=secret_key)[0]
 
 
 # -----------------------------

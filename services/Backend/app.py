@@ -702,10 +702,21 @@ async def flipcheck(request: Request):
 
     # ── Kaufland branch ──────────────────────────────────────────────────────
     if market == "kaufland":
+        # Extract Kaufland seller credentials (if available) for API-based EAN lookup
+        _kl_ck, _kl_sk = None, None
+        try:
+            _kl_creds = _get_kaufland_creds_from_request(request)
+            if _kl_creds:
+                _kl_ck, _kl_sk = _kl_creds
+        except Exception:
+            pass
+
         try:
             from kaufland import check_ean as kl_check
             import asyncio
-            kl = await asyncio.get_event_loop().run_in_executor(None, kl_check, ean)
+            kl = await asyncio.get_event_loop().run_in_executor(
+                None, lambda: kl_check(ean, client_key=_kl_ck, secret_key=_kl_sk)
+            )
         except Exception as e:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": f"Kaufland-Check fehlgeschlagen: {e}"})
 
@@ -715,20 +726,61 @@ async def flipcheck(request: Request):
         if not sell:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": "Kein Kaufland-Preis gefunden"})
 
-        kl_fee_pcts = {
-            "kl_elektronik": 0.085, "kl_handys": 0.085, "kl_gaming": 0.085,
-            "kl_foto": 0.085, "kl_haushalt_el": 0.085, "kl_buecher": 0.085,
-            "kl_sport": 0.105, "kl_spielzeug": 0.105, "kl_haushalt": 0.105,
-            "kl_garten": 0.105, "kl_mode": 0.175, "kl_sonstiges": 0.105,
+        # Fee calculation — prefer real category fee from Seller API, fallback to hardcoded.
+        # Official Kaufland commission rates (DE/AT/CZ/SK/FR/IT) — verified April 2026:
+        # https://www.kaufland.de/haendler-infobereich/de/so-funktionierts/preise-konditionen
+        KL_FEES = {
+            # 7% — Consumer Electronics & White Goods (Großgeräte)
+            "kl_elektronik":       (0.07, 0.00),  # Computer, Unterhaltungselektronik, Staubsaugerroboter, Reifen/Felgen
+            "kl_handys":           (0.07, 0.00),  # → Unterhaltungselektronik
+            "kl_gaming":           (0.07, 0.00),  # → Unterhaltungselektronik
+            "kl_foto":             (0.07, 0.00),  # → Unterhaltungselektronik
+            "kl_haushalt_gross":   (0.07, 0.00),  # Haushaltselektronik Großgeräte
+            # 10%
+            "kl_werkzeug":         (0.10, 0.00),  # Werkzeug & Gartengeräte
+            "kl_parfuem":          (0.10, 0.00),  # Parfüm
+            # 13% (default for "Alle anderen Kategorien")
+            "kl_haushalt_el":      (0.13, 0.00),  # Haushaltselektronik Kleingeräte, PC/E-Zubehör, Fahrräder
+            "kl_koerperpflege":    (0.13, 0.00),  # Körperpflege & Gesundheit, Auto/Motorrad (ohne Reifen)
+            "kl_baumarkt":         (0.13, 0.00),  # Baumarkt
+            "kl_moebel":           (0.13, 0.00),  # Möbel & Wohnen, Lampen & Leuchten
+            "kl_sport":            (0.13, 0.00),  # Sport & Outdoor
+            "kl_baby":             (0.13, 0.00),  # Babyprodukte
+            "kl_spielzeug":        (0.13, 0.00),  # Spielwaren
+            "kl_lebensmittel":     (0.13, 0.00),  # Lebensmittel
+            "kl_sonstiges":        (0.13, 0.00),  # Default
+            # 13% + 0,70 € fixed fee per unit
+            "kl_medien":           (0.13, 0.70),  # Bücher, Filme, Musik
+            "kl_buecher":          (0.13, 0.70),  # Legacy alias → Medien
+            # 14%
+            "kl_garten":           (0.14, 0.00),  # Garten
+            "kl_mode":             (0.14, 0.00),  # Bekleidung, Taschen, Schuhe (was wrongly 17.5%!)
+            "kl_haushalt":         (0.14, 0.00),  # Küche & Haushalt, Matratzen
+            "kl_kueche":           (0.14, 0.00),  # alias
+            "kl_tier":             (0.14, 0.00),  # Tierbedarf
+            "kl_camping":          (0.14, 0.00),  # Camping, Fitness, Paddle-Boards
+            # 16%
+            "kl_schmuck":          (0.16, 0.00),  # Schmuck
         }
-        fee_pct = kl_fee_pcts.get(category, 0.105)
-        fee = round(sell * fee_pct, 2)
+        # API provides variable_fee as percentage (e.g. 8.5 for 8.5%) + fixed_fee in cents
+        api_fee_pct = kl.get("api_variable_fee")
+        api_fixed_fee = kl.get("api_fixed_fee")  # cents → euros
+        if api_fee_pct is not None:
+            fee_pct = api_fee_pct / 100.0
+            fixed_fee = (api_fixed_fee or 0) / 100.0
+        else:
+            fee_pct, fixed_fee = KL_FEES.get(category, (0.13, 0.00))   # default 13% (Kaufland default)
+        # fee_netto = variable commission + fixed per-unit fee (for Medien)
+        fee_netto = round(sell * fee_pct + fixed_fee, 2)
 
         ek_adj = ek / vat_factor if is_vat and ek_mode == "gross" else ek
         sell_adj = sell / vat_factor if is_vat else sell
-        fee_adj = fee / vat_factor if is_vat else fee
         ship_in_adj = (shipping_in / vat_factor) if (is_vat and ship_mode == "gross") else shipping_in
         ship_out_adj = (shipping_out / vat_factor) if (is_vat and ship_mode == "gross") else shipping_out
+        # MwSt on fees: Kaufland invoices commission as netto + 19% MwSt.
+        # Regelbesteuerung: netto fee is the cost (MwSt is deductible as Vorsteuer)
+        # Kleinunternehmer: brutto fee is the cost (MwSt is NOT deductible)
+        fee_adj = fee_netto if is_vat else round(fee_netto * vat_factor, 2)
 
         profit = round(sell_adj - ek_adj - fee_adj - ship_in_adj - ship_out_adj, 2)
         margin = round((profit / sell_adj * 100), 1) if sell_adj > 0 else 0
@@ -766,8 +818,12 @@ async def flipcheck(request: Request):
             "profit_median": profit,
             "profit_avg": profit,
             "margin_pct": margin,
-            "fees_median": fee,
+            "fees_median": fee_netto,
             "fee_rate": fee_pct,
+            "fee_fixed": fixed_fee,         # e.g. 0.70 for Medien
+            "fee_source": "api" if api_fee_pct is not None else "hardcoded",
+            "api_category": kl.get("api_category_name"),
+            "lookup_strategy": kl.get("strategy", "scrape"),
             "offers_count": kl.get("offers_count_new", 0),
             "bestseller": kl.get("bestseller", False),
             "rating": kl.get("rating"),

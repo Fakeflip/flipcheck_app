@@ -371,3 +371,115 @@ def _map_condition(raw) -> str:
         2: "used_like_new", 4: "used_good", 5: "used_acceptable",
     }
     return mapping.get(raw, "new")
+
+
+# ── Product Lookup (EAN → Product) ─────────────────────────────────────────
+
+async def get_product_by_ean(
+    client_key: str,
+    secret_key: str,
+    ean: str,
+    storefront: str = "de",
+) -> Dict:
+    """Look up a Kaufland product directly by EAN via Seller API.
+    GET /products/ean/{ean}?storefront={sf}
+    Returns product_id, title, category info, EANs, and URL.
+    """
+    result = await _kaufland_request(
+        "GET",
+        f"/products/ean/{ean}",
+        client_key,
+        secret_key,
+        params={"storefront": storefront, "embedded": "units"},
+    )
+    if not result.get("ok"):
+        return {"ok": False, "product_id": None, "error": result.get("error"), "status": result.get("status")}
+
+    data = result["data"]
+    pid = data.get("id_product")
+    cat = data.get("category") or {}
+
+    return {
+        "ok": True,
+        "product_id": pid,
+        "title": data.get("title", ""),
+        "eans": data.get("eans", [ean]),
+        "category_id": cat.get("id_category"),
+        "category_name": cat.get("name"),
+        "category_title": cat.get("title_singular") or cat.get("title_plural"),
+        "variable_fee": cat.get("variable_fee"),       # e.g. 8.5 (percent)
+        "fixed_fee": cat.get("fixed_fee", 0),           # e.g. 0 (cents)
+        "vat": cat.get("vat", 19),
+        "url": f"https://www.kaufland.de/product/{pid}/" if pid else None,
+        "raw": data,
+    }
+
+
+async def search_products(
+    client_key: str,
+    secret_key: str,
+    query: str,
+    storefront: str = "de",
+    limit: int = 5,
+) -> Dict:
+    """Search Kaufland products by keyword/EAN string.
+    GET /products/search?q={query}&storefront={sf}&limit={n}
+    """
+    result = await _kaufland_request(
+        "GET",
+        "/products/search",
+        client_key,
+        secret_key,
+        params={"q": query, "storefront": storefront, "limit": str(limit)},
+    )
+    if not result.get("ok"):
+        return {"ok": False, "products": [], "error": result.get("error")}
+
+    data = result.get("data", {})
+    items = data.get("data", [])
+    products = []
+    for item in items:
+        pid = item.get("id_product")
+        cat = item.get("category") or {}
+        products.append({
+            "product_id": pid,
+            "title": item.get("title", ""),
+            "eans": item.get("eans", []),
+            "category_id": cat.get("id_category"),
+            "variable_fee": cat.get("variable_fee"),
+            "fixed_fee": cat.get("fixed_fee", 0),
+            "url": f"https://www.kaufland.de/product/{pid}/" if pid else None,
+        })
+    return {"ok": True, "products": products}
+
+
+async def get_category_info(
+    client_key: str,
+    secret_key: str,
+    category_id: int,
+    storefront: str = "de",
+) -> Dict:
+    """Fetch category details including fee rates.
+    GET /categories/{id}?storefront={sf}
+    """
+    result = await _kaufland_request(
+        "GET",
+        f"/categories/{category_id}/",
+        client_key,
+        secret_key,
+        params={"storefront": storefront},
+    )
+    if not result.get("ok"):
+        return {"ok": False, "error": result.get("error")}
+
+    cat = result["data"]
+    return {
+        "ok": True,
+        "id_category": cat.get("id_category"),
+        "name": cat.get("name"),
+        "title": cat.get("title_singular") or cat.get("title_plural"),
+        "variable_fee": cat.get("variable_fee"),   # percent, e.g. 8.5
+        "fixed_fee": cat.get("fixed_fee", 0),      # euro-cents
+        "vat": cat.get("vat", 19),
+        "shipping_category": cat.get("shipping_category"),
+    }

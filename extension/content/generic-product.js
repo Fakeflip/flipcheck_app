@@ -12,6 +12,7 @@
   const panel = document.createElement('flipcheck-panel');
   panel.id = '__fc_panel';
   // Pre-set inline position so panel is visible even before shadow-DOM CSS applies.
+  // Using inline !important to guarantee no page CSS can override these.
   panel.style.setProperty('position', 'fixed',       'important');
   panel.style.setProperty('display',  'block',        'important');
   panel.style.setProperty('z-index',  '2147483647',  'important');
@@ -20,6 +21,38 @@
   panel.style.setProperty('bottom',   'auto',         'important');
   panel.style.setProperty('height',   '100vh',        'important');
   panel.style.setProperty('width',    'auto',         'important');
+  panel.style.setProperty('background', 'transparent', 'important');
+  panel.style.setProperty('color-scheme', 'dark',     'important');
+  panel.style.setProperty('margin',   '0',            'important');
+  panel.style.setProperty('padding',  '0',            'important');
+  panel.style.setProperty('border',   'none',         'important');
+  panel.style.setProperty('opacity',  '1',            'important');
+  panel.style.setProperty('visibility', 'visible',    'important');
+  panel.style.setProperty('transform', 'none',        'important');
+  panel.style.setProperty('max-width', 'none',        'important');
+  panel.style.setProperty('min-width', '0',           'important');
+  panel.style.setProperty('overflow',  'visible',     'important');
+  panel.style.setProperty('float',     'none',        'important');
+  panel.style.setProperty('clear',     'none',        'important');
+  panel.style.setProperty('isolation', 'isolate',     'important');
+  // Inject page-level <style> as extra defense — beats page CSS even if inline styles get wiped
+  if (!document.getElementById('__fc_host_shield')) {
+    const shield = document.createElement('style');
+    shield.id = '__fc_host_shield';
+    shield.textContent = `flipcheck-panel, flipcheck-panel#__fc_panel {
+      all: initial !important;
+      position: fixed !important; display: block !important;
+      z-index: 2147483647 !important; top: 0 !important; right: 0 !important;
+      bottom: auto !important; height: 100vh !important; width: auto !important;
+      background: transparent !important; color-scheme: dark !important;
+      margin: 0 !important; padding: 0 !important; border: none !important;
+      opacity: 1 !important; visibility: visible !important;
+      transform: none !important; max-width: none !important;
+      overflow: visible !important; float: none !important;
+      isolation: isolate !important; pointer-events: none !important;
+    }`;
+    (document.head || document.documentElement).appendChild(shield);
+  }
   document.documentElement.appendChild(panel);
   // Push page content so sidebar doesn't overlap
   (function () {
