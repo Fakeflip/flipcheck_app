@@ -319,19 +319,24 @@ def main():
         try:
             from curl_cffi import requests as cffi
             resp = cffi.get(url, headers=modern_headers(cookie), timeout=15, impersonate="chrome")
-            print(f"   Status: {resp.status_code}, Length: {len(resp.text)} bytes")
-            # Quick PageError check
-            if "PageErrorModule" in resp.text:
-                m = re.search(r'PageErrorModule[^"]*"text":"([^"]+)"', resp.text)
+            length = len(resp.text)
+            print(f"   Status: {resp.status_code}, Length: {length} bytes")
+            # Real data has dataItems with values; PageErrorModule alone has no dataItems
+            has_data = ('"dataItems"' in resp.text and '"textSpans"' in resp.text and
+                        '"sections"' in resp.text)
+            has_pageerror = "PageErrorModule" in resp.text and '"severity":"ERROR"' in resp.text
+            if has_data:
+                ok(f"   → ✅ REAL DATA ({length} bytes)")
+                # Extract sold count from aggregates
+                m = re.search(r'"dataItems":\s*\[\s*\{[^}]*"value":\s*\{[^}]*"text":\s*"([^"]+)"', resp.text)
+                if m: ok(f"   → First aggregate value: {m.group(1)}")
+            elif has_pageerror and length < 1000:
+                m = re.search(r'PageErrorModule.*?"text":"([^"]+)"', resp.text)
                 err_msg = m.group(1) if m else "?"
-                fail(f"   → PageError: {err_msg}")
-            elif "ResearchAggregateModule" in resp.text and len(resp.text) > 1000:
-                ok(f"   → Looks like REAL data! ({len(resp.text)} bytes)")
-                # Try to find sold count
-                m = re.search(r'"name":\s*"sold"[^}]*"text":\s*"(\d[\d.,]*)"', resp.text)
-                if m: ok(f"   → SOLD: {m.group(1)}")
+                fail(f"   → PageError ONLY: {err_msg}")
             else:
-                warn(f"   → Empty/unknown response")
+                warn(f"   → Unknown/empty response — first 200 chars:")
+                print(f"   {resp.text[:200]}")
         except Exception as e:
             fail(f"   Exception: {e}")
 

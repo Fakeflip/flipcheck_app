@@ -436,14 +436,13 @@ def _parse_ndjson_modules(resp_text: str) -> List[Dict[str, Any]]:
             continue
     return modules
 def _build_research_url(keywords: str, day_range: int = 30, include_trends: bool = False) -> str:
-    end_ts = int(time.time() * 1000)
-    start_ts = end_ts - int(day_range) * 24 * 60 * 60 * 1000
+    # eBay started rejecting endDate=now_ms in April 2026 with
+    # "Das Startdatum ist nicht korrekt." (TZ-future-by-microseconds).
+    # Using only dayRange — eBay computes the date range internally.
     params: List[Tuple[str, str]] = [
         ("marketplace", "EBAY-DE"),
         ("keywords", keywords),
         ("dayRange", str(day_range)),
-        ("endDate", str(end_ts)),
-        ("startDate", str(start_ts)),
         ("categoryId", "0"),
         ("conditionId", "1000"),
         ("format", "FIXED_PRICE"),
