@@ -470,23 +470,44 @@ def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[st
     if hit and (now - hit["ts"] < _RESEARCH_TTL):
         return hit["data"]
     url = _build_research_url(keywords, day_range=day_range, include_trends=False)
+    # Modern Chrome 138 headers — eBay started requiring sec-ch-ua + sec-fetch-* in April 2026
     headers = {
         "Cookie": EBAY_RESEARCH_COOKIE,
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://www.ebay.de/sh/research",
         "Connection": "keep-alive",
-        "User-Agent": SESSION.headers.get("User-Agent", "Mozilla/5.0"),
         "X-Requested-With": "XMLHttpRequest",
+        "sec-ch-ua": '"Not/A)Brand";v="99", "Google Chrome";v="138", "Chromium";v="138"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
     }
     _throttle_research(0.6)
-    proxy = _get_proxy()
+    # Research API uses session cookies bound to the originating IP + browser fingerprint.
+    # Plain `requests` library is detected by TLS-fingerprint (JA3) → eBay returns login page.
+    # Solution: use curl_cffi to impersonate a real Chrome browser at the TLS level.
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    proxy = _get_proxy() if use_proxy else None
     try:
-        resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        from curl_cffi import requests as cffi_requests
+        resp = cffi_requests.get(
+            url, headers=headers, timeout=12,
+            proxies=proxy, impersonate="chrome",
+        )
+    except ImportError:
+        # Fallback to plain requests if curl_cffi unavailable
+        try:
+            resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        except Exception:
+            return None
     except Exception:
         return None
     if resp.status_code != 200:
-        logger.info(f"[Research] HTTP {resp.status_code}: {resp.text[:160]}")
+        logger.info(f"[Research] HTTP {resp.status_code} (proxy={'yes' if proxy else 'no'}): {resp.text[:160]}")
         return None
     modules = _parse_ndjson_modules(resp.text)
     aggregates = next((m for m in modules if m.get("_type") == "ResearchAggregateModule"), None)
@@ -564,18 +585,36 @@ def fetch_research_trends(keywords: str, day_range: int = 30) -> Optional[Dict[s
         "Cookie": EBAY_RESEARCH_COOKIE,
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://www.ebay.de/sh/research",
         "Connection": "keep-alive",
-        "User-Agent": SESSION.headers.get("User-Agent", "Mozilla/5.0"),
         "X-Requested-With": "XMLHttpRequest",
+        "sec-ch-ua": '"Not/A)Brand";v="99", "Google Chrome";v="138", "Chromium";v="138"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"macOS"',
+        "sec-fetch-site": "same-origin",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-dest": "empty",
     }
     _throttle_research(0.6)
-    proxy = _get_proxy()
+    # Same reasoning as fetch_research_stats — needs curl_cffi for TLS impersonation
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    proxy = _get_proxy() if use_proxy else None
     try:
-        resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        from curl_cffi import requests as cffi_requests
+        resp = cffi_requests.get(
+            url, headers=headers, timeout=12,
+            proxies=proxy, impersonate="chrome",
+        )
+    except ImportError:
+        try:
+            resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        except Exception:
+            return None
     except Exception:
         return None
     if resp.status_code != 200:
+        logger.info(f"[Research-Trends] HTTP {resp.status_code} (proxy={'yes' if proxy else 'no'}): {resp.text[:160]}")
         return None
     modules = _parse_ndjson_modules(resp.text)
     trends_mod = next((m for m in modules if isinstance(m, dict) and m.get("_type") == "MetricsTrendsModule"), None)
