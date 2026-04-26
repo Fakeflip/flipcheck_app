@@ -103,19 +103,37 @@ def analyze_response(name: str, status: int, headers: dict, body: str, verbose: 
         if m: print(f"   Title:   {m.group(1).strip()[:120]}")
     elif "captcha" in body.lower()[:2000]:
         fail(f"   → CAPTCHA-Page erkannt")
-    elif body.startswith("{"):
-        try:
-            data = json.loads(body)
-            if "modules" in data or "_type" in data:
-                ok(f"   → JSON-Response sieht VALID aus ✓")
-                # Try to find sold count
-                m = re.search(r'"name":\s*"sold"[^}]*"value":\s*"?(\d+)"?', body)
-                if m: ok(f"   → Sold count: {m.group(1)}")
-            else:
-                warn(f"   → JSON aber kein 'modules' Key — schau Inhalt:")
+    elif body.startswith("{") or body.startswith("["):
+        # eBay Research API uses NDJSON — newline-delimited JSON modules
+        lines = [l for l in body.strip().split("\n") if l.strip()]
+        modules = []
+        for line in lines:
+            try:
+                modules.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+
+        if modules:
+            ok(f"   → Valid NDJSON ✓ — {len(modules)} module(s) geparst")
+            for i, m in enumerate(modules):
+                t = m.get("_type", "?")
+                print(f"      Module {i}: _type={t}")
+                # Look for aggregate values (sold count, avg price)
+                if t == "ResearchAggregateModule":
+                    sections = m.get("sections", [])
+                    for sec in sections:
+                        title_obj = sec.get("title", {}) or {}
+                        title_text = (title_obj.get("textSpans", [{}])[0] or {}).get("text", "?")
+                        for d in sec.get("dataItems", [])[:1]:
+                            val = (d.get("value", {}).get("textSpans", [{}])[0] or {}).get("text", "?")
+                            print(f"         {title_text}: {val}")
+                if t == "SearchResultsModule":
+                    items = m.get("items", []) or []
+                    print(f"         {len(items)} sold items returned")
+        else:
+            warn(f"   → JSON-ähnlich aber 0 NDJSON-Module geparst — vermutlich leere Response")
+            if not verbose:
                 print(f"   {body[:200]}")
-        except json.JSONDecodeError:
-            warn(f"   → Anfang sieht wie JSON aus, aber parsen fehlgeschlagen")
     elif body.startswith("ndjson") or "\n{" in body[:200]:
         ok(f"   → NDJSON-Response (eBay-spezifisch) ✓")
     else:
