@@ -52,13 +52,15 @@ def info(msg):  print(f"{BLUE}ℹ{RESET}  {msg}")
 def title(msg): print(f"\n{BOLD}── {msg} ──{RESET}")
 
 
-def build_url(ean: str, day_range: int = 30) -> str:
-    end_date_ms = int(time.time() * 1000)
+def build_url(ean: str, day_range: int = 30, date_strategy: str = "current") -> str:
+    """Build research URL with various date param strategies."""
+    now_ms = int(time.time() * 1000)
+    yesterday_ms = now_ms - 24 * 3600 * 1000   # 1 day ago
+    start_ms = now_ms - day_range * 24 * 3600 * 1000
+
     params = [
         ("marketplace", "EBAY-DE"),
         ("keywords", ean),
-        ("dayRange", str(day_range)),
-        ("endDate", str(end_date_ms)),
         ("offset", "0"),
         ("limit", "10"),
         ("tabName", "SOLD"),
@@ -66,6 +68,33 @@ def build_url(ean: str, day_range: int = 30) -> str:
         ("modules", "aggregates"),
         ("modules", "searchResults"),
     ]
+
+    if date_strategy == "current":
+        # Current code: dayRange + endDate=now_ms
+        params.append(("dayRange", str(day_range)))
+        params.append(("endDate", str(now_ms)))
+    elif date_strategy == "endDate_yesterday":
+        # endDate=yesterday (avoid timezone-future issue)
+        params.append(("dayRange", str(day_range)))
+        params.append(("endDate", str(yesterday_ms)))
+    elif date_strategy == "no_endDate":
+        # Only dayRange, no endDate (let eBay default)
+        params.append(("dayRange", str(day_range)))
+    elif date_strategy == "startDate_endDate":
+        # Both dates explicit
+        params.append(("startDate", str(start_ms)))
+        params.append(("endDate", str(now_ms)))
+    elif date_strategy == "iso_dates":
+        # ISO 8601 strings instead of ms
+        from datetime import datetime, timezone, timedelta
+        end_iso = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        start_iso = (datetime.now(timezone.utc) - timedelta(days=day_range)).strftime("%Y-%m-%d")
+        params.append(("startDate", start_iso))
+        params.append(("endDate", end_iso))
+    elif date_strategy == "dayRange_only":
+        # Just dayRange, no date params at all
+        params.append(("dayRange", str(day_range)))
+
     return f"{RESEARCH_BASE}?{urlencode(params, doseq=True)}"
 
 
@@ -271,10 +300,45 @@ def main():
     if not cookie:
         sys.exit(1)
 
-    url = build_url(args.ean, args.day_range)
-    info(f"\nTarget URL: {url[:120]}...")
+    # ── Phase 1: Try different DATE strategies (what eBay changed) ──
+    title("PHASE 1: DATE PARAM STRATEGIES")
+    info("eBay-Fehler 'Startdatum nicht korrekt' → testen welches Date-Format akzeptiert wird")
 
-    # Run all strategies
+    date_strategies = [
+        ("current", "endDate=now_ms (CURRENT — broken)"),
+        ("endDate_yesterday", "endDate=YESTERDAY_ms (avoid TZ future)"),
+        ("no_endDate", "Only dayRange, no endDate"),
+        ("startDate_endDate", "startDate + endDate as ms"),
+        ("iso_dates", "ISO 8601 dates (YYYY-MM-DD)"),
+        ("dayRange_only", "dayRange alone, no date params"),
+    ]
+
+    for strat, desc in date_strategies:
+        url = build_url(args.ean, args.day_range, date_strategy=strat)
+        title(f"DATE STRATEGY: {desc}")
+        try:
+            from curl_cffi import requests as cffi
+            resp = cffi.get(url, headers=modern_headers(cookie), timeout=15, impersonate="chrome")
+            print(f"   Status: {resp.status_code}, Length: {len(resp.text)} bytes")
+            # Quick PageError check
+            if "PageErrorModule" in resp.text:
+                m = re.search(r'PageErrorModule[^"]*"text":"([^"]+)"', resp.text)
+                err_msg = m.group(1) if m else "?"
+                fail(f"   → PageError: {err_msg}")
+            elif "ResearchAggregateModule" in resp.text and len(resp.text) > 1000:
+                ok(f"   → Looks like REAL data! ({len(resp.text)} bytes)")
+                # Try to find sold count
+                m = re.search(r'"name":\s*"sold"[^}]*"text":\s*"(\d[\d.,]*)"', resp.text)
+                if m: ok(f"   → SOLD: {m.group(1)}")
+            else:
+                warn(f"   → Empty/unknown response")
+        except Exception as e:
+            fail(f"   Exception: {e}")
+
+    # ── Phase 2: Original 4 transport strategies (with current URL) ──
+    url = build_url(args.ean, args.day_range)
+    info(f"\nFull URL (current): {url[:160]}")
+
     test_strategy("Plain Python requests (current code path)",
                   test_plain_requests, url, cookie, args.verbose)
     test_strategy("curl_cffi impersonate=chrome (new code path)",
