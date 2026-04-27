@@ -489,7 +489,9 @@ def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[st
     # Research API uses session cookies bound to the originating IP + browser fingerprint.
     # Plain `requests` library is detected by TLS-fingerprint (JA3) → eBay returns login page.
     # Solution: use curl_cffi to impersonate a real Chrome browser at the TLS level.
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    # Default ON — proxy rotation gives IP-block resilience.
+    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (e.g. when cookie is server-IP-bound).
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
     proxy = _get_proxy() if use_proxy else None
     try:
         from curl_cffi import requests as cffi_requests
@@ -597,7 +599,9 @@ def fetch_research_trends(keywords: str, day_range: int = 30) -> Optional[Dict[s
     }
     _throttle_research(0.6)
     # Same reasoning as fetch_research_stats — needs curl_cffi for TLS impersonation
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    # Default ON — proxy rotation gives IP-block resilience.
+    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (e.g. when cookie is server-IP-bound).
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
     proxy = _get_proxy() if use_proxy else None
     try:
         from curl_cffi import requests as cffi_requests
