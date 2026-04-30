@@ -790,22 +790,27 @@ async def flipcheck(request: Request):
         # Best offer details
         best_new = kl.get("best_offer_new") or {}
 
-        # ── Cross-market volume hints (non-blocking, best-effort) ──
+        # ── Cross-market volume hints — fetch eBay + Amazon IN PARALLEL ──
+        # Was sequential (~2s) → now ~1s when both APIs respond simultaneously.
         vol_ebay, vol_amazon = None, None
-        try:
-            from ebay_live import fetch_research_stats
-            ebay_res = await asyncio.get_event_loop().run_in_executor(None, fetch_research_stats, ean)
-            if ebay_res and ebay_res.get("monthly_sales"):
-                vol_ebay = ebay_res["monthly_sales"]
-        except Exception:
-            pass
-        try:
-            from amazon import amazon_check
-            amz = await amazon_check(ean, ean, 0)
-            if amz and amz.get("sales_30d"):
-                vol_amazon = amz["sales_30d"]
-        except Exception:
-            pass
+        async def _fetch_ebay_vol():
+            try:
+                from ebay_live import fetch_research_stats
+                r = await asyncio.get_event_loop().run_in_executor(None, fetch_research_stats, ean)
+                return r.get("monthly_sales") if r else None
+            except Exception:
+                return None
+        async def _fetch_amazon_vol():
+            try:
+                from amazon import amazon_check
+                r = await amazon_check(ean, ean, 0)
+                return r.get("sales_30d") if r else None
+            except Exception:
+                return None
+        # gather() runs both concurrently — total time = max(ebay, amazon) instead of sum
+        results = await asyncio.gather(_fetch_ebay_vol(), _fetch_amazon_vol(), return_exceptions=True)
+        vol_ebay = results[0] if not isinstance(results[0], BaseException) else None
+        vol_amazon = results[1] if not isinstance(results[1], BaseException) else None
 
         pid = kl.get("product_id")
         return JSONResponse({

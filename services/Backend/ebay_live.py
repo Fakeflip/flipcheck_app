@@ -353,17 +353,43 @@ def _filter_items_by_title(items: List[Dict[str, Any]], bad_words: Optional[List
 # =========================================================
 # RESEARCH / NDJSON PARSING
 # =========================================================
-_RESEARCH_CACHE: Dict[str, Dict[str, Any]] = {}
-_RESEARCH_TTL = 30 * 60
+# Robustness primitives — coalesce concurrent same-EAN requests, circuit-break
+# on upstream failures, track proxy health, retry transient errors with backoff.
+from _robustness import (
+    InflightCoalescer, CircuitBreaker, ProxyHealth, TTLCache,
+    UpstreamLimiter, robust_request,
+)
+
+# TTLCache replaces the old dict-based cache — thread-safe + LRU + max size
+_RESEARCH_CACHE = TTLCache(max_size=2000, ttl_sec=30 * 60)          # 30 min
+_RESEARCH_TRENDS_CACHE = TTLCache(max_size=2000, ttl_sec=6 * 3600)  # 6 h
+
+# One coalescer per endpoint type → 5 concurrent users for same EAN = 1 upstream call
+_research_coalescer = InflightCoalescer(timeout=20.0)
+_trends_coalescer = InflightCoalescer(timeout=20.0)
+
+# Circuit breaker — if eBay returns 5+ 5xx errors in 60s, short-circuit for 30s
+_research_breaker = CircuitBreaker(failure_threshold=5, window_sec=60, cooldown_sec=30)
+
+# Proxy health — datacenter proxies that get blocked are skipped for 2 min
+_proxy_health = ProxyHealth(cooldown_sec=120)
+
+# Limit concurrent upstream eBay calls (FastAPI worker pool can have 100s of threads)
+_research_limiter = UpstreamLimiter(max_concurrent=8, acquire_timeout=15.0)
+
+# Legacy throttle — kept for backward compat, but coalescer + limiter make it
+# largely redundant. We use a tiny min interval as a final safety net.
 _LAST_RESEARCH_TS = 0.0
-_RESEARCH_TRENDS_CACHE: Dict[str, Dict[str, Any]] = {}
-_RESEARCH_TRENDS_TTL = 6 * 60 * 60
-def _throttle_research(min_interval: float = 0.6) -> None:
+_RESEARCH_THROTTLE_LOCK = __import__("threading").Lock()
+
+def _throttle_research(min_interval: float = 0.2) -> None:
+    """Minimum gap between upstream calls — last line of defense against bursting."""
     global _LAST_RESEARCH_TS
-    dt = time.time() - _LAST_RESEARCH_TS
-    if dt < min_interval:
-        time.sleep(min_interval - dt)
-    _LAST_RESEARCH_TS = time.time()
+    with _RESEARCH_THROTTLE_LOCK:
+        dt = time.time() - _LAST_RESEARCH_TS
+        if dt < min_interval:
+            time.sleep(min_interval - dt)
+        _LAST_RESEARCH_TS = time.time()
 def _parse_price_number(text: str) -> Optional[float]:
     if not text:
         return None
@@ -456,22 +482,10 @@ def _build_research_url(keywords: str, day_range: int = 30, include_trends: bool
     if include_trends:
         params.append(("modules", "metricsTrends"))
     return f"{RESEARCH_BASE}?{urlencode(params, doseq=True)}"
-def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
-    if not EBAY_RESEARCH_COOKIE:
-        return None
-    try:
-        day_range = int(day_range or 30)
-    except Exception:
-        day_range = 30
-    cache_key = f"{keywords}__{day_range}"
-    now = time.time()
-    hit = _RESEARCH_CACHE.get(cache_key)
-    if hit and (now - hit["ts"] < _RESEARCH_TTL):
-        return hit["data"]
-    url = _build_research_url(keywords, day_range=day_range, include_trends=False)
-    # Modern Chrome 138 headers — eBay started requiring sec-ch-ua + sec-fetch-* in April 2026
-    headers = {
-        "Cookie": EBAY_RESEARCH_COOKIE,
+# Standard headers used by all research calls — reusable
+def _research_headers() -> Dict[str, str]:
+    return {
+        "Cookie": EBAY_RESEARCH_COOKIE or "",
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
@@ -485,36 +499,77 @@ def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[st
         "sec-fetch-mode": "cors",
         "sec-fetch-dest": "empty",
     }
-    _throttle_research(0.6)
-    # Research API uses session cookies bound to the originating IP + browser fingerprint.
-    # Plain `requests` library is detected by TLS-fingerprint (JA3) → eBay returns login page.
-    # Solution: use curl_cffi to impersonate a real Chrome browser at the TLS level.
-    # Default ON — proxy rotation gives IP-block resilience.
-    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (e.g. when cookie is server-IP-bound).
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
-    proxy = _get_proxy() if use_proxy else None
-    try:
-        from curl_cffi import requests as cffi_requests
-        resp = cffi_requests.get(
-            url, headers=headers, timeout=12,
-            proxies=proxy, impersonate="chrome",
-        )
-    except ImportError:
-        # Fallback to plain requests if curl_cffi unavailable
+
+
+def _do_research_request(url: str, headers: Dict[str, str], use_proxy: bool):
+    """Execute the actual HTTP call. Wrapped by robust_request for retry/circuit/proxy-health."""
+    def _fn(proxy):
         try:
-            resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
-        except Exception:
-            return None
+            from curl_cffi import requests as cffi_requests
+            return cffi_requests.get(url, headers=headers, timeout=12, proxies=proxy, impersonate="chrome")
+        except ImportError:
+            return SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+
+    return robust_request(
+        request_fn=_fn,
+        breaker=_research_breaker,
+        proxy_health=_proxy_health,
+        proxies=_PROXY_LIST,
+        use_proxy=use_proxy,
+        max_retries=2,
+        backoff_base=0.4,
+    )
+
+
+def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
+    """Fetch eBay research aggregate + median for an EAN.
+    Concurrent same-EAN callers share one upstream call via InflightCoalescer.
+    Cached for 30 min in TTLCache.
+    """
+    if not EBAY_RESEARCH_COOKIE:
+        return None
+    try:
+        day_range = int(day_range or 30)
     except Exception:
+        day_range = 30
+    cache_key = f"stats:{keywords}:{day_range}"
+
+    # 1. Check cache (no upstream call)
+    cached = _RESEARCH_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    # 2. Coalesce concurrent callers for same key
+    return _research_coalescer.run(cache_key, _fetch_research_stats_uncached, keywords, day_range, cache_key)
+
+
+def _fetch_research_stats_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
+    """Inner uncached fetch — guarded by limiter + circuit + proxy-health."""
+    url = _build_research_url(keywords, day_range=day_range, include_trends=False)
+    headers = _research_headers()
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
+
+    # Limiter caps concurrent upstream eBay calls — backpressure for traffic bursts
+    try:
+        with _research_limiter:
+            _throttle_research(0.2)   # tiny gap as final safety net
+            resp = _do_research_request(url, headers, use_proxy)
+    except TimeoutError:
+        logger.info("[Research] Limiter timeout — too many concurrent calls")
+        return None
+
+    if resp is None:
         return None
     if resp.status_code != 200:
-        logger.info(f"[Research] HTTP {resp.status_code} (proxy={'yes' if proxy else 'no'}): {resp.text[:160]}")
+        logger.info(f"[Research] HTTP {resp.status_code}: {resp.text[:160]}")
         return None
+
     modules = _parse_ndjson_modules(resp.text)
     aggregates = next((m for m in modules if m.get("_type") == "ResearchAggregateModule"), None)
     search_results = next((m for m in modules if m.get("_type") == "SearchResultsModule"), None)
     if not aggregates:
         return None
+
     sections = aggregates.get("sections", [])
     def _val(sec_idx: int, item_idx: int) -> Optional[str]:
         try:
@@ -529,8 +584,9 @@ def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[st
     med_price = None
     if search_results:
         med_price = _extract_median_from_search_results(search_results)
+
     data = {"avg_price": avg_price, "median_price": med_price, "monthly_sales": sold_count}
-    _RESEARCH_CACHE[cache_key] = {"ts": time.time(), "data": data}
+    _RESEARCH_CACHE.set(cache_key, data)
     return data
 def _normalize_metrics_trends(mod: Dict[str, Any]) -> Dict[str, Any]:
     series = mod.get("series") or []
@@ -574,57 +630,48 @@ def _normalize_metrics_trends(mod: Dict[str, Any]) -> Dict[str, Any]:
             regression = {"from": reg_points[0], "to": reg_points[-1]}
     return {"granularity": gran, "currency": currency, "points": points, "regression": regression}
 def fetch_research_trends(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
+    """Fetch eBay research price/qty trends for an EAN.
+    Coalesced + cached + circuit-breakered + retried."""
     if not EBAY_RESEARCH_COOKIE:
         return None
-    cache_key = f"{keywords}__{int(day_range)}"
-    now = time.time()
-    hit = _RESEARCH_TRENDS_CACHE.get(cache_key)
-    if hit and (now - hit["ts"] < _RESEARCH_TRENDS_TTL):
-        return hit["data"]
-    url = _build_research_url(keywords, day_range=int(day_range), include_trends=True)
-    headers = {
-        "Cookie": EBAY_RESEARCH_COOKIE,
-        "Accept": "application/json, text/plain, */*",
-        "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Referer": "https://www.ebay.de/sh/research",
-        "Connection": "keep-alive",
-        "X-Requested-With": "XMLHttpRequest",
-        "sec-ch-ua": '"Not/A)Brand";v="99", "Google Chrome";v="138", "Chromium";v="138"',
-        "sec-ch-ua-mobile": "?0",
-        "sec-ch-ua-platform": '"macOS"',
-        "sec-fetch-site": "same-origin",
-        "sec-fetch-mode": "cors",
-        "sec-fetch-dest": "empty",
-    }
-    _throttle_research(0.6)
-    # Same reasoning as fetch_research_stats — needs curl_cffi for TLS impersonation
-    # Default ON — proxy rotation gives IP-block resilience.
-    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (e.g. when cookie is server-IP-bound).
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
-    proxy = _get_proxy() if use_proxy else None
     try:
-        from curl_cffi import requests as cffi_requests
-        resp = cffi_requests.get(
-            url, headers=headers, timeout=12,
-            proxies=proxy, impersonate="chrome",
-        )
-    except ImportError:
-        try:
-            resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
-        except Exception:
-            return None
+        day_range = int(day_range or 30)
     except Exception:
+        day_range = 30
+    cache_key = f"trends:{keywords}:{day_range}"
+
+    cached = _RESEARCH_TRENDS_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+
+    return _trends_coalescer.run(cache_key, _fetch_research_trends_uncached, keywords, day_range, cache_key)
+
+
+def _fetch_research_trends_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
+    url = _build_research_url(keywords, day_range=day_range, include_trends=True)
+    headers = _research_headers()
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
+
+    try:
+        with _research_limiter:
+            _throttle_research(0.2)
+            resp = _do_research_request(url, headers, use_proxy)
+    except TimeoutError:
+        logger.info("[Research-Trends] Limiter timeout — too many concurrent calls")
+        return None
+
+    if resp is None:
         return None
     if resp.status_code != 200:
-        logger.info(f"[Research-Trends] HTTP {resp.status_code} (proxy={'yes' if proxy else 'no'}): {resp.text[:160]}")
+        logger.info(f"[Research-Trends] HTTP {resp.status_code}: {resp.text[:160]}")
         return None
+
     modules = _parse_ndjson_modules(resp.text)
     trends_mod = next((m for m in modules if isinstance(m, dict) and m.get("_type") == "MetricsTrendsModule"), None)
     if not trends_mod:
         return None
     data = _normalize_metrics_trends(trends_mod)
-    _RESEARCH_TRENDS_CACHE[cache_key] = {"ts": time.time(), "data": data}
+    _RESEARCH_TRENDS_CACHE.set(cache_key, data)
     return data
 def calc_days_to_cash_window(offer_count: Optional[int], sales_nd: Optional[int], window_days: int) -> Optional[int]:
     if not offer_count or offer_count <= 0:
