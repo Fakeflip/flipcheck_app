@@ -547,9 +547,10 @@ def _fetch_research_stats_uncached(keywords: str, day_range: int, cache_key: str
     """Inner uncached fetch — guarded by limiter + circuit + proxy-health."""
     url = _build_research_url(keywords, day_range=day_range, include_trends=False)
     headers = _research_headers()
-    # Default OFF — datacenter proxies are dead/blocked. Server IP works since
-    # cookie is bound to it. Set EBAY_RESEARCH_USE_PROXY=1 if you have residential proxies.
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    # Default ON — proxy rotation gives IP-block resilience. Combined with
+    # ProxyHealth, dead proxies get auto-skipped after first failure.
+    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (cookie must be server-IP-bound).
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
 
     # Limiter caps concurrent upstream eBay calls — backpressure for traffic bursts
     try:
@@ -652,9 +653,10 @@ def fetch_research_trends(keywords: str, day_range: int = 30) -> Optional[Dict[s
 def _fetch_research_trends_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
     url = _build_research_url(keywords, day_range=day_range, include_trends=True)
     headers = _research_headers()
-    # Default OFF — datacenter proxies are dead/blocked. Server IP works since
-    # cookie is bound to it. Set EBAY_RESEARCH_USE_PROXY=1 if you have residential proxies.
-    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "0") == "1"
+    # Default ON — proxy rotation gives IP-block resilience. Combined with
+    # ProxyHealth, dead proxies get auto-skipped after first failure.
+    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (cookie must be server-IP-bound).
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
 
     try:
         with _research_limiter:
