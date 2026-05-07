@@ -14,9 +14,14 @@
  *   (b) data passed through esc() helper for HTML-escaping
  *   All operations happen inside a closed shadow DOM.
  */
+console.warn('[FC boot] panel-component.js v7 loading');
 (function () {
-  if (window._fcPanelDef) return;
+  if (window._fcPanelDef) {
+    console.warn('[FC boot] panel-component.js — skip (already defined)');
+    return;
+  }
   window._fcPanelDef = true;
+  console.warn('[FC boot] panel-component.js — defining FlipcheckPanel');
 
   // CSS — Linear/Vercel-inspired clean dark aesthetic
   const PANEL_CSS = `
