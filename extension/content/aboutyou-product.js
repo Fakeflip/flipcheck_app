@@ -14,47 +14,12 @@
   panel.style.setProperty('height', '100vh', 'important');
   panel.style.setProperty('width',  'auto',  'important');
   document.documentElement.appendChild(panel);
-  // Push page content so sidebar doesn't overlap
-  (function () {
-    function _syncBodyMargin(w, pos) {
-      document.body.style.removeProperty('margin-right');
-      document.body.style.removeProperty('margin-left');
-      document.body.style.removeProperty('padding-bottom');
-      if (pos === 'left')        document.body.style.setProperty('margin-left',    w + 'px', 'important');
-      else if (pos === 'bottom') document.body.style.setProperty('padding-bottom', '320px',  'important');
-      else                       document.body.style.setProperty('margin-right',   w + 'px', 'important');
-    }
-    // Default: right-docked at 380px
-    try {
-      chrome.storage.local.get('fc_position', r => {
-        _syncBodyMargin(380, r?.fc_position || 'right');
-      });
-    } catch (_) { _syncBodyMargin(380, 'right'); }
-    panel.addEventListener('fc-width-change', e => _syncBodyMargin(e.detail.w, e.detail.pos));
-    panel.addEventListener('fc-close', () => {
-      document.body.style.removeProperty('margin-right');
-      document.body.style.removeProperty('margin-left');
-      document.body.style.removeProperty('padding-bottom');
-    });
-    // Re-apply margin if SPA navigation resets body styles
-    let _fcMg = false;
-    new MutationObserver(() => {
-      if (_fcMg || !document.body) return;
-      const pos = panel._position || 'right';
-      const ok  = (pos === 'left'   && document.body.style.marginLeft)   ||
-                  (pos === 'bottom' && document.body.style.paddingBottom) ||
-                  (pos !== 'left' && pos !== 'bottom' && document.body.style.marginRight);
-      if (!ok) {
-        _fcMg = true;
-        try {
-          chrome.storage.local.get('fc_position', r => {
-            _syncBodyMargin(panel.offsetWidth || 380, r?.fc_position || 'right');
-            setTimeout(() => { _fcMg = false; }, 300);
-          });
-        } catch (_) { _fcMg = false; }
-      }
-    }).observe(document.body, { attributes: true, attributeFilter: ['style'] });
-  })();
+  // v7: Panel floats — no body-margin push needed.
+  try {
+    document.body.style.removeProperty('margin-right');
+    document.body.style.removeProperty('margin-left');
+    document.body.style.removeProperty('padding-bottom');
+  } catch (_) {}
 
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.type === 'CONTEXT_EAN_PROBE' && msg.ean && typeof panel.probe === 'function') panel.probe(msg.ean);
