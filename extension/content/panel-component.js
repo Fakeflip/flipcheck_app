@@ -774,32 +774,107 @@ console.warn('[FC boot] panel-component.js v7 loading');
     _renderCardError(mkt, msg) { this._renderCardEmpty(mkt, '⚠ ' + msg); }
   }
 
-  console.warn('[FC boot] reaching customElements registration block');
-  // customElements may not be available at document_start; retry with backoff.
-  (function _define(retries) {
-    const ceType = typeof customElements;
-    const ceTruthy = !!customElements;
-    if (retries === 30) {
-      console.warn('[FC boot] customElements check:', { type: ceType, truthy: ceTruthy });
-    }
-    if (ceType !== 'undefined' && customElements) {
-      try {
-        const already = customElements.get('flipcheck-panel');
-        console.warn('[FC boot] customElements.get returned:', already ? 'already-registered' : 'undefined (will define)');
-        if (!already) {
-          customElements.define('flipcheck-panel', FlipcheckPanel);
-          console.warn('[FC] ✓ flipcheck-panel REGISTERED (v7)');
-        }
-        return;
-      } catch (e) {
-        console.error('[FC] ✗ customElements.define FAILED:', e?.message, e?.stack);
+  // ─────────────────────────────────────────────────────────────────────────
+  // MANUAL UPGRADE — works even when customElements is null/blocked.
+  // Some pages (or other extensions) wipe out window.customElements,
+  // making customElements.define() impossible. This binds the FlipcheckPanel
+  // prototype methods directly to existing <flipcheck-panel> elements +
+  // runs the constructor logic manually.
+  // ─────────────────────────────────────────────────────────────────────────
+  function manuallyUpgrade(el) {
+    if (el._fcUpgraded) return;
+    el._fcUpgraded = true;
+    // Bind all prototype methods (including private _foo and getters)
+    const proto = FlipcheckPanel.prototype;
+    for (const name of Object.getOwnPropertyNames(proto)) {
+      if (name === 'constructor') continue;
+      const desc = Object.getOwnPropertyDescriptor(proto, name);
+      if (!desc) continue;
+      if (typeof desc.value === 'function') {
+        el[name] = desc.value.bind(el);
+      } else if (desc.get || desc.set) {
+        Object.defineProperty(el, name, {
+          get: desc.get ? desc.get.bind(el) : undefined,
+          set: desc.set ? desc.set.bind(el) : undefined,
+          configurable: true, enumerable: false,
+        });
       }
-    } else {
-      console.warn('[FC boot] customElements not available, retrying in 50ms (retries left:', retries, ')');
     }
-    if (retries > 0) setTimeout(() => _define(retries - 1), 50);
-    else console.error('[FC] ✗ all retries exhausted, customElements never available');
-  })(30);
+    // Run constructor logic manually
+    try {
+      // Replicate constructor body — attach shadow + init state + wire events
+      const shadow = el.attachShadow({ mode: 'closed' });
+      shadow.innerHTML = PANEL_HTML;
+      el._shadow = shadow;
+
+      // Defensive host styles
+      const HOST_STYLES = {
+        position: 'fixed', display: 'block', 'z-index': '2147483647',
+        top: '0', left: '0', right: 'auto', bottom: 'auto',
+        width: '100vw', height: '100vh',
+        background: 'transparent', 'color-scheme': 'dark',
+        margin: '0', padding: '0', border: 'none',
+        opacity: '1', visibility: 'visible', transform: 'none',
+        'pointer-events': 'none', isolation: 'isolate', overflow: 'visible',
+      };
+      const _applyHost = () => {
+        for (const [k, v] of Object.entries(HOST_STYLES)) {
+          el.style.setProperty(k, v, 'important');
+        }
+      };
+      _applyHost();
+      new MutationObserver(() => {
+        if (el.style.getPropertyValue('background') !== 'transparent') _applyHost();
+      }).observe(el, { attributes: true, attributeFilter: ['style'] });
+
+      el._currentEan = null;
+      el._currentAsin = null;
+      el._lastEk = 0;
+      el._mode = 'mid';
+      el._results = { ebay: null, amazon: null, kaufland: null };
+
+      el._initWindow();
+      el._wireEvents();
+      el._initFromStorage();
+
+      console.warn('[FC] ✓ flipcheck-panel manually upgraded');
+    } catch (e) {
+      console.error('[FC] ✗ manual upgrade failed:', e?.message, e?.stack);
+    }
+  }
+
+  // Try customElements.define first — fastest path when registry works.
+  // Fall through to manual upgrade if customElements is null/broken.
+  let registered = false;
+  try {
+    if (typeof customElements !== 'undefined' && customElements) {
+      if (!customElements.get('flipcheck-panel')) {
+        customElements.define('flipcheck-panel', FlipcheckPanel);
+      }
+      registered = true;
+      console.warn('[FC] ✓ flipcheck-panel REGISTERED via customElements');
+    } else {
+      console.warn('[FC] customElements null — falling back to manual upgrade');
+    }
+  } catch (e) {
+    console.warn('[FC] customElements.define threw, manual fallback:', e?.message);
+  }
+
+  if (!registered) {
+    // Manual upgrade: scan now + watch for future <flipcheck-panel> insertions
+    document.querySelectorAll('flipcheck-panel').forEach(manuallyUpgrade);
+    new MutationObserver((muts) => {
+      for (const m of muts) {
+        for (const n of m.addedNodes) {
+          if (n.nodeType !== 1) continue;
+          if (n.tagName === 'FLIPCHECK-PANEL') manuallyUpgrade(n);
+          else if (n.querySelector) {
+            n.querySelectorAll('flipcheck-panel').forEach(manuallyUpgrade);
+          }
+        }
+      }
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
 
   // esc helper retained for future use
   void esc;
