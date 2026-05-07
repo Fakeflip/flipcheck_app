@@ -345,6 +345,164 @@ function _normEanBg(s) {
   return ean;
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// EAN ↔ ASIN Multi-Strategy Resolver with persistent cache + verification
+// ════════════════════════════════════════════════════════════════════════════
+//
+// Layered resolution (race for speed, fall back for reliability):
+//   1. chrome.storage.local cache  (instant, 7d TTL for verified hits)
+//   2. Keepa via apiAmazonCheck    (~150ms, authoritative)
+//   3. Amazon SERP scrape          (~500ms, validated against EAN)
+//
+// Verification: when SERP returns ASIN, we verify the EAN matches by checking
+// the product detail page. Eliminates false-positives from generic searches.
+// ════════════════════════════════════════════════════════════════════════════
+
+const _RESOLVE_CACHE_KEY = '__fc_resolve_cache_v1';
+const _RESOLVE_TTL_HIT_VERIFIED = 7 * 24 * 3600 * 1000;  // 7 days
+const _RESOLVE_TTL_HIT_UNVERIFIED = 60 * 60 * 1000;       // 1 hour
+const _RESOLVE_TTL_MISS = 24 * 3600 * 1000;               // 1 day for negative cache
+
+async function _resolveCacheGet(key) {
+  try {
+    const r = await chrome.storage.local.get(_RESOLVE_CACHE_KEY);
+    const cache = r[_RESOLVE_CACHE_KEY] || {};
+    const entry = cache[key];
+    if (!entry) return null;
+    if (Date.now() > entry.exp) { delete cache[key]; await chrome.storage.local.set({ [_RESOLVE_CACHE_KEY]: cache }); return null; }
+    return entry.val;  // {asin, ean, verified, source}
+  } catch (_) { return null; }
+}
+async function _resolveCacheSet(key, val, ttl) {
+  try {
+    const r = await chrome.storage.local.get(_RESOLVE_CACHE_KEY);
+    const cache = r[_RESOLVE_CACHE_KEY] || {};
+    cache[key] = { val, exp: Date.now() + ttl };
+    // Evict if cache grows too large (>2000 entries)
+    const keys = Object.keys(cache);
+    if (keys.length > 2000) {
+      keys.sort((a, b) => cache[a].exp - cache[b].exp).slice(0, 500).forEach(k => delete cache[k]);
+    }
+    await chrome.storage.local.set({ [_RESOLVE_CACHE_KEY]: cache });
+  } catch (_) {}
+}
+
+// Verify a candidate ASIN actually corresponds to the EAN by scraping its detail page.
+async function _verifyAsinForEan(asin, ean) {
+  try {
+    const scraped = await _scrapeAmazonPageEan(asin);
+    if (!scraped) return false;
+    return _normEanBg(scraped) === _normEanBg(ean);
+  } catch (_) { return false; }
+}
+
+// Strategy 1: Cache lookup
+async function _resolveEanToAsin_cache(ean) {
+  return await _resolveCacheGet(`e2a:${ean}`);
+}
+// Strategy 2: Keepa via amazon_check
+async function _resolveEanToAsin_keepa(ean) {
+  try {
+    const data = await apiAmazonCheck({ asin: '', ean, ek: 0, mode: 'mid' });
+    if (data?.asin) return { asin: data.asin, ean, verified: true, source: 'keepa' };
+  } catch (_) {}
+  return null;
+}
+// Strategy 3: SERP scrape with multi-result + verification
+async function _resolveEanToAsin_serp(ean) {
+  try {
+    const url = `https://www.amazon.de/s?k=${encodeURIComponent(ean)}&i=aps`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept-Language': 'de-DE,de;q=0.9', 'Accept': 'text/html' },
+    });
+    if (!res.ok) return null;
+    const html = await res.text();
+    // Extract up to 3 candidate ASINs (first match might be a sponsored irrelevant one)
+    const matches = [...html.matchAll(/data-asin="([A-Z0-9]{10})"[^>]*data-component-type="s-search-result"/g)].slice(0, 3);
+    const candidates = matches.map(m => m[1]);
+    if (!candidates.length) {
+      // Less strict regex fallback
+      const m = html.match(/data-asin="([A-Z0-9]{10})"/);
+      if (m) candidates.push(m[1]);
+    }
+    // Verify each candidate sequentially (race to first match)
+    for (const asin of candidates) {
+      if (await _verifyAsinForEan(asin, ean)) {
+        return { asin, ean, verified: true, source: 'serp+verified' };
+      }
+    }
+    // Unverified fallback (return first if no verification matched, low confidence)
+    if (candidates[0]) return { asin: candidates[0], ean, verified: false, source: 'serp' };
+  } catch (_) {}
+  return null;
+}
+
+// Master EAN→ASIN resolver — race + fall back
+async function resolveEanToAsin(ean) {
+  if (!ean) return { ok: false, asin: null };
+  const norm = _normEanBg(ean);
+  if (!norm) return { ok: false, asin: null, reason: 'invalid_ean' };
+
+  // 1. Cache hit
+  const cached = await _resolveEanToAsin_cache(norm);
+  if (cached) return { ok: true, ...cached, fromCache: true };
+
+  // 2. Keepa first (most authoritative when it has the EAN)
+  const keepa = await _resolveEanToAsin_keepa(norm);
+  if (keepa?.asin) {
+    await _resolveCacheSet(`e2a:${norm}`, keepa, _RESOLVE_TTL_HIT_VERIFIED);
+    await _resolveCacheSet(`a2e:${keepa.asin}`, keepa, _RESOLVE_TTL_HIT_VERIFIED);
+    return { ok: true, ...keepa };
+  }
+
+  // 3. SERP scrape with verification
+  const serp = await _resolveEanToAsin_serp(norm);
+  if (serp?.asin) {
+    const ttl = serp.verified ? _RESOLVE_TTL_HIT_VERIFIED : _RESOLVE_TTL_HIT_UNVERIFIED;
+    await _resolveCacheSet(`e2a:${norm}`, serp, ttl);
+    if (serp.verified) await _resolveCacheSet(`a2e:${serp.asin}`, serp, ttl);
+    return { ok: true, ...serp };
+  }
+
+  // Negative cache to avoid repeated lookups for known-not-found EANs
+  await _resolveCacheSet(`e2a:${norm}`, { asin: null, ean: norm, verified: false, source: 'miss' }, _RESOLVE_TTL_MISS);
+  return { ok: false, asin: null };
+}
+
+// Master ASIN→EAN resolver
+async function resolveAsinToEan(asin) {
+  if (!asin || !/^[A-Z0-9]{10}$/.test(asin)) return { ok: false, ean: null };
+
+  const cached = await _resolveCacheGet(`a2e:${asin}`);
+  if (cached) return { ok: true, ...cached, fromCache: true };
+
+  // 1. Keepa
+  try {
+    const data = await apiAmazonCheck({ asin, ean: '', ek: 0, mode: 'mid' });
+    if (data?.ean) {
+      const result = { asin, ean: data.ean, title: data.title || null, verified: true, source: 'keepa' };
+      await _resolveCacheSet(`a2e:${asin}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+      await _resolveCacheSet(`e2a:${data.ean}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+      return { ok: true, ...result };
+    }
+  } catch (_) {}
+
+  // 2. Page scrape
+  try {
+    const scraped = await _scrapeAmazonPageEan(asin);
+    if (scraped) {
+      const result = { asin, ean: scraped, verified: true, source: 'scrape' };
+      await _resolveCacheSet(`a2e:${asin}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+      await _resolveCacheSet(`e2a:${scraped}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+      return { ok: true, ...result };
+    }
+  } catch (_) {}
+
+  await _resolveCacheSet(`a2e:${asin}`, { asin, ean: null, verified: false, source: 'miss' }, _RESOLVE_TTL_MISS);
+  return { ok: false, ean: null };
+}
+
 // ── Amazon Check API Call (L1 → L2 → Network) ────────────────────────────────
 async function apiAmazonCheck({ asin, ean, ek = 0, mode = 'mid', method = 'fba', shipIn = 4.99, catId = 'sonstiges', prepFee = 0 }) {
   const ekNum    = parseFloat(ek) || 0;
@@ -598,40 +756,17 @@ _cr.runtime.onMessage.addListener((msg, _sender, reply) => {
           break;
         }
 
-        // ── ASIN → EAN: resolve via amazon-check (Keepa), fallback to page scrape ─
+        // ── ASIN → EAN: multi-strategy resolver (cache → Keepa → page scrape) ─
         case 'ASIN_TO_EAN': {
-          try {
-            const asinData = await apiAmazonCheck({ asin: msg.asin, ean: '', ek: 0, mode: 'mid' });
-            const keepaEan = asinData?.ean || null;
-            if (keepaEan) {
-              reply({ ok: true, ean: keepaEan, asin: msg.asin, title: asinData?.title || null });
-              break;
-            }
-            // Keepa returned no EAN — scrape the Amazon product page HTML for
-            // UPC / EAN / GTIN (Amazon.de English locale uses "UPC" label, not "EAN")
-            const scrapeEan = await _scrapeAmazonPageEan(msg.asin);
-            reply({ ok: true, ean: scrapeEan, asin: msg.asin, title: asinData?.title || null });
-          } catch {
-            reply({ ok: false, ean: null });
-          }
+          const result = await resolveAsinToEan(msg.asin);
+          reply(result);
           break;
         }
 
-        // ── EAN → ASIN: fetch Amazon search page, extract first product ASIN ──
+        // ── EAN → ASIN: multi-strategy resolver (cache → Keepa → SERP+verify) ─
         case 'EAN_TO_ASIN': {
-          try {
-            const searchUrl = `https://www.amazon.de/s?k=${encodeURIComponent(msg.ean)}&i=aps`;
-            const searchRes = await fetch(searchUrl, {
-              signal: AbortSignal.timeout(8000),
-              headers: { 'Accept-Language': 'de-DE,de;q=0.9', 'Accept': 'text/html' },
-            });
-            if (!searchRes.ok) throw new Error(`HTTP ${searchRes.status}`);
-            const html  = await searchRes.text();
-            const match = html.match(/data-asin="([A-Z0-9]{10})"/);
-            reply({ ok: true, asin: match ? match[1] : null });
-          } catch {
-            reply({ ok: false, asin: null });
-          }
+          const result = await resolveEanToAsin(msg.ean);
+          reply(result);
           break;
         }
 

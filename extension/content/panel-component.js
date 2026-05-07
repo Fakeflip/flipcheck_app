@@ -668,16 +668,21 @@ console.warn('[FC boot] panel-component.js v7 loading');
         set('kpi4', d.days_to_cash != null ? num(Math.round(d.days_to_cash)) : '—');
         set('kpi4-sub', d.days_to_cash != null ? 'bis Verkauf' : '');
       } else if (mkt === 'amazon') {
-        // BSR drops = sales indicator from Keepa
+        // sales_30d is computed from badge | bsr_estimate | bsr_drops (Keepa)
         const sales = d.sales_30d ?? d.bsr_drops_30d;
+        const sourceLabel = {
+          badge: 'Amazon-Badge',
+          bsr_drops: 'BSR-Drops',
+          bsr_estimate: 'BSR-Schätzung',
+        }[d.sales_30d_source] || (d.bsr_drops_30d != null ? 'BSR-Drops' : '/30 Tage');
         set('kpi3-label', 'Verkäufe');
         set('kpi3', num(sales));
-        set('kpi3-sub', d.bsr_drops_30d != null
-          ? 'aus BSR-Drops'
-          : (d.sales_30d ? '/30 Tage' : ''));
+        set('kpi3-sub', sourceLabel);
         set('kpi4-label', 'BSR');
-        set('kpi4', d.bsr_rank ? '#' + num(d.bsr_rank) : '—');
-        set('kpi4-sub', d.fba_fee ? 'FBA ' + eur(d.fba_fee) : '');
+        // Backend returns sales_rank (not bsr_rank) — match field name
+        const rank = d.sales_rank ?? d.bsr_rank;
+        set('kpi4', rank ? '#' + num(rank) : '—');
+        set('kpi4-sub', d.fba_fee ? 'FBA ' + eur(d.fba_fee) : (d.bsr_drops_30d != null ? d.bsr_drops_30d + ' Drops' : ''));
       } else if (mkt === 'kaufland') {
         set('kpi3-label', 'Angebote');
         set('kpi3', num(d.offers_count));
@@ -719,11 +724,17 @@ console.warn('[FC boot] panel-component.js v7 loading');
       if (this._lastEk) rows.push(['Einkauf', eur(this._lastEk), '']);
       rows.push(['Profit', eur(profit), profit > 0 ? 'profit-pos' : profit < 0 ? 'profit-neg' : '']);
 
-      if (mkt === 'amazon' && d.bsr_drops_30d != null) {
-        rows.push(['BSR-Drops 30 Tage', num(d.bsr_drops_30d) + ' (≈ Verkäufe)', '']);
-      }
-      if (mkt === 'amazon' && d.buy_box_price) {
-        rows.push(['Buy Box', eur(d.buy_box_price), '']);
+      if (mkt === 'amazon') {
+        const rank = d.sales_rank ?? d.bsr_rank;
+        if (rank) rows.push(['BSR (aktuell)', '#' + num(rank), '']);
+        if (d.bsr_min_30d) rows.push(['BSR best 30d', '#' + num(d.bsr_min_30d), '']);
+        if (d.bsr_drops_30d != null) rows.push(['BSR-Drops 30d', num(d.bsr_drops_30d) + ' Drops (≈ Verkäufe)', '']);
+        if (d.bb_changes_30d != null) rows.push(['Buy-Box Wechsel 30d', num(d.bb_changes_30d), '']);
+        if (d.bb_unique_sellers != null) rows.push(['Anzahl Buy-Box Verkäufer', num(d.bb_unique_sellers), '']);
+        if (d.fba_count != null) rows.push(['FBA Angebote', num(d.fba_count), '']);
+        if (d.offer_count != null) rows.push(['Gesamt Angebote', num(d.offer_count), '']);
+        if (d.review_count) rows.push(['Bewertungen', num(d.review_count) + (d.rating ? ` (${d.rating.toFixed(1)}★)` : ''), '']);
+        if (d.buy_box_price) rows.push(['Buy Box Preis', eur(d.buy_box_price), '']);
       }
       if (mkt === 'kaufland' && d.best_seller_name) {
         rows.push(['Bester Verkäufer', d.best_seller_name, '']);
