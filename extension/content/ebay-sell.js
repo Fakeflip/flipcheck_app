@@ -15,14 +15,30 @@
   // ── Create Panel ──────────────────────────────────────────────────────────
   const panel = document.createElement('flipcheck-panel');
   panel.id = '__fc_panel';
-  panel.style.setProperty('position', 'fixed',       'important');
+    panel.style.setProperty('position', 'fixed',       'important');
   panel.style.setProperty('display',  'block',        'important');
   panel.style.setProperty('z-index',  '2147483647',  'important');
   panel.style.setProperty('top',      '0',            'important');
-  panel.style.setProperty('right',    '0',            'important');
+  panel.style.setProperty('left',     '0',            'important');
+  panel.style.setProperty('right',    'auto',         'important');
   panel.style.setProperty('bottom',   'auto',         'important');
+  panel.style.setProperty('width',    '100vw',        'important');
   panel.style.setProperty('height',   '100vh',        'important');
-  panel.style.setProperty('width',    'auto',         'important');
+  panel.style.setProperty('background', 'transparent', 'important');
+  panel.style.setProperty('color-scheme', 'dark',     'important');
+  panel.style.setProperty('margin',   '0',            'important');
+  panel.style.setProperty('padding',  '0',            'important');
+  panel.style.setProperty('border',   'none',         'important');
+  panel.style.setProperty('opacity',  '1',            'important');
+  panel.style.setProperty('visibility', 'visible',    'important');
+  panel.style.setProperty('transform', 'none',        'important');
+  panel.style.setProperty('max-width', 'none',        'important');
+  panel.style.setProperty('min-width', '0',           'important');
+  panel.style.setProperty('overflow',  'visible',     'important');
+  panel.style.setProperty('float',     'none',        'important');
+  panel.style.setProperty('clear',     'none',        'important');
+  panel.style.setProperty('isolation', 'isolate',     'important');
+  panel.style.setProperty('pointer-events', 'none',   'important');
   document.documentElement.appendChild(panel);
 
   // ── Push page content so sidebar doesn't overlap ──────────────────────────

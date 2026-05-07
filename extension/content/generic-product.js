@@ -13,14 +13,15 @@
   panel.id = '__fc_panel';
   // Pre-set inline position so panel is visible even before shadow-DOM CSS applies.
   // Using inline !important to guarantee no page CSS can override these.
-  panel.style.setProperty('position', 'fixed',       'important');
+    panel.style.setProperty('position', 'fixed',       'important');
   panel.style.setProperty('display',  'block',        'important');
   panel.style.setProperty('z-index',  '2147483647',  'important');
   panel.style.setProperty('top',      '0',            'important');
-  panel.style.setProperty('right',    '0',            'important');
+  panel.style.setProperty('left',     '0',            'important');
+  panel.style.setProperty('right',    'auto',         'important');
   panel.style.setProperty('bottom',   'auto',         'important');
+  panel.style.setProperty('width',    '100vw',        'important');
   panel.style.setProperty('height',   '100vh',        'important');
-  panel.style.setProperty('width',    'auto',         'important');
   panel.style.setProperty('background', 'transparent', 'important');
   panel.style.setProperty('color-scheme', 'dark',     'important');
   panel.style.setProperty('margin',   '0',            'important');
@@ -35,6 +36,7 @@
   panel.style.setProperty('float',     'none',        'important');
   panel.style.setProperty('clear',     'none',        'important');
   panel.style.setProperty('isolation', 'isolate',     'important');
+  panel.style.setProperty('pointer-events', 'none',   'important');
   // Inject page-level <style> as extra defense — beats page CSS even if inline styles get wiped
   if (!document.getElementById('__fc_host_shield')) {
     const shield = document.createElement('style');
@@ -42,8 +44,9 @@
     shield.textContent = `flipcheck-panel, flipcheck-panel#__fc_panel {
       all: initial !important;
       position: fixed !important; display: block !important;
-      z-index: 2147483647 !important; top: 0 !important; right: 0 !important;
-      bottom: auto !important; height: 100vh !important; width: auto !important;
+      z-index: 2147483647 !important; top: 0 !important; left: 0 !important;
+      right: auto !important; bottom: auto !important;
+      width: 100vw !important; height: 100vh !important;
       background: transparent !important; color-scheme: dark !important;
       margin: 0 !important; padding: 0 !important; border: none !important;
       opacity: 1 !important; visibility: visible !important;
