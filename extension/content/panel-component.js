@@ -31,8 +31,8 @@ console.warn('[FC boot] panel-component.js v7 loading');
     input[type=number] { -moz-appearance: textfield; }
     input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; }
 
-    /* Floating window shell */
-    .fc-window { position: absolute; width: 440px; height: 720px; min-width: 360px; min-height: 400px; max-width: 100vw; max-height: 100vh; display: flex; flex-direction: column; background: #0A0A0F; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset; overflow: hidden; pointer-events: auto; backdrop-filter: blur(20px); }
+    /* Floating window shell — position:fixed so it works even if host is 0x0 (some pages collapse custom elements) */
+    .fc-window { position: fixed; width: 440px; height: 720px; min-width: 360px; min-height: 400px; max-width: 100vw; max-height: 100vh; display: flex; flex-direction: column; background: #0A0A0F; border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.55), 0 1px 0 rgba(255,255,255,0.04) inset; overflow: hidden; pointer-events: auto; backdrop-filter: blur(20px); }
     .fc-window.dragging { transition: none; cursor: grabbing; user-select: none; }
     .fc-window.resizing { transition: none; user-select: none; }
 
