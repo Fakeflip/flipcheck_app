@@ -2,6 +2,7 @@
 
 (function () {
   if (document.getElementById('__fc_panel')) return;
+  console.log('[FC boot] amazon-product.js');
 
   function getAmazonAsin() {
     // From URL: /dp/B0XXXXXXXXX/  or /gp/product/B0XXXXXXXXX

@@ -1,6 +1,7 @@
 /* Flipcheck Extension — Metro Content Script */
 (function () {
   if (document.getElementById('__fc_panel')) return;
+  console.log('[FC boot] metro-product.js');
 
   const panel = document.createElement('flipcheck-panel');
   panel.id = '__fc_panel';

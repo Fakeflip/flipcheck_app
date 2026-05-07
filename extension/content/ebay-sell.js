@@ -11,6 +11,7 @@
 
 (function () {
   if (document.getElementById('__fc_panel')) return;
+  console.log('[FC boot] ebay-sell.js');
 
   // ── Create Panel ──────────────────────────────────────────────────────────
   const panel = document.createElement('flipcheck-panel');
