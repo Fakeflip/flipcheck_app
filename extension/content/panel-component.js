@@ -774,21 +774,31 @@ console.warn('[FC boot] panel-component.js v7 loading');
     _renderCardError(mkt, msg) { this._renderCardEmpty(mkt, '⚠ ' + msg); }
   }
 
+  console.warn('[FC boot] reaching customElements registration block');
   // customElements may not be available at document_start; retry with backoff.
-  // Also handles cases where the page or another extension messes with the registry.
   (function _define(retries) {
-    if (typeof customElements !== 'undefined' && customElements) {
+    const ceType = typeof customElements;
+    const ceTruthy = !!customElements;
+    if (retries === 30) {
+      console.warn('[FC boot] customElements check:', { type: ceType, truthy: ceTruthy });
+    }
+    if (ceType !== 'undefined' && customElements) {
       try {
-        if (!customElements.get('flipcheck-panel')) {
+        const already = customElements.get('flipcheck-panel');
+        console.warn('[FC boot] customElements.get returned:', already ? 'already-registered' : 'undefined (will define)');
+        if (!already) {
           customElements.define('flipcheck-panel', FlipcheckPanel);
-          console.log('[FC] flipcheck-panel registered (v7)');
+          console.warn('[FC] ✓ flipcheck-panel REGISTERED (v7)');
         }
         return;
       } catch (e) {
-        console.warn('[FC] customElements.define failed:', e?.message);
+        console.error('[FC] ✗ customElements.define FAILED:', e?.message, e?.stack);
       }
+    } else {
+      console.warn('[FC boot] customElements not available, retrying in 50ms (retries left:', retries, ')');
     }
     if (retries > 0) setTimeout(() => _define(retries - 1), 50);
+    else console.error('[FC] ✗ all retries exhausted, customElements never available');
   })(30);
 
   // esc helper retained for future use
