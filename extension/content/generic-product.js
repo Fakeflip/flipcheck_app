@@ -58,13 +58,18 @@
     (document.head || document.documentElement).appendChild(shield);
   }
   document.documentElement.appendChild(panel);
-  // v7: Panel floats — no body-margin push needed.
-  // Clean up any residual margins from previous (sidebar) version on first load.
   try {
     document.body.style.removeProperty('margin-right');
     document.body.style.removeProperty('margin-left');
     document.body.style.removeProperty('padding-bottom');
   } catch (_) {}
+
+  // Self-heal: re-attach if SPA/React navigation removes our panel from DOM
+  new MutationObserver(() => {
+    if (!document.documentElement.contains(panel)) {
+      try { document.documentElement.appendChild(panel); } catch (_) {}
+    }
+  }).observe(document.documentElement, { childList: true });
 
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.type === 'CONTEXT_EAN_PROBE' && msg.ean && typeof panel.probe === 'function') panel.probe(msg.ean);

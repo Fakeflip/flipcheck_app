@@ -37,6 +37,13 @@
     document.body.style.removeProperty('margin-left');
     document.body.style.removeProperty('padding-bottom');
   } catch (_) {}
+  // Self-heal: re-attach if SPA/React navigation removes our panel from DOM
+  new MutationObserver(() => {
+    if (!document.documentElement.contains(panel)) {
+      try { document.documentElement.appendChild(panel); } catch (_) {}
+    }
+  }).observe(document.documentElement, { childList: true });
+
 
   chrome.runtime.onMessage.addListener(msg => {
     if (msg.type === 'CONTEXT_EAN_PROBE' && msg.ean && typeof panel.probe === 'function') panel.probe(msg.ean);

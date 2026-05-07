@@ -339,16 +339,43 @@ console.warn('[FC boot] panel-component.js v7 loading');
         if (status) status.textContent = 'Bereit';
       }
     }
-    probe(ean) {
-      if (!ean) return;
-      this._currentEan = String(ean).replace(/\D/g, "");
+    probe(idOrAsin) {
+      if (!idOrAsin) return;
+      const raw = String(idOrAsin).trim();
+      const isAsin = /^[A-Z0-9]{10}$/.test(raw);
+
       const ekRaw = this._shadow.getElementById('fcEkInput')?.value;
       this._lastEk = parseFloat(ekRaw) || 0;
       const empty = this._shadow.getElementById('fcEmptyState');
       if (empty) empty.style.display = 'none';
       this._renderSkeletons();
-      this._updateIdsBar();
-      this._fetchAllMarkets();
+
+      if (isAsin) {
+        // ASIN-first probe (e.g. user is on Amazon /dp/ page).
+        // Resolve ASIN→EAN in background so eBay/Kaufland can still fetch.
+        this._currentAsin = raw;
+        this._updateIdsBar();
+        // Fire Amazon immediately (we have ASIN — no resolution needed)
+        this._fetchAmazonCard();
+        // Resolve EAN async, then fire eBay/Kaufland once we have it
+        chrome.runtime.sendMessage({ type: 'ASIN_TO_EAN', asin: raw }, (res) => {
+          if (chrome.runtime.lastError) return;
+          if (res?.ok && res.ean) {
+            this._currentEan = res.ean;
+            this._updateIdsBar();
+            this._fetchEbayCard();
+            this._fetchKauflandCard();
+          } else {
+            this._renderCardEmpty('ebay', 'Keine EAN gefunden für eBay-Suche');
+            this._renderCardEmpty('kaufland', 'Keine EAN gefunden für Kaufland-Suche');
+          }
+        });
+      } else {
+        // EAN probe (default — most pages)
+        this._currentEan = raw.replace(/\D/g, "");
+        this._updateIdsBar();
+        this._fetchAllMarkets();
+      }
     }
 
     // ── Window init + drag/resize/persist ──
@@ -569,12 +596,15 @@ console.warn('[FC boot] panel-component.js v7 loading');
 
     // ── Data fetch — all 3 markets in parallel ──
     _fetchAllMarkets() {
-      if (!this._currentEan) return;
-      const ek = this._lastEk, mode = this._mode;
+      this._fetchEbayCard();
+      this._fetchAmazonCard();
+      this._fetchKauflandCard();
+    }
 
-      // eBay (always)
+    _fetchEbayCard() {
+      if (!this._currentEan) return;
       chrome.runtime.sendMessage({
-        type: 'FLIPCHECK', ean: this._currentEan, ek, mode, market: 'ebay',
+        type: 'FLIPCHECK', ean: this._currentEan, ek: this._lastEk, mode: this._mode, market: 'ebay',
       }, (res) => {
         if (chrome.runtime.lastError || !res?.ok) {
           this._renderCardError('ebay', 'Konnte nicht geladen werden'); return;
@@ -586,11 +616,13 @@ console.warn('[FC boot] panel-component.js v7 loading');
         }
         this._renderCard('ebay', res.data);
       });
+    }
 
-      // Amazon — needs ASIN
-      const fetchAmazon = (asin) => {
+    _fetchAmazonCard() {
+      const ek = this._lastEk, mode = this._mode;
+      const fetchWithAsin = (asin) => {
         chrome.runtime.sendMessage({
-          type: 'AMAZON_CHECK', asin, ean: this._currentEan, ek, mode, method: 'fba',
+          type: 'AMAZON_CHECK', asin, ean: this._currentEan || '', ek, mode, method: 'fba',
         }, (res) => {
           if (chrome.runtime.lastError || !res?.ok) {
             this._renderCardError('amazon', 'Konnte nicht geladen werden'); return;
@@ -600,21 +632,23 @@ console.warn('[FC boot] panel-component.js v7 loading');
         });
       };
       if (this._currentAsin) {
-        fetchAmazon(this._currentAsin);
-      } else {
+        fetchWithAsin(this._currentAsin);
+      } else if (this._currentEan) {
         chrome.runtime.sendMessage({ type: 'EAN_TO_ASIN', ean: this._currentEan }, (res) => {
           if (chrome.runtime.lastError || !res?.ok || !res.asin) {
             this._renderCardEmpty('amazon', 'Auf Amazon nicht gefunden'); return;
           }
           this._currentAsin = res.asin;
           this._updateIdsBar();
-          fetchAmazon(res.asin);
+          fetchWithAsin(res.asin);
         });
       }
+    }
 
-      // Kaufland (uses EAN)
+    _fetchKauflandCard() {
+      if (!this._currentEan) return;
       chrome.runtime.sendMessage({
-        type: 'FLIPCHECK', ean: this._currentEan, ek, mode, market: 'kaufland',
+        type: 'FLIPCHECK', ean: this._currentEan, ek: this._lastEk, mode: this._mode, market: 'kaufland',
       }, (res) => {
         if (chrome.runtime.lastError) {
           this._renderCardError('kaufland', 'Konnte nicht geladen werden'); return;

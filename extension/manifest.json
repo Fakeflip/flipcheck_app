@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Flipcheck",
-  "version": "1.5.3",
+  "version": "1.5.4",
   "description": "Profitabilit\u00e4tsanalyse f\u00fcr eBay-Reseller: BUY/HOLD/SKIP-Verdikt, Gewinnkalkulator, Preisverlauf & Deal-Benachrichtigungen.",
   "background": {
     "service_worker": "background.js"
