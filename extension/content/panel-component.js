@@ -769,9 +769,23 @@
     _renderCardError(mkt, msg) { this._renderCardEmpty(mkt, '⚠ ' + msg); }
   }
 
-  if (!customElements.get('flipcheck-panel')) {
-    customElements.define('flipcheck-panel', FlipcheckPanel);
-  }
-  // esc helper retained for future use; intentionally not exported
+  // customElements may not be available at document_start; retry with backoff.
+  // Also handles cases where the page or another extension messes with the registry.
+  (function _define(retries) {
+    if (typeof customElements !== 'undefined' && customElements) {
+      try {
+        if (!customElements.get('flipcheck-panel')) {
+          customElements.define('flipcheck-panel', FlipcheckPanel);
+          console.log('[FC] flipcheck-panel registered (v7)');
+        }
+        return;
+      } catch (e) {
+        console.warn('[FC] customElements.define failed:', e?.message);
+      }
+    }
+    if (retries > 0) setTimeout(() => _define(retries - 1), 50);
+  })(30);
+
+  // esc helper retained for future use
   void esc;
 })();
