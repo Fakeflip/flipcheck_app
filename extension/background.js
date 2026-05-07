@@ -387,86 +387,48 @@ async function _resolveCacheSet(key, val, ttl) {
   } catch (_) {}
 }
 
-// Verify a candidate ASIN actually corresponds to the EAN by scraping its detail page.
-async function _verifyAsinForEan(asin, ean) {
-  try {
-    const scraped = await _scrapeAmazonPageEan(asin);
-    if (!scraped) return false;
-    return _normEanBg(scraped) === _normEanBg(ean);
-  } catch (_) { return false; }
-}
-
-// Strategy 1: Cache lookup
-async function _resolveEanToAsin_cache(ean) {
-  return await _resolveCacheGet(`e2a:${ean}`);
-}
-// Strategy 2: Keepa via amazon_check
-async function _resolveEanToAsin_keepa(ean) {
-  try {
-    const data = await apiAmazonCheck({ asin: '', ean, ek: 0, mode: 'mid' });
-    if (data?.asin) return { asin: data.asin, ean, verified: true, source: 'keepa' };
-  } catch (_) {}
-  return null;
-}
-// Strategy 3: SERP scrape with multi-result + verification
-async function _resolveEanToAsin_serp(ean) {
-  try {
-    const url = `https://www.amazon.de/s?k=${encodeURIComponent(ean)}&i=aps`;
-    const res = await fetch(url, {
-      signal: AbortSignal.timeout(8000),
-      headers: { 'Accept-Language': 'de-DE,de;q=0.9', 'Accept': 'text/html' },
-    });
-    if (!res.ok) return null;
-    const html = await res.text();
-    // Extract up to 3 candidate ASINs (first match might be a sponsored irrelevant one)
-    const matches = [...html.matchAll(/data-asin="([A-Z0-9]{10})"[^>]*data-component-type="s-search-result"/g)].slice(0, 3);
-    const candidates = matches.map(m => m[1]);
-    if (!candidates.length) {
-      // Less strict regex fallback
-      const m = html.match(/data-asin="([A-Z0-9]{10})"/);
-      if (m) candidates.push(m[1]);
-    }
-    // Verify each candidate sequentially (race to first match)
-    for (const asin of candidates) {
-      if (await _verifyAsinForEan(asin, ean)) {
-        return { asin, ean, verified: true, source: 'serp+verified' };
-      }
-    }
-    // Unverified fallback (return first if no verification matched, low confidence)
-    if (candidates[0]) return { asin: candidates[0], ean, verified: false, source: 'serp' };
-  } catch (_) {}
-  return null;
-}
-
-// Master EAN→ASIN resolver — race + fall back
+// EAN → ASIN: Simple SERP scrape (mirrors pre-Phase-2 behavior) + persistent cache.
+// Multiple regex patterns for robustness against Amazon DOM changes.
 async function resolveEanToAsin(ean) {
   if (!ean) return { ok: false, asin: null };
   const norm = _normEanBg(ean);
   if (!norm) return { ok: false, asin: null, reason: 'invalid_ean' };
 
-  // 1. Cache hit
-  const cached = await _resolveEanToAsin_cache(norm);
-  if (cached) return { ok: true, ...cached, fromCache: true };
+  // 1. Cache hit (super-fast)
+  const cached = await _resolveCacheGet(`e2a:${norm}`);
+  if (cached?.asin) return { ok: true, asin: cached.asin, ean: norm, fromCache: true };
 
-  // 2. Keepa first (most authoritative when it has the EAN)
-  const keepa = await _resolveEanToAsin_keepa(norm);
-  if (keepa?.asin) {
-    await _resolveCacheSet(`e2a:${norm}`, keepa, _RESOLVE_TTL_HIT_VERIFIED);
-    await _resolveCacheSet(`a2e:${keepa.asin}`, keepa, _RESOLVE_TTL_HIT_VERIFIED);
-    return { ok: true, ...keepa };
+  // 2. SERP scrape — try multiple result-card regex patterns
+  try {
+    const url = `https://www.amazon.de/s?k=${encodeURIComponent(norm)}&i=aps`;
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers: { 'Accept-Language': 'de-DE,de;q=0.9', 'Accept': 'text/html' },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      // Try patterns in order from most-specific to least-specific
+      const patterns = [
+        /data-asin="([A-Z0-9]{10})"[^>]*data-component-type="s-search-result"/,
+        /data-component-type="s-search-result"[^>]*data-asin="([A-Z0-9]{10})"/,
+        /data-asin="([A-Z0-9]{10})"/,
+        /\/dp\/([A-Z0-9]{10})\b/,
+      ];
+      for (const re of patterns) {
+        const m = html.match(re);
+        if (m && m[1]) {
+          const result = { asin: m[1], ean: norm };
+          await _resolveCacheSet(`e2a:${norm}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+          await _resolveCacheSet(`a2e:${m[1]}`, result, _RESOLVE_TTL_HIT_VERIFIED);
+          return { ok: true, asin: m[1], ean: norm };
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('[FC EAN→ASIN] SERP failed:', e?.message);
   }
 
-  // 3. SERP scrape with verification
-  const serp = await _resolveEanToAsin_serp(norm);
-  if (serp?.asin) {
-    const ttl = serp.verified ? _RESOLVE_TTL_HIT_VERIFIED : _RESOLVE_TTL_HIT_UNVERIFIED;
-    await _resolveCacheSet(`e2a:${norm}`, serp, ttl);
-    if (serp.verified) await _resolveCacheSet(`a2e:${serp.asin}`, serp, ttl);
-    return { ok: true, ...serp };
-  }
-
-  // Negative cache to avoid repeated lookups for known-not-found EANs
-  await _resolveCacheSet(`e2a:${norm}`, { asin: null, ean: norm, verified: false, source: 'miss' }, _RESOLVE_TTL_MISS);
+  // No negative cache — let user retry, EANs sometimes appear later
   return { ok: false, asin: null };
 }
 
