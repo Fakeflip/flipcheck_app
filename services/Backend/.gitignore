@@ -1,0 +1,13 @@
+# Runtime cache (eBay research) — never track
+research_cache.sqlite
+
+# Secrets & env
+.env
+
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Vercel link
+.vercel

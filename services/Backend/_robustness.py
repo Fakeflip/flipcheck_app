@@ -216,6 +216,48 @@ class ProxyHealth:
 
 
 # ════════════════════════════════════════════════════════════════════════════
+# 3b. CookieHealth — per-cookie health tracking (throttle is cookie-bound)
+# ════════════════════════════════════════════════════════════════════════════
+class CookieHealth:
+    """
+    Mirror of ProxyHealth, but for Seller-Hub research cookies. The /sh/research
+    throttle is bound to the cookie+session (not the IP), so a 429/soft-block must
+    cool the *cookie*, not (only) the proxy. Default cooldown is longer than the
+    proxy cooldown because a throttled account stays throttled for a while.
+    """
+
+    def __init__(self, cooldown_sec: int = 300):
+        self._cooldown = cooldown_sec
+        self._bad_until: Dict[str, float] = {}
+        self._lock = threading.Lock()
+
+    def mark_bad(self, cookie_id: str, cooldown_sec: Optional[float] = None) -> None:
+        if not cookie_id:
+            return
+        cd = self._cooldown if cooldown_sec is None else cooldown_sec
+        with self._lock:
+            self._bad_until[cookie_id] = time.time() + cd
+        logger.info(f"Cookie {cookie_id[:12]}... marked bad for {cd:.0f}s")
+
+    def is_healthy(self, cookie_id: str) -> bool:
+        with self._lock:
+            until = self._bad_until.get(cookie_id, 0)
+            if time.time() >= until:
+                self._bad_until.pop(cookie_id, None)
+                return True
+            return False
+
+    def pick_random_healthy(self, cookie_ids: list) -> Optional[str]:
+        """Return a random healthy cookie_id, or None if all are cooling."""
+        if not cookie_ids:
+            return None
+        healthy = [c for c in cookie_ids if self.is_healthy(c)]
+        if not healthy:
+            return None
+        return random.choice(healthy)
+
+
+# ════════════════════════════════════════════════════════════════════════════
 # 4. TTLCache — thread-safe time-bound LRU cache
 # ════════════════════════════════════════════════════════════════════════════
 class TTLCache:
@@ -290,6 +332,30 @@ class UpstreamLimiter:
 # ════════════════════════════════════════════════════════════════════════════
 # 6. Combined: robust_request — retry + circuit + proxy health
 # ════════════════════════════════════════════════════════════════════════════
+def _parse_retry_after(value: Optional[str]) -> Optional[float]:
+    """Parse a Retry-After header: delta-seconds (int) or HTTP-date. Returns seconds or None."""
+    if not value:
+        return None
+    value = value.strip()
+    try:
+        secs = float(value)
+        return max(0.0, secs)
+    except (TypeError, ValueError):
+        pass
+    try:
+        from email.utils import parsedate_to_datetime
+        import datetime as _dt
+        dt = parsedate_to_datetime(value)
+        if dt is None:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=_dt.timezone.utc)
+        delta = (dt - _dt.datetime.now(_dt.timezone.utc)).total_seconds()
+        return max(0.0, delta)
+    except Exception:
+        return None
+
+
 def robust_request(
     request_fn: Callable,
     breaker: CircuitBreaker,
@@ -298,6 +364,11 @@ def robust_request(
     use_proxy: bool = True,
     max_retries: int = 2,
     backoff_base: float = 0.5,
+    *,
+    retry_after_cap: float = 60.0,
+    rate_limit_backoff_base: float = 5.0,
+    on_rate_limit: Optional[Callable[[Optional[float]], None]] = None,
+    throttle_opens_circuit: bool = True,
 ):
     """
     Execute an HTTP request with:
@@ -305,6 +376,10 @@ def robust_request(
       - Proxy health-aware selection (skip dead proxies)
       - Exponential backoff retry on transient errors
       - Proxy auto-marking bad on failure
+      - Retry-After-aware backoff on 403/429 (delta-seconds or HTTP-date)
+      - on_rate_limit(retry_after) callback so the caller can cool a throttled COOKIE
+        (the /sh/research throttle is cookie-bound, not proxy-bound)
+      - sustained 429/403 counts toward the circuit so a fully-throttled pool opens it
 
     request_fn signature: (proxy: Optional[Dict]) -> response
         Should return a response object with .status_code, or raise on network error.
@@ -316,9 +391,11 @@ def robust_request(
         return None
 
     last_error = None
+    saw_throttle = False
     for attempt in range(max_retries + 1):
         proxy = proxy_health.pick_random_healthy(proxies) if (use_proxy and proxies) else None
         proxy_url = (proxy.get("http") if isinstance(proxy, dict) else None) if proxy else None
+        retry_after: Optional[float] = None
 
         try:
             resp = request_fn(proxy)
@@ -329,10 +406,27 @@ def robust_request(
             elif resp.status_code == 200:
                 breaker.record_success()
                 return resp
-            elif resp.status_code in (403, 429):
-                # Likely IP/proxy issue
+            elif resp.status_code in (403, 429, 430):
+                # Throttle / soft-block — bound to cookie+session, not just IP.
+                saw_throttle = True
+                try:
+                    hdrs = resp.headers or {}
+                    retry_after = _parse_retry_after(
+                        hdrs.get("Retry-After") or hdrs.get("retry-after")
+                    )
+                except Exception:
+                    retry_after = None
                 if proxy_url:
                     proxy_health.mark_bad(proxy_url)
+                if on_rate_limit is not None:
+                    try:
+                        on_rate_limit(retry_after)
+                    except Exception:
+                        pass
+                if throttle_opens_circuit:
+                    # Count sustained throttling toward the breaker so a fully
+                    # throttled pool opens the circuit instead of hammering.
+                    breaker.record_failure()
                 last_error = f"HTTP {resp.status_code}"
             elif resp.status_code >= 500:
                 # Upstream failure — count toward circuit
@@ -347,9 +441,14 @@ def robust_request(
                 proxy_health.mark_bad(proxy_url)
 
         if attempt < max_retries:
-            # Exponential backoff with jitter
-            delay = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
-            time.sleep(delay)
+            if retry_after is not None:
+                delay = min(retry_after, retry_after_cap)
+            elif saw_throttle:
+                delay = rate_limit_backoff_base * (2 ** attempt) + random.uniform(0, 0.5)
+            else:
+                # Exponential backoff with jitter
+                delay = backoff_base * (2 ** attempt) + random.uniform(0, 0.2)
+            time.sleep(max(0.0, delay))
 
     # All retries exhausted
     breaker.record_failure()

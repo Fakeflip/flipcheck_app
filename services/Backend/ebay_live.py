@@ -32,6 +32,25 @@ EBAY_CLIENT_ID = os.getenv("EBAY_CLIENT_ID")
 EBAY_CLIENT_SECRET = os.getenv("EBAY_CLIENT_SECRET")
 # Seller Hub Research Cookie (einzeilig in .env)
 EBAY_RESEARCH_COOKIE = os.getenv("EBAY_RESEARCH_COOKIE")
+# Optional multi-cookie pool (newline/comma separated) for per-request rotation.
+# Falls back to the single EBAY_RESEARCH_COOKIE for backward compatibility.
+EBAY_RESEARCH_COOKIES = os.getenv("EBAY_RESEARCH_COOKIES")
+# --- Behaviour flags (safe defaults preserve current output shape) -----------
+# Generic "chrome" resolves to curl_cffi's NEWEST profile and therefore never goes
+# stale. A pinned profile does: chrome131 (Nov 2024) gets splash-blocked by eBay while
+# "chrome"/chrome142 sail through from the SAME IP in the SAME minute — the stale
+# JA3/JA4 IS the bot signal. Never pin this to an explicit version again.
+EBAY_IMPERSONATE = os.getenv("EBAY_IMPERSONATE", "chrome").strip() or "chrome"
+EBAY_RESEARCH_WARMUP = os.getenv("EBAY_RESEARCH_WARMUP", "1").strip() in ("1", "true", "True", "yes", "YES")
+EBAY_RESEARCH_COMBINED = os.getenv("EBAY_RESEARCH_COMBINED", "1").strip() in ("1", "true", "True", "yes", "YES")
+try:
+    EBAY_RESEARCH_CACHE_TTL = int(os.getenv("EBAY_RESEARCH_CACHE_TTL", str(3 * 3600)))
+except Exception:
+    EBAY_RESEARCH_CACHE_TTL = 3 * 3600
+try:
+    EBAY_RESEARCH_NEG_TTL = int(os.getenv("EBAY_RESEARCH_NEG_TTL", "90"))
+except Exception:
+    EBAY_RESEARCH_NEG_TTL = 90
 TOKEN_FILE = BASE_DIR / "ebay_token.json"
 EBAY_SCOPE = "https://api.ebay.com/oauth/api_scope"
 TOKEN_URL = "https://api.ebay.com/identity/v1/oauth2/token"
@@ -49,40 +68,89 @@ SESSION.headers.update(
     }
 )
 # =========================================================
-# PROXY ROTATION (Research scraping)
+# PROXY ROTATION (Research scraping) — ENV-DRIVEN
 # =========================================================
-_RAW_PROXIES = [
-    "82.25.197.175:61234:user_c19093666cc1:wy0tCBJt",
-    "82.25.202.144:61234:user_01b8187438ef:bmAD6Cae",
-    "82.25.202.246:61234:user_9397c11aa7c9:Ni3W6nEo",
-    "88.135.99.9:61234:user_9e85beaac451:RNCF6VAa",
-    "88.135.99.33:61234:user_2f8623fdea99:GxHT6JFy",
-    "88.135.99.106:61234:user_14b9aa1a93e9:0WXnfNeZ",
-    "88.135.99.113:61234:user_3c1866aeb60f:qVfP0R3r",
-    "88.135.99.147:61234:user_95e3199150b0:rwPc5LeF",
-    "88.135.99.209:61234:user_ace3fa75d6a4:CXPwsJrm",
-    "88.135.99.243:61234:user_6163e08b6c75:PdlSG1tJ",
-]
-
+# The old hardcoded datacenter pool is DEAD (407 CONNECT / ProxyError) and must
+# NOT be used: it concentrates all research traffic on one server IP → rate limit
+# trips fast. Proxies now come purely from EBAY_RESEARCH_PROXIES (newline/comma
+# list of "ip:port:user:pass" or full http(s):// URLs). Empty → run DIRECT
+# (no proxy), which works but throttles sooner.
 def _parse_proxy_list(raw: List[str]) -> List[Dict[str, str]]:
-    """Parse 'ip:port:user:password' → requests proxy dict."""
-    result = []
+    """Parse 'ip:port:user:password' OR a full http(s):// URL → requests proxy dict."""
+    result: List[Dict[str, str]] = []
     for entry in raw:
-        parts = entry.strip().split(":")
-        if len(parts) != 4:
+        entry = (entry or "").strip()
+        if not entry:
             continue
-        ip, port, user, pw = parts
-        url = f"http://{user}:{pw}@{ip}:{port}"
-        result.append({"http": url, "https": url})
+        if entry.startswith("http://") or entry.startswith("https://"):
+            result.append({"http": entry, "https": entry})
+            continue
+        parts = entry.split(":")
+        if len(parts) == 4:
+            ip, port, user, pw = parts
+            url = f"http://{user}:{pw}@{ip}:{port}"
+            result.append({"http": url, "https": url})
+        elif len(parts) == 2:
+            ip, port = parts
+            url = f"http://{ip}:{port}"
+            result.append({"http": url, "https": url})
     return result
 
-_PROXY_LIST: List[Dict[str, str]] = _parse_proxy_list(_RAW_PROXIES)
+
+def _split_env_list(raw: Optional[str]) -> List[str]:
+    """Split a newline/comma-separated env value into trimmed non-empty tokens."""
+    if not raw:
+        return []
+    tokens: List[str] = []
+    for chunk in raw.replace("\r", "\n").split("\n"):
+        for part in chunk.split(","):
+            part = part.strip()
+            if part:
+                tokens.append(part)
+    return tokens
+
+
+# German RESIDENTIAL pool (AS3320 Deutsche Telekom, Frankfurt) — verified 10/10 alive
+# against ebay.de. Residential is the IP class that matters here: Imperva scores
+# datacenter ranges far harder. EBAY_RESEARCH_PROXIES overrides this list, so rotating
+# credentials never needs a redeploy.
+_DEFAULT_PROXIES: List[str] = [
+    f"82.41.244.{i}:11000:birdBW7dQ:qzg6ibNtwt73" for i in range(147, 157)
+]
+
+
+def _build_proxy_list() -> List[Dict[str, str]]:
+    env = _split_env_list(os.getenv("EBAY_RESEARCH_PROXIES"))
+    return _parse_proxy_list(env or _DEFAULT_PROXIES)
+
+
+_PROXY_LIST: List[Dict[str, str]] = _build_proxy_list()
+
 
 def _get_proxy() -> Optional[Dict[str, str]]:
-    """Return a random proxy from the pool (None if pool empty)."""
+    """Random proxy from the pool (None if empty → direct). Fine for the ANONYMOUS
+    public scrape; the authenticated research path uses _proxy_for_cookie() instead."""
     if not _PROXY_LIST:
         return None
     return random.choice(_PROXY_LIST)
+
+
+def _proxy_for_cookie(cookie_id: Optional[str]) -> List[Dict[str, str]]:
+    """Pin ONE proxy per cookie instead of rotating per request.
+
+    Rotating an *authenticated* Seller-Hub session across 10 exits is an
+    account-takeover signature — realistic outcome is a security hold on the seller
+    account, which is worse than a bot-block. Keeping each cookie on a stable exit
+    looks like a normal user, while MULTIPLE cookies still spread across MULTIPLE IPs
+    (that is where the pool actually buys us headroom). Deterministic: same cookie →
+    same exit across restarts.
+    """
+    if not _PROXY_LIST:
+        return []
+    if not cookie_id:
+        return _PROXY_LIST
+    idx = int(hashlib.md5(cookie_id.encode()).hexdigest(), 16) % len(_PROXY_LIST)
+    return [_PROXY_LIST[idx]]
 
 # =========================================================
 # TOKEN CACHE (Browse only)
@@ -264,13 +332,188 @@ def _build_browse_market_prices(items: List[Dict[str, Any]]) -> Dict[str, Any]:
 _PUBLIC_SOLD_CACHE: Dict[str, Dict[str, Any]] = {}
 _PUBLIC_SOLD_TTL = 20 * 60  # 20 min
 
-def _fetch_public_sold_prices(query: str) -> Optional[Dict[str, Any]]:
+# German month abbreviations used in eBay's "Verkauft <d>. <Mon> <YYYY>" captions
+_DE_MONTHS = {
+    "jan": 1, "feb": 2, "mär": 3, "maer": 3, "mrz": 3, "apr": 4, "mai": 5,
+    "jun": 6, "jul": 7, "aug": 8, "sep": 9, "okt": 10, "nov": 11, "dez": 12,
+}
+
+
+def _parse_de_sold_date(caption_text: str) -> Optional[float]:
+    """Parse 'Verkauft  7. Jul 2026' → epoch seconds (None if unparseable)."""
+    if not caption_text:
+        return None
+    m = re.search(r"(\d{1,2})\.\s*([A-Za-zäöü]{3,4})\.?\s*(\d{4})", caption_text)
+    if not m:
+        return None
+    day = int(m.group(1))
+    mon_key = m.group(2).lower()[:3]
+    year = int(m.group(3))
+    month = _DE_MONTHS.get(mon_key)
+    if not month:
+        return None
+    try:
+        import datetime as _dt
+        return _dt.datetime(year, month, day, tzinfo=_dt.timezone.utc).timestamp()
+    except Exception:
+        return None
+
+
+# Split a listing page into per-card blocks so title/price/caption stay paired.
+_CARD_SPLIT_RE = re.compile(r'su-card-container|class="?s-card', re.I)
+_SCARD_PRICE_RE = re.compile(r'(?:s-card|su-item-card)__price[^>]*>(.*?)</span>', re.S)
+_SCARD_CAPTION_RE = re.compile(r's-card__caption[^>]*>(.*?)</div>', re.S)
+_SCARD_TITLE_RE = re.compile(r's-card__title[^>]*>(.*?)</div>', re.S)
+_EUR_PRICE_RE = re.compile(r'(?:EUR\s*)?(\d{1,4}(?:\.\d{3})*,\d{2})')
+
+
+def _scard_is_promo(block: str) -> bool:
+    """Filter ad/promo cards: $-prices, 'Shop on eBay', 'Neues Angebot'."""
+    if "Shop on eBay" in block or "Neues Angebot" in block:
+        return True
+    # $-price (US promo card) with no EUR price at all
+    if "$" in block and "EUR" not in block:
+        return True
+    return False
+
+
+def _relevance_tokens(title: Optional[str]) -> List[str]:
+    """Distinctive model tokens (those containing a digit, e.g. '1050','d2','c1')
+    from a product name, used to keep only the actual product/variant among fuzzy
+    eBay sold results. Returns [] when the name has none → no filtering."""
+    if not title:
+        return []
+    seen: set = set()
+    out: List[str] = []
+    for t in re.findall(r"[a-z0-9]+", title.lower()):
+        if len(t) <= 6 and any(ch.isdigit() for ch in t) and t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def _title_matches(text: str, tokens: List[str]) -> bool:
+    """True if `text` contains ALL model tokens as whole words (case-insensitive)."""
+    if not tokens:
+        return True
+    low = text.lower()
+    return all(re.search(r"(?<![a-z0-9])" + re.escape(t) + r"(?![a-z0-9])", low) for t in tokens)
+
+
+def _parse_scard_sold_page(html: str, window_days: int = 30,
+                           match_tokens: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
+    """Parse the 2024+ eBay 's-card' sold-listings markup for median price and an
+    APPROXIMATE monthly_sales (count of 'Verkauft <date>' captions in-window,
+    scaled to 30d). When match_tokens is given, only cards whose title contains ALL
+    those model tokens are counted (drops fuzzy variant/accessory matches — e.g. the
+    older 'C1' when the product is the 'D2'). Returns
+    {avg_price, median_price, monthly_sales, ...} or None."""
+    if not html:
+        return None
+    # Anchor on each price occurrence. A card's block runs from the PREVIOUS price
+    # anchor (or start) up to the NEXT price anchor, so exactly one card's
+    # title+price+caption falls inside and neighbouring cards don't leak in.
+    # eBay rotates markup: legacy 's-item__price', 's-card__price' (variant A),
+    # and 'su-item-card__price' (variant B, no caption class). Anchor on both s-card
+    # families so the fallback works regardless of which variant eBay served.
+    price_positions = [m.start() for m in re.finditer(r'(?:s-card|su-item-card)__price', html)]
+    if not price_positions:
+        return None
+    prices: List[float] = []
+    now = time.time()
+    window_start = now - window_days * 86400
+    in_window = 0
+    dated = 0
+    seen_ids: set = set()
+    for i, pos in enumerate(price_positions):
+        prev_pos = price_positions[i - 1] if i > 0 else 0
+        next_pos = price_positions[i + 1] if i + 1 < len(price_positions) else len(html)
+        # Block for promo/caption detection: from just after the previous price
+        # (its title/caption belong to that card) to the next price anchor.
+        block = html[prev_pos:next_pos]
+        if _scard_is_promo(block):
+            continue
+        # Skip crossed-out "was" prices (class '...strikethrough...__price'). They are
+        # the original price, not what the item sold for, and they inflate the average.
+        # Scope the check to THIS price's own <span> so a neighbour's class can't leak in.
+        _span_start = html.rfind("<span", max(0, pos - 200), pos)
+        if "strikethrough" in (html[_span_start:pos] if _span_start != -1 else ""):
+            continue
+        # This card's title + listing-id sit between the previous price and this one.
+        title_span = html[prev_pos:pos]
+        # Relevance filter: skip cards whose title lacks the product's model tokens
+        # (fuzzy eBay search mixes e.g. 'SDR 1050 D2' with the older 'C1' + Zubehör).
+        if match_tokens and not _title_matches(title_span, match_tokens):
+            continue
+        # Dedup: eBay sometimes renders the same listing card twice.
+        lids = re.findall(r'data-listingid=["\']?(\d+)', title_span)
+        if lids:
+            if lids[-1] in seen_ids:
+                continue
+            seen_ids.add(lids[-1])
+        pm = _SCARD_PRICE_RE.search(html[pos:next_pos])
+        if not pm:
+            continue
+        price_text = re.sub(r"<[^>]+>", "", pm.group(1))
+        em = _EUR_PRICE_RE.search(price_text)
+        if not em:
+            continue
+        p = _parse_price_number(em.group(1))
+        if not p or not (0.5 < p < 20000):
+            continue
+        prices.append(p)
+        # Sold date for THIS card — markup-agnostic. "Verkauft <date>" carries a
+        # caption class in the s-card variant but NONE in the su-item-card variant,
+        # so anchor on the "Verkauft" text rather than a CSS class.
+        card_text = re.sub(r"<[^>]+>", " ", html[pos:next_pos])
+        vm = re.search(r"Verkauft(.{0,40})", card_text)
+        ts = _parse_de_sold_date(vm.group(1)) if vm else None
+        if ts is not None:
+            dated += 1
+            if ts >= window_start:
+                in_window += 1
+
+    if len(prices) < 3:
+        return None
+
+    prices.sort()
+    n = len(prices)
+    median = prices[n // 2] if n % 2 == 1 else (prices[n // 2 - 1] + prices[n // 2]) / 2
+    # Median-anchored band instead of IQR. Sold pages mix single units with bundles/
+    # sets (max is routinely 5x the median). On a SMALL/fuzzy result set the IQR grows
+    # wide enough to keep those outliers, which inflated sell_price_avg far above the
+    # median (observed: Ø 43.92 vs Median 29.95) and produced phantom profits, because
+    # the caller computes profit from the avg. ±50% around the median is exactly what
+    # the Browse path (_build_browse_market_prices) already uses.
+    lo, hi = median * 0.5, median * 1.5
+    filtered = [p for p in prices if lo <= p <= hi] or prices
+    avg = sum(filtered) / len(filtered)
+
+    # Approximate monthly_sales from in-window dated cards scaled to 30 days.
+    # NOTE: the page shows a bounded, sorted subset → this is a floor, flagged approx.
+    monthly_sales = None
+    if dated > 0:
+        monthly_sales = int(round(in_window * (30.0 / max(1, window_days)))) or in_window or None
+
+    return {
+        "avg_price": round(avg, 2),
+        "median_price": round(median, 2),
+        "monthly_sales": monthly_sales,
+        "_source": "public_scrape",
+        "velocity_approx": True,
+    }
+
+
+def _fetch_public_sold_prices(query: str, window_days: int = 30,
+                              match_tokens: Optional[List[str]] = None) -> Optional[Dict[str, Any]]:
     """
-    Scrapt öffentliche eBay Abgeschlossene Angebote (LH_Sold=1).
-    Kein OAuth, kein Cookie nötig — funktioniert immer als Fallback.
-    Gibt {"avg_price", "median_price", "monthly_sales": None} zurück.
+    Scrapt öffentliche eBay Abgeschlossene Angebote (LH_Sold=1) im 2024+ s-card
+    Markup. Kein OAuth/Cookie nötig — Fallback wenn Research throttled/tot ist.
+    Liefert median + APPROX monthly_sales (velocity_approx=True) via 'Verkauft'-Datum.
+    match_tokens filtert auf das echte Produkt/die Variante (gegen eBays Fuzzy-Suche).
+    Fetch läuft über die gewärmte curl_cffi Session (Chrome-Impersonation).
     """
-    cache_key = query.strip().lower()
+    cache_key = query.strip().lower() + "|" + ",".join(match_tokens or [])
     now = time.time()
     hit = _PUBLIC_SOLD_CACHE.get(cache_key)
     if hit and (now - hit["ts"] < _PUBLIC_SOLD_TTL):
@@ -280,51 +523,39 @@ def _fetch_public_sold_prices(query: str) -> Optional[Dict[str, Any]]:
         url = (
             "https://www.ebay.de/sch/i.html"
             f"?_nkw={requests.utils.quote(query)}"
-            "&LH_Complete=1&LH_Sold=1&_sacat=0&_sop=10&_ipg=50"
+            "&LH_Complete=1&LH_Sold=1&_sacat=0&_sop=13&_ipg=60"
         )
         headers = {
             "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
             "Accept-Language": "de-DE,de;q=0.9",
-            "User-Agent": SESSION.headers.get("User-Agent", "Mozilla/5.0"),
+            # Deliberately NO User-Agent: curl_cffi's impersonate profile supplies a UA
+            # that matches its TLS/JA3. Forcing our own creates a UA↔fingerprint
+            # mismatch, which is itself a bot signal.
         }
         proxy = _get_proxy()
-        resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+        sess = _get_cffi_session()
+        if sess is not None:
+            _ensure_homepage_warmup(proxy)   # cold session 403s without homepage cookies
+            resp = sess.get(url, headers=headers, timeout=12, proxies=proxy)
+            # Cold/blocked session → re-warm once and retry (first call after restart)
+            final_url = (getattr(resp, "url", "") or "").lower()
+            if resp.status_code == 403 or "splashui/distil" in final_url:
+                _ensure_homepage_warmup(proxy, force=True)
+                resp = sess.get(url, headers=headers, timeout=12, proxies=proxy)
+        else:
+            resp = SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
         if resp.status_code != 200:
             return None
 
-        # Preise aus HTML extrahieren (kein BeautifulSoup nötig)
-        # eBay schreibt Preise als: EUR 12,99 oder 12,99 €
-        price_pattern = re.compile(
-            r'class="s-item__price"[^>]*>.*?(?:EUR\s*|)(\d{1,4}[.,]\d{2})\s*(?:€|EUR)?',
-            re.DOTALL | re.IGNORECASE,
-        )
-        raw_prices = price_pattern.findall(resp.text)
-        prices: List[float] = []
-        for raw in raw_prices:
-            p = _parse_price_number(raw)
-            if p and 0.5 < p < 5000:
-                prices.append(p)
-
-        if len(prices) < 3:
+        data = _parse_scard_sold_page(resp.text, window_days=window_days, match_tokens=match_tokens)
+        if not data:
             return None
 
-        prices.sort()
-        n = len(prices)
-        median = prices[n // 2] if n % 2 == 1 else (prices[n // 2 - 1] + prices[n // 2]) / 2
-        # IQR-filter: Ausreißer entfernen
-        q1, q3 = prices[n // 4], prices[(3 * n) // 4]
-        iqr = q3 - q1
-        filtered = [p for p in prices if q1 - 1.5 * iqr <= p <= q3 + 1.5 * iqr] or prices
-        avg = sum(filtered) / len(filtered)
-
-        data = {
-            "avg_price": round(avg, 2),
-            "median_price": round(median, 2),
-            "monthly_sales": None,
-            "_source": "public_scrape",
-        }
         _PUBLIC_SOLD_CACHE[cache_key] = {"ts": now, "data": data}
-        logger.info(f"[PublicSold] {query}: median={median:.2f} avg={avg:.2f} n={len(prices)}")
+        logger.info(
+            f"[PublicSold] {query}: median={data['median_price']:.2f} "
+            f"avg={data['avg_price']:.2f} monthly_sales≈{data.get('monthly_sales')}"
+        )
         return data
     except Exception as e:
         logger.warning(f"[PublicSold] Scrape failed for '{query}': {e}")
@@ -356,31 +587,350 @@ def _filter_items_by_title(items: List[Dict[str, Any]], bad_words: Optional[List
 # Robustness primitives — coalesce concurrent same-EAN requests, circuit-break
 # on upstream failures, track proxy health, retry transient errors with backoff.
 from _robustness import (
-    InflightCoalescer, CircuitBreaker, ProxyHealth, TTLCache,
+    InflightCoalescer, CircuitBreaker, ProxyHealth, CookieHealth, TTLCache,
     UpstreamLimiter, robust_request,
 )
+import threading
+import hashlib
+import sqlite3
 
 # TTLCache replaces the old dict-based cache — thread-safe + LRU + max size
 _RESEARCH_CACHE = TTLCache(max_size=2000, ttl_sec=30 * 60)          # 30 min
 _RESEARCH_TRENDS_CACHE = TTLCache(max_size=2000, ttl_sec=6 * 3600)  # 6 h
+# Combined fetch cache (aggregates+searchResults+metricsTrends in one dict).
+# velocity changes slowly, so a longer TTL is fine (default 3h, env-tunable).
+_RESEARCH_COMBINED_CACHE = TTLCache(max_size=2000, ttl_sec=EBAY_RESEARCH_CACHE_TTL)
+# Negative cache: throttled/None results are parked briefly so a rate-limited
+# product is not re-hammered on every incoming request.
+_RESEARCH_NEG_CACHE = TTLCache(max_size=2000, ttl_sec=EBAY_RESEARCH_NEG_TTL)
 
 # One coalescer per endpoint type → 5 concurrent users for same EAN = 1 upstream call
 _research_coalescer = InflightCoalescer(timeout=20.0)
 _trends_coalescer = InflightCoalescer(timeout=20.0)
+_combined_coalescer = InflightCoalescer(timeout=25.0)
 
-# Circuit breaker — if eBay returns 5+ 5xx errors in 60s, short-circuit for 30s
+# Circuit breaker — if eBay returns 5+ failures (5xx OR sustained 429s) in 60s,
+# short-circuit for 30s so a fully-throttled pool stops hammering.
 _research_breaker = CircuitBreaker(failure_threshold=5, window_sec=60, cooldown_sec=30)
 
-# Proxy health — datacenter proxies that get blocked are skipped for 2 min
+# Proxy health — blocked proxies are skipped for 2 min
 _proxy_health = ProxyHealth(cooldown_sec=120)
+
+# Cookie health — the /sh/research throttle is cookie-bound, so a 429/soft-block
+# cools the COOKIE for a real cooldown (5 min) and rotation picks a fresh one.
+_cookie_health = CookieHealth(cooldown_sec=300)
 
 # Limit concurrent upstream eBay calls (FastAPI worker pool can have 100s of threads)
 _research_limiter = UpstreamLimiter(max_concurrent=8, acquire_timeout=15.0)
 
-# Legacy throttle — kept for backward compat, but coalescer + limiter make it
-# largely redundant. We use a tiny min interval as a final safety net.
+
+# ---------------------------------------------------------------------------
+# Cookie pool + rotation (per-request), rebuilt lazily so app.py hot-swap works
+# ---------------------------------------------------------------------------
+def _cookie_id(cookie: str) -> str:
+    """Stable short id for a cookie string (for health tracking / warmup keys)."""
+    return hashlib.sha1((cookie or "").encode("utf-8", "replace")).hexdigest()[:16]
+
+
+def _build_cookie_pool() -> List[str]:
+    """Assemble the active cookie list from EBAY_RESEARCH_COOKIES, falling back to
+    the single EBAY_RESEARCH_COOKIE. Reads the *module* globals so the live
+    hot-swap (app.py mutating ebay_live.EBAY_RESEARCH_COOKIE) takes effect."""
+    pool = _split_env_list(EBAY_RESEARCH_COOKIES)
+    if not pool and EBAY_RESEARCH_COOKIE:
+        pool = [EBAY_RESEARCH_COOKIE]
+    # de-dup, preserve order
+    seen = set()
+    out: List[str] = []
+    for c in pool:
+        if c and c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+
+def _pick_cookie() -> Tuple[Optional[str], Optional[str]]:
+    """Return (cookie, cookie_id) preferring a healthy cookie. Falls back to any
+    cookie if all are cooling (better to try than to return no data)."""
+    pool = _build_cookie_pool()
+    if not pool:
+        return None, None
+    ids = [_cookie_id(c) for c in pool]
+    by_id = dict(zip(ids, pool))
+    healthy_id = _cookie_health.pick_random_healthy(ids)
+    if healthy_id is not None:
+        return by_id[healthy_id], healthy_id
+    # all cooling → pick any (last resort) so we still attempt / fall to scrape
+    cid = random.choice(ids)
+    return by_id[cid], cid
+
+
+def _has_any_research_cookie() -> bool:
+    return bool(_build_cookie_pool())
+
+
+# ---------------------------------------------------------------------------
+# Persistent (sqlite) research cache — survives restarts/redeploys
+# ---------------------------------------------------------------------------
+_PERSIST_DB_PATH = BASE_DIR / "research_cache.sqlite"
+_PERSIST_LOCK = threading.Lock()
+_PERSIST_DISABLED = os.getenv("EBAY_RESEARCH_PERSIST", "1").strip() not in ("1", "true", "True", "yes", "YES")
+
+
+def _persist_conn():
+    conn = sqlite3.connect(str(_PERSIST_DB_PATH), timeout=5.0)
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS research_cache ("
+        "k TEXT PRIMARY KEY, v TEXT NOT NULL, expires_at REAL NOT NULL)"
+    )
+    return conn
+
+
+def _persist_get(key: str) -> Optional[Dict[str, Any]]:
+    if _PERSIST_DISABLED:
+        return None
+    try:
+        with _PERSIST_LOCK:
+            conn = _persist_conn()
+            try:
+                row = conn.execute(
+                    "SELECT v, expires_at FROM research_cache WHERE k = ?", (key,)
+                ).fetchone()
+            finally:
+                conn.close()
+        if not row:
+            return None
+        v, expires_at = row
+        if expires_at < time.time():
+            return None
+        return json.loads(v)
+    except Exception as e:
+        logger.warning(f"[ResearchPersist] read error: {e}")
+        return None
+
+
+def _persist_set(key: str, value: Dict[str, Any], ttl_sec: int) -> None:
+    if _PERSIST_DISABLED:
+        return
+    try:
+        payload = json.dumps(value)
+        expires_at = time.time() + max(1, int(ttl_sec))
+        with _PERSIST_LOCK:
+            conn = _persist_conn()
+            try:
+                conn.execute(
+                    "INSERT INTO research_cache (k, v, expires_at) VALUES (?, ?, ?) "
+                    "ON CONFLICT(k) DO UPDATE SET v=excluded.v, expires_at=excluded.expires_at",
+                    (key, payload, expires_at),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+    except Exception as e:
+        logger.warning(f"[ResearchPersist] write error: {e}")
+
+
+def _clear_research_caches() -> None:
+    """Clear all in-process research caches (used by the live cookie hot-swap)."""
+    try:
+        _RESEARCH_CACHE.clear()
+        _RESEARCH_TRENDS_CACHE.clear()
+        _RESEARCH_COMBINED_CACHE.clear()
+        _RESEARCH_NEG_CACHE.clear()
+    except Exception:
+        pass
+
+
+# ---------------------------------------------------------------------------
+# Warmed, reused curl_cffi session + per-(cookie,proxy) warmup
+# ---------------------------------------------------------------------------
+_CFFI_SESSION = None
+_CFFI_SESSION_LOCK = threading.Lock()
+_WARMUP_STATE: Dict[str, float] = {}          # "cookie_id|proxy_id" -> expires_at
+_WARMUP_TOKENS: Dict[str, Tuple[str, str]] = {}  # cookie_id -> (header_name, token)
+_WARMUP_TTL = 30 * 60
+
+
+def _get_cffi_session():
+    """Module-level persistent curl_cffi Session (keep-alive lowers fingerprint).
+    Returns None if curl_cffi is unavailable (callers fall back to plain SESSION)."""
+    global _CFFI_SESSION
+    if _CFFI_SESSION is not None:
+        return _CFFI_SESSION
+    with _CFFI_SESSION_LOCK:
+        if _CFFI_SESSION is None:
+            try:
+                from curl_cffi import requests as cffi_requests
+                _CFFI_SESSION = cffi_requests.Session(impersonate=EBAY_IMPERSONATE)
+            except Exception as e:
+                logger.info(f"[Research] curl_cffi Session unavailable: {e}")
+                _CFFI_SESSION = None
+    return _CFFI_SESSION
+
+
+_HOMEPAGE_WARMED_UNTIL = 0.0
+_HOMEPAGE_WARM_LOCK = threading.Lock()
+_HOMEPAGE_WARM_TTL = 30 * 60
+
+
+def _ensure_homepage_warmup(proxy: Optional[Dict[str, str]] = None, force: bool = False) -> None:
+    """Seed the shared curl_cffi session with ebay.de homepage cookies. The public
+    /sch/i.html sold-scrape 403s on a COLD session (Imperva expects the cookies a
+    real browser collects on the homepage first). One homepage GET fixes it, so the
+    very first fallback after a restart doesn't fail (verified: cold→403, warmed→200)."""
+    global _HOMEPAGE_WARMED_UNTIL
+    now = time.time()
+    if not force and _HOMEPAGE_WARMED_UNTIL > now:
+        return
+    sess = _get_cffi_session()
+    if sess is None:
+        return
+    try:
+        sess.get(
+            "https://www.ebay.de/",
+            headers={
+                # No User-Agent override — see _fetch_public_sold_prices.
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+                "Accept-Language": "de-DE,de;q=0.9",
+                "Upgrade-Insecure-Requests": "1",
+                "sec-fetch-site": "none",
+                "sec-fetch-mode": "navigate",
+                "sec-fetch-dest": "document",
+            },
+            timeout=12, proxies=proxy,
+        )
+        with _HOMEPAGE_WARM_LOCK:
+            _HOMEPAGE_WARMED_UNTIL = now + _HOMEPAGE_WARM_TTL
+    except Exception as e:
+        logger.info(f"[PublicSold] homepage warmup failed: {e}")
+
+
+def _proxy_id(proxy: Optional[Dict[str, str]]) -> str:
+    if not proxy:
+        return "direct"
+    return (proxy.get("http") or proxy.get("https") or "direct")
+
+
+def _warmup_session(cookie: str, cookie_id: str, proxy: Optional[Dict[str, str]]) -> None:
+    """One-time GET to the Seller-Hub SPA landing page per (cookie,proxy) pair.
+    Seeds any Set-Cookie delta and captures an anti-CSRF token to echo later.
+    Best-effort: failures are swallowed (the XHR may still work)."""
+    if not EBAY_RESEARCH_WARMUP or not cookie:
+        return
+    pid = _proxy_id(proxy)
+    state_key = f"{cookie_id}|{pid}"
+    now = time.time()
+    exp = _WARMUP_STATE.get(state_key, 0)
+    if exp > now:
+        return
+    sess = _get_cffi_session()
+    if sess is None:
+        _WARMUP_STATE[state_key] = now + _WARMUP_TTL
+        return
+    try:
+        headers = {
+            "Cookie": cookie,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
+            "Referer": "https://www.ebay.de/",
+            "Upgrade-Insecure-Requests": "1",
+            "sec-fetch-site": "same-origin",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-dest": "document",
+        }
+        resp = sess.get(
+            "https://www.ebay.de/sh/research",
+            headers=headers, timeout=12, proxies=proxy,
+        )
+        # Capture any xsrf/srt/csrf token from Set-Cookie for later echoing
+        try:
+            set_cookie = ""
+            for k, v in (resp.headers or {}).items():
+                if k.lower() == "set-cookie":
+                    set_cookie += ";" + str(v)
+            m = re.search(r"(?i)([a-z0-9_\-]*(?:xsrf|csrf|srt)[a-z0-9_\-]*)=([^;,\s]+)", set_cookie)
+            if m:
+                name, token = m.group(1), m.group(2)
+                header_name = "X-CSRF-Token" if "csrf" in name.lower() else "srt"
+                _WARMUP_TOKENS[cookie_id] = (header_name, token)
+        except Exception:
+            pass
+        logger.info(f"[Research] warmup {cookie_id[:8]} via {pid[:24]} → HTTP {getattr(resp,'status_code','?')}")
+    except Exception as e:
+        logger.info(f"[Research] warmup failed ({cookie_id[:8]}): {type(e).__name__}")
+    finally:
+        _WARMUP_STATE[state_key] = now + _WARMUP_TTL
+
+
+# ---------------------------------------------------------------------------
+# Per-cookie AIMD min-interval throttle (widens on 429, decays on success)
+# ---------------------------------------------------------------------------
+_AIMD_LOCK = threading.Lock()
+_AIMD_INTERVAL: Dict[str, float] = {}   # cookie_id -> current min interval
+_AIMD_LAST_TS: Dict[str, float] = {}    # cookie_id -> last call ts
+# /sh/research sits behind Imperva/Distil, which blocks on request *velocity*
+# ("übermenschliche Geschwindigkeit"). Keep a conservative per-cookie floor with
+# jitter so we never present a fast, regular cadence. Tunable via env.
+_AIMD_MIN = float(os.getenv("EBAY_RESEARCH_MIN_GAP", "1.8"))
+_AIMD_MAX = float(os.getenv("EBAY_RESEARCH_MAX_GAP", "45"))
+# Hard ceiling on how long a single call may queue for its slot. Beyond this we
+# DROP the request rather than fire early (early = burst = Imperva block).
+_AIMD_MAX_WAIT = float(os.getenv("EBAY_RESEARCH_MAX_WAIT", "90"))
+
+
+def _throttle_research_aimd(cookie_id: Optional[str]) -> bool:
+    """Additive-increase/multiplicative-decrease per-cookie spacing. On a fresh
+    cookie the gap is tiny; after a 429 it widens (see _aimd_penalize)."""
+    key = cookie_id or "_default_"
+    with _AIMD_LOCK:
+        interval = _AIMD_INTERVAL.get(key, _AIMD_MIN)
+        now = time.time()
+        last = _AIMD_LAST_TS.get(key, 0.0)
+        # RESERVE this caller's slot while still holding the lock. Writing the
+        # timestamp only *after* sleeping let every concurrent caller read the same
+        # `last`, sleep the same amount and then fire simultaneously — an N-request
+        # burst instead of one-every-`interval`. That burst is precisely the
+        # "übermenschliche Geschwindigkeit" Imperva/Distil blocks on. Reserving the
+        # slot under the lock makes concurrent callers queue behind one another.
+        # Jitter breaks the regular cadence Imperva fingerprints on.
+        slot = max(now, last + interval) + random.uniform(0.0, max(0.25, interval * 0.2))
+        if slot - now > _AIMD_MAX_WAIT:
+            # Queue too deep. Do NOT fire early (capping the sleep is what re-created
+            # the burst: late slots all collapsed onto the cap and fired together).
+            # Skip this request instead — no data beats a bot-block. Slot is NOT
+            # reserved, so we don't block the queue for a request we're dropping.
+            return False
+        _AIMD_LAST_TS[key] = slot
+    wait = slot - time.time()
+    if wait > 0:
+        time.sleep(wait)          # full wait — bounded above by _AIMD_MAX_WAIT
+    return True
+
+
+def _aimd_penalize(cookie_id: Optional[str], retry_after: Optional[float] = None) -> None:
+    """Multiplicative increase after a throttle signal."""
+    key = cookie_id or "_default_"
+    with _AIMD_LOCK:
+        cur = _AIMD_INTERVAL.get(key, _AIMD_MIN)
+        if retry_after and retry_after > cur:
+            cur = min(retry_after, _AIMD_MAX)
+        else:
+            cur = min(cur * 2.0 if cur >= _AIMD_MIN else _AIMD_MIN * 2, _AIMD_MAX)
+        _AIMD_INTERVAL[key] = max(cur, _AIMD_MIN * 2)
+
+
+def _aimd_reward(cookie_id: Optional[str]) -> None:
+    """Additive decrease after a clean success."""
+    key = cookie_id or "_default_"
+    with _AIMD_LOCK:
+        cur = _AIMD_INTERVAL.get(key, _AIMD_MIN)
+        cur = max(_AIMD_MIN, cur - 0.1)
+        _AIMD_INTERVAL[key] = cur
+
+
+# Legacy throttle — kept for backward compat (unused callers may still import it).
 _LAST_RESEARCH_TS = 0.0
-_RESEARCH_THROTTLE_LOCK = __import__("threading").Lock()
+_RESEARCH_THROTTLE_LOCK = threading.Lock()
 
 def _throttle_research(min_interval: float = 0.2) -> None:
     """Minimum gap between upstream calls — last line of defense against bursting."""
@@ -391,12 +941,21 @@ def _throttle_research(min_interval: float = 0.2) -> None:
             time.sleep(min_interval - dt)
         _LAST_RESEARCH_TS = time.time()
 def _parse_price_number(text: str) -> Optional[float]:
+    """Extract a EUR amount from strings like 'EUR 150,50', '150,50 €', '1.234,56'.
+    Handles German thousands('.')/decimal(',') and a leading/trailing currency."""
     if not text:
         return None
-    t = text.replace("€", "").strip()
-    t = t.replace(".", "").replace(",", ".")
+    # Isolate the numeric token (German format: optional thousands dots + ,dd)
+    m = re.search(r"(\d{1,3}(?:\.\d{3})+,\d{1,2}|\d+,\d{1,2}|\d+(?:\.\d+)?)", text)
+    if not m:
+        return None
+    tok = m.group(1)
+    if "," in tok:
+        # German: '.' = thousands sep, ',' = decimal
+        tok = tok.replace(".", "").replace(",", ".")
+    # else: plain integer or already-dotted decimal — leave as-is
     try:
-        return float(t)
+        return float(tok)
     except ValueError:
         return None
 def _extract_median_from_search_results(search_results: Dict[str, Any]) -> Optional[float]:
@@ -482,81 +1041,507 @@ def _build_research_url(keywords: str, day_range: int = 30, include_trends: bool
     if include_trends:
         params.append(("modules", "metricsTrends"))
     return f"{RESEARCH_BASE}?{urlencode(params, doseq=True)}"
-# Standard headers used by all research calls — reusable
-def _research_headers() -> Dict[str, str]:
-    return {
-        "Cookie": EBAY_RESEARCH_COOKIE or "",
+# Standard headers used by all research calls — reusable.
+# `cookie` overrides the module default (enables per-request cookie rotation).
+# NOTE: no User-Agent / sec-ch-ua here on purpose — curl_cffi's impersonate profile
+# emits both, matched to the TLS/JA3 it presents. Hardcoding them (we used to pin
+# Chrome 131) guarantees a mismatch the moment the profile moves, and the mismatch is
+# itself a block signal.
+def _research_headers(cookie: Optional[str] = None, cookie_id: Optional[str] = None) -> Dict[str, str]:
+    headers = {
+        "Cookie": cookie if cookie is not None else (EBAY_RESEARCH_COOKIE or ""),
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "de-DE,de;q=0.9,en;q=0.8",
         "Accept-Encoding": "gzip, deflate, br",
         "Referer": "https://www.ebay.de/sh/research",
         "Connection": "keep-alive",
         "X-Requested-With": "XMLHttpRequest",
-        "sec-ch-ua": '"Not/A)Brand";v="99", "Google Chrome";v="138", "Chromium";v="138"',
         "sec-ch-ua-mobile": "?0",
         "sec-ch-ua-platform": '"macOS"',
         "sec-fetch-site": "same-origin",
         "sec-fetch-mode": "cors",
         "sec-fetch-dest": "empty",
     }
-
-
-def _do_research_request(url: str, headers: Dict[str, str], use_proxy: bool):
-    """Execute the actual HTTP call. Wrapped by robust_request for retry/circuit/proxy-health."""
-    def _fn(proxy):
+    # Echo any anti-CSRF token captured during warmup for this cookie
+    if cookie_id and cookie_id in _WARMUP_TOKENS:
         try:
-            from curl_cffi import requests as cffi_requests
-            return cffi_requests.get(url, headers=headers, timeout=12, proxies=proxy, impersonate="chrome")
-        except ImportError:
-            return SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+            hname, tok = _WARMUP_TOKENS[cookie_id]
+            headers[hname] = tok
+        except Exception:
+            pass
+    return headers
+
+
+def _do_research_request(url: str, cookie: str, cookie_id: str, use_proxy: bool):
+    """Execute the research XHR through the warmed, reused curl_cffi session.
+    Wrapped by robust_request for retry/circuit/proxy-health, and honours
+    Retry-After while cooling the *cookie* (not just the proxy) on throttle."""
+    headers = _research_headers(cookie=cookie, cookie_id=cookie_id)
+
+    def _fn(proxy):
+        # Warm the SPA/session once per (cookie,proxy) before the XHR.
+        try:
+            _warmup_session(cookie, cookie_id, proxy)
+        except Exception:
+            pass
+        sess = _get_cffi_session()
+        if sess is not None:
+            return sess.get(url, headers=headers, timeout=12, proxies=proxy)
+        # Fallback: plain requests (no TLS impersonation) if curl_cffi missing
+        return SESSION.get(url, headers=headers, timeout=12, proxies=proxy)
+
+    def _on_rate_limit(retry_after):
+        # /sh/research throttle is cookie-bound → cool the cookie + widen its AIMD gap
+        if cookie_id:
+            _cookie_health.mark_bad(cookie_id, retry_after if retry_after else None)
+            _aimd_penalize(cookie_id, retry_after)
 
     return robust_request(
         request_fn=_fn,
         breaker=_research_breaker,
         proxy_health=_proxy_health,
-        proxies=_PROXY_LIST,
+        # Pinned exit for THIS cookie (not the whole pool) — see _proxy_for_cookie.
+        proxies=_proxy_for_cookie(cookie_id),
         use_proxy=use_proxy,
         max_retries=2,
         backoff_base=0.4,
+        on_rate_limit=_on_rate_limit,
     )
 
 
-def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
-    """Fetch eBay research aggregate + median for an EAN.
-    Concurrent same-EAN callers share one upstream call via InflightCoalescer.
-    Cached for 30 min in TTLCache.
-    """
-    if not EBAY_RESEARCH_COOKIE:
+# --- NDJSON module extraction (label-matched, positional fallback) -----------
+def _aggregate_section_text(aggregates: Dict[str, Any], *labels: str,
+                            fallback_idx: Optional[int] = None) -> Optional[str]:
+    """Return the first dataItem value text from the section whose title matches
+    any of `labels` (case-insensitive substring). Falls back to positional index."""
+    sections = aggregates.get("sections") or []
+
+    def _first_value(sec: Dict[str, Any]) -> Optional[str]:
+        try:
+            return sec["dataItems"][0]["value"]["textSpans"][0]["text"]
+        except Exception:
+            return None
+
+    low_labels = [l.lower() for l in labels]
+    for sec in sections:
+        try:
+            title = (sec.get("title", {}).get("textSpans", [{}])[0] or {}).get("text", "") or ""
+        except Exception:
+            title = ""
+        tl = title.lower()
+        if any(lbl in tl for lbl in low_labels):
+            v = _first_value(sec)
+            if v is not None:
+                return v
+    if fallback_idx is not None and 0 <= fallback_idx < len(sections):
+        return _first_value(sections[fallback_idx])
+    return None
+
+
+def _parse_research_modules(resp_text: str) -> Dict[str, Any]:
+    """Parse a research NDJSON body into {avg_price, median_price, monthly_sales,
+    trends} plus a classification flag. Returns {} when nothing parseable."""
+    modules = _parse_ndjson_modules(resp_text)
+    aggregates = next((m for m in modules if m.get("_type") == "ResearchAggregateModule"), None)
+    search_results = next((m for m in modules if m.get("_type") == "SearchResultsModule"), None)
+    trends_mod = next((m for m in modules if m.get("_type") == "MetricsTrendsModule"), None)
+
+    avg_price = None
+    sold_count = None
+    if aggregates:
+        avg_text = _aggregate_section_text(
+            aggregates, "durchschnitt", "average", "avg", "verkaufspreis", fallback_idx=0
+        )
+        sold_text = _aggregate_section_text(
+            aggregates, "verkauft", "sold", "anzahl", "verkäufe", "sales", fallback_idx=2
+        )
+        avg_price = _parse_price_number(avg_text) if avg_text else None
+        digits = re.sub(r"[^\d]", "", sold_text or "")
+        sold_count = int(digits) if digits else None
+
+    med_price = _extract_median_from_search_results(search_results) if search_results else None
+    trends = _normalize_metrics_trends(trends_mod) if trends_mod else None
+
+    return {
+        "avg_price": avg_price,
+        "median_price": med_price,
+        "monthly_sales": sold_count,
+        "trends": trends,
+        "_module_count": len(modules),
+        "_has_aggregates": aggregates is not None,
+    }
+
+
+def _classify_research_body(status_code: int, body: str, final_url: str = "") -> str:
+    """Classify a non-usable research response for distinct logging + handling."""
+    b = body or ""
+    low = b[:4000].lower()
+    url_low = (final_url or "").lower()
+    # Imperva/Distil bot-wall: eBay redirects /sh/research → /splashui/distil?...&page=block.
+    # curl_cffi follows the redirect, so this arrives as HTTP 200 with the block splash
+    # HTML (NOT NDJSON, NOT font-marketsans). Detect it explicitly so we back off hard
+    # instead of mistaking it for an empty result and re-hammering the bot-wall.
+    if ("splashui/distil" in url_low or "splashui/distil" in low
+            or "page=block" in url_low
+            or "entschuldigen sie die störung" in low
+            or ("incapsula" in low and "unsuccessful" in low)):
+        return "bot_block"
+    if status_code in (429, 430):
+        return "throttled"
+    # Dead cookie on the /sh/research **API** does NOT return the HTML login page — it
+    # returns HTTP 200 with a JSON auth error:
+    #   {"error":"auth_required","reason_code":"invalid_session","signin_url":"…"}
+    # Without this branch it fell through to "empty_or_unknown" and the cookie-dead
+    # alert never fired — i.e. the monitor silently missed the exact thing it exists for.
+    if ('"auth_required"' in low or '"invalid_session"' in low
+            or '"signin_url"' in low or "signin.ebay.de" in low):
+        return "login_interstitial"
+    head = b[:800]
+    if status_code == 403 and ("<html" in head.lower() or "font-marketsans" in head):
+        return "blocked_html"
+    if "font-marketsans" in head:
+        return "login_interstitial"
+    if "PageErrorModule" in b and '"severity":"ERROR"' in b:
+        return "page_error"
+    return "empty_or_unknown"
+
+
+# --- Global Imperva/Distil short-circuit -------------------------------------
+# Once /sh/research bot-blocks (which it does persistently from a datacenter IP),
+# skip LIVE research entirely for a cooldown so EVERY check goes straight to the
+# working public-scrape fallback instead of paying warmup + a doomed request +
+# backoff. That per-check latency is what made the app feel "offline / lädt ewig".
+# Cached research results are still served; only new upstream calls are suppressed.
+# EBAY_RESEARCH_ENABLED=0 forces scrape-only; otherwise it auto-re-probes after the
+# cooldown so research recovers by itself if the IP/cookie later clears.
+_RESEARCH_ENABLED = os.getenv("EBAY_RESEARCH_ENABLED", "1").strip() not in ("0", "false", "False", "no", "NO")
+# Research-only mode. Default ON (keep the scrape fallback) because a blocked research
+# call would otherwise leave the check with no data at all. Set to 0 once the Hetzner
+# probe proves research works from the server — then estimates never masquerade as exact.
+EBAY_SCRAPE_FALLBACK = os.getenv("EBAY_SCRAPE_FALLBACK", "1").strip() not in ("0", "false", "False", "no", "NO")
+_RESEARCH_BLOCK_LOCK = threading.Lock()
+_RESEARCH_BLOCKED_UNTIL = 0.0
+_RESEARCH_BLOCK_COOLDOWN = float(os.getenv("EBAY_RESEARCH_BLOCK_COOLDOWN", "1800"))  # 30 min
+
+
+# --- Discord alerting --------------------------------------------------------
+# Webhook URL lives in the env, NEVER in the repo: anyone holding it can post to the
+# channel. Set EBAY_ALERT_WEBHOOK on the server. Empty => alerting silently disabled.
+EBAY_ALERT_WEBHOOK = os.getenv("EBAY_ALERT_WEBHOOK", "").strip()
+_ALERT_COOLDOWN = float(os.getenv("EBAY_ALERT_COOLDOWN", "3600"))   # per key, 1h
+_ALERT_LOCK = threading.Lock()
+_ALERT_LAST: Dict[str, float] = {}
+
+
+def _alert_discord(key: str, title: str, message: str, urgent: bool = True) -> None:
+    """Fire-and-forget Discord webhook, rate-limited per `key` so a dead cookie cannot
+    spam the channel on every single request. Posts from a daemon thread so alerting
+    never adds latency to a check, and never raises — a broken webhook must not break
+    the eBay path."""
+    if not EBAY_ALERT_WEBHOOK:
+        return
+    now = time.time()
+    with _ALERT_LOCK:
+        if now - _ALERT_LAST.get(key, 0.0) < _ALERT_COOLDOWN:
+            return
+        _ALERT_LAST[key] = now
+
+    payload = {
+        "username": "FlipCheck",
+        "embeds": [{
+            "title": title,
+            "description": message,
+            "color": 0xE74C3C if urgent else 0xF1C40F,
+        }],
+    }
+
+    def _post() -> None:
+        try:
+            requests.post(EBAY_ALERT_WEBHOOK, json=payload, timeout=8)
+            logger.info(f"[Alert] Discord notified: {key}")
+        except Exception as e:
+            logger.warning(f"[Alert] Discord webhook failed ({key}): {e}")
+
+    threading.Thread(target=_post, daemon=True, name="discord-alert").start()
+
+
+# True once we've reported the cookie dead, so we can announce recovery exactly once.
+_COOKIE_DEAD = False
+
+_COOKIE_REFRESH_HOWTO = (
+    "**Fix:** eingeloggt `https://www.ebay.de/sh/research` öffnen → DevTools → Network → "
+    "`api/search` → Request Headers → `Cookie` kopieren → auf dem Server "
+    "`EBAY_RESEARCH_COOKIE` setzen → Backend neu starten."
+)
+
+
+def _on_research_failure(kind: str, cookie_id: Optional[str]) -> None:
+    """Single place that reacts to a failed research call: cool the cookie, arm the
+    Imperva short-circuit, and alert Discord for the cases a HUMAN must act on."""
+    global _COOKIE_DEAD
+    if kind == "bot_block":
+        _mark_research_blocked()
+        _alert_discord(
+            "bot_block",
+            "🤖 eBay Research: Imperva-Block",
+            f"`/sh/research` wird von Imperva/Distil geblockt (`/splashui/distil`).\n"
+            f"Research pausiert {int(_RESEARCH_BLOCK_COOLDOWN)}s; der Check läuft solange "
+            f"über den Public-Sold-Scrape (**geschätzte** Velocity statt exakter Zahlen).",
+            urgent=False,
+        )
+    elif kind == "login_interstitial":
+        _COOKIE_DEAD = True
+        _alert_discord(
+            "cookie_dead",
+            "🍪 eBay Research-Cookie ist TOT",
+            "Terapeak liefert die Login-Seite statt Daten → `EBAY_RESEARCH_COOKIE` ist "
+            "abgelaufen.\n\n**Exakte Verkaufszahlen fallen bis zum Refresh aus** "
+            f"(Fallback: Scrape-Schätzung).\n\n{_COOKIE_REFRESH_HOWTO}",
+            urgent=True,
+        )
+    if kind in ("throttled", "bot_block", "login_interstitial", "blocked_html", "page_error") and cookie_id:
+        _cookie_health.mark_bad(cookie_id)
+    if kind == "throttled" and cookie_id:
+        _aimd_penalize(cookie_id)   # genuine 429 rate-limit → widen this cookie's gap
+
+
+def _on_research_success(cookie_id: Optional[str]) -> None:
+    """Reward the cookie and announce recovery if we previously reported it dead."""
+    global _COOKIE_DEAD
+    _aimd_reward(cookie_id)
+    if _COOKIE_DEAD:
+        _COOKIE_DEAD = False
+        with _ALERT_LOCK:
+            _ALERT_LAST.pop("cookie_dead", None)   # next death may alert immediately
+        _alert_discord(
+            "cookie_ok",
+            "✅ eBay Research-Cookie wieder aktiv",
+            "Terapeak liefert wieder Daten — exakte Verkaufszahlen sind zurück.",
+            urgent=False,
+        )
+
+
+def _research_is_blocked() -> bool:
+    if not _RESEARCH_ENABLED:
+        return True
+    return time.time() < _RESEARCH_BLOCKED_UNTIL
+
+
+def _mark_research_blocked() -> None:
+    global _RESEARCH_BLOCKED_UNTIL
+    with _RESEARCH_BLOCK_LOCK:
+        was_blocked = time.time() < _RESEARCH_BLOCKED_UNTIL
+        _RESEARCH_BLOCKED_UNTIL = time.time() + _RESEARCH_BLOCK_COOLDOWN
+    if not was_blocked:
+        logger.info(
+            f"[Research] Imperva/Distil block → /sh/research übersprungen für "
+            f"{int(_RESEARCH_BLOCK_COOLDOWN)}s, nutze Scrape-Fallback"
+        )
+
+
+def fetch_research_combined(keywords: str, day_range: int = 90) -> Optional[Dict[str, Any]]:
+    """ONE upstream /sh/research call returning aggregates+searchResults+metricsTrends.
+    Shared cache for stats+trends+enrichment paths. Coalesced, in-process +
+    sqlite-persistent cached, negative-cached on throttle/None."""
+    if not _has_any_research_cookie():
         return None
+    try:
+        day_range = int(day_range or 90)
+    except Exception:
+        day_range = 90
+    cache_key = f"combined:{keywords}:{day_range}"
+
+    # 1. in-process cache
+    cached = _RESEARCH_COMBINED_CACHE.get(cache_key)
+    if cached is not None:
+        return cached
+    # 2. negative cache — recently throttled/None, don't re-hammer
+    if _RESEARCH_NEG_CACHE.get(cache_key) is not None:
+        return None
+    # 3. persistent (sqlite) cache — warm after restart
+    persisted = _persist_get(cache_key)
+    if persisted is not None:
+        _RESEARCH_COMBINED_CACHE.set(cache_key, persisted)
+        return persisted
+    # 3b. Imperva/Distil short-circuit — skip the doomed live call, go to scrape fast
+    if _research_is_blocked():
+        return None
+    # 4. live fetch (coalesced)
+    return _combined_coalescer.run(cache_key, _fetch_research_combined_uncached, keywords, day_range, cache_key)
+
+
+def _fetch_research_combined_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
+    url = _build_research_url(keywords, day_range=day_range, include_trends=True)
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
+    cookie, cookie_id = _pick_cookie()
+    if not cookie:
+        return None
+
+    try:
+        # Pace FIRST, outside the limiter: the per-cookie wait can be tens of seconds
+        # on a batch, and sleeping while holding a limiter slot starved everyone else
+        # into the 15s acquire timeout. The limiter now only guards the actual HTTP call.
+        if not _throttle_research_aimd(cookie_id):
+            logger.info("[Research] Slot-Queue zu tief — Request übersprungen (Burst-Schutz)")
+            return None
+        with _research_limiter:
+            resp = _do_research_request(url, cookie, cookie_id, use_proxy)
+    except TimeoutError:
+        logger.info("[Research-Combined] Limiter timeout — too many concurrent calls")
+        return None
+
+    if resp is None:
+        # robust_request already handled throttle cooldown; negative-cache it
+        _RESEARCH_NEG_CACHE.set(cache_key, True)
+        return None
+    if resp.status_code != 200:
+        kind = _classify_research_body(resp.status_code, getattr(resp, "text", "") or "", getattr(resp, "url", "") or "")
+        logger.info(f"[Research-Combined] HTTP {resp.status_code} ({kind}): {(getattr(resp,'text','') or '')[:160]}")
+        _on_research_failure(kind, cookie_id)
+        _RESEARCH_NEG_CACHE.set(cache_key, True)
+        return None
+
+    parsed = _parse_research_modules(resp.text)
+    if not parsed.get("_has_aggregates"):
+        kind = _classify_research_body(200, resp.text, getattr(resp, "url", "") or "")
+        logger.info(f"[Research-Combined] 200 but no aggregates ({kind})")
+        # soft-block / bot-wall / param error → cool cookie, negative-cache, let scrape take over
+        _on_research_failure(kind, cookie_id)
+        _RESEARCH_NEG_CACHE.set(cache_key, True)
+        return None
+
+    _on_research_success(cookie_id)
+    data = {
+        "avg_price": parsed.get("avg_price"),
+        "median_price": parsed.get("median_price"),
+        "monthly_sales": parsed.get("monthly_sales"),
+        "trends": parsed.get("trends"),
+        "day_range": day_range,
+        "_source": "research_api",
+    }
+    _RESEARCH_COMBINED_CACHE.set(cache_key, data)
+    _persist_set(cache_key, data, EBAY_RESEARCH_CACHE_TTL)
+    return data
+
+
+def check_research_cookie(test_keywords: str = "4052916891773") -> Dict[str, Any]:
+    """Actively probe /sh/research with the current cookie — bypasses every cache AND the
+    Imperva short-circuit, because the whole point is to learn the CURRENT truth.
+    Fires the Discord alert on a dead cookie / block, and the recovery alert when it is
+    healthy again. Returns a status dict. Meant for cron (see check_ebay_cookie.py), not
+    for the request hot path.
+    """
+    if not _has_any_research_cookie():
+        _alert_discord(
+            "cookie_missing",
+            "🍪 eBay Research-Cookie fehlt",
+            f"`EBAY_RESEARCH_COOKIE` ist auf dem Server nicht gesetzt — es gibt keine "
+            f"exakten Verkaufszahlen.\n\n{_COOKIE_REFRESH_HOWTO}",
+        )
+        return {"ok": False, "status": "missing", "detail": "EBAY_RESEARCH_COOKIE not set"}
+
+    cookie, cookie_id = _pick_cookie()
+    if not cookie:
+        # every cookie in the pool is cooling down — probe the primary one anyway
+        cookie = EBAY_RESEARCH_COOKIE or ""
+        cookie_id = _cookie_id(cookie)
+
+    url = _build_research_url(test_keywords, day_range=30, include_trends=False)
+    use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
+    try:
+        resp = _do_research_request(url, cookie, cookie_id, use_proxy)
+    except Exception as e:
+        return {"ok": False, "status": "exception", "detail": repr(e)[:200]}
+    if resp is None:
+        return {"ok": False, "status": "no_response", "detail": "request failed after retries"}
+
+    body = getattr(resp, "text", "") or ""
+    final_url = str(getattr(resp, "url", "") or "")
+
+    if resp.status_code == 200:
+        parsed = _parse_research_modules(body)
+        if parsed.get("_has_aggregates"):
+            _on_research_success(cookie_id)
+            return {
+                "ok": True, "status": "alive",
+                "avg_price": parsed.get("avg_price"),
+                "monthly_sales": parsed.get("monthly_sales"),
+            }
+
+    kind = _classify_research_body(resp.status_code, body, final_url)
+    _on_research_failure(kind, cookie_id)
+    return {
+        "ok": False, "status": kind, "http": resp.status_code,
+        "final_url": final_url[:120], "detail": body[:200],
+    }
+
+
+def _normalized_combined_day_range(day_range: int) -> int:
+    """Collapse stats/trends callers onto one dayRange so the combined cache key
+    is shared. Uses 90 (velocity-friendly window) unless combined mode is off."""
+    try:
+        dr = int(day_range or 90)
+    except Exception:
+        dr = 90
+    return dr
+
+
+def fetch_research_stats(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
+    """Adapter → slices {avg_price, median_price, monthly_sales} out of the ONE
+    combined research fetch. Concurrent same-EAN callers share the upstream call.
+    Backward-compatible: returns the same shape as before.
+
+    monthly_sales is rescaled to a 30-day window when the combined dayRange
+    differs (app.py velocity thresholds assume 30d)."""
+    if not _has_any_research_cookie():
+        return None
+    if not EBAY_RESEARCH_COMBINED:
+        return _fetch_research_stats_legacy(keywords, day_range)
+
+    combined = fetch_research_combined(keywords, day_range=_normalized_combined_day_range(90))
+    if combined is None:
+        return None
+    monthly = combined.get("monthly_sales")
+    dr = combined.get("day_range") or 90
+    if isinstance(monthly, (int, float)) and dr and int(dr) != 30 and int(dr) > 0:
+        monthly = int(round(monthly * 30.0 / float(dr)))
+    return {
+        "avg_price": combined.get("avg_price"),
+        "median_price": combined.get("median_price"),
+        "monthly_sales": monthly,
+        "_source": combined.get("_source", "research_api"),
+    }
+
+
+def _fetch_research_stats_legacy(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
+    """Legacy 2-call path (EBAY_RESEARCH_COMBINED=0) — kept for rollback."""
     try:
         day_range = int(day_range or 30)
     except Exception:
         day_range = 30
     cache_key = f"stats:{keywords}:{day_range}"
-
-    # 1. Check cache (no upstream call)
     cached = _RESEARCH_CACHE.get(cache_key)
     if cached is not None:
         return cached
-
-    # 2. Coalesce concurrent callers for same key
     return _research_coalescer.run(cache_key, _fetch_research_stats_uncached, keywords, day_range, cache_key)
 
 
 def _fetch_research_stats_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
-    """Inner uncached fetch — guarded by limiter + circuit + proxy-health."""
+    """Inner uncached legacy fetch — guarded by limiter + circuit + proxy-health."""
     url = _build_research_url(keywords, day_range=day_range, include_trends=False)
-    headers = _research_headers()
-    # Default ON — proxy rotation gives IP-block resilience. Combined with
-    # ProxyHealth, dead proxies get auto-skipped after first failure.
-    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (cookie must be server-IP-bound).
     use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
-
-    # Limiter caps concurrent upstream eBay calls — backpressure for traffic bursts
+    cookie, cookie_id = _pick_cookie()
+    if not cookie:
+        return None
     try:
+        # Pace FIRST, outside the limiter: the per-cookie wait can be tens of seconds
+        # on a batch, and sleeping while holding a limiter slot starved everyone else
+        # into the 15s acquire timeout. The limiter now only guards the actual HTTP call.
+        if not _throttle_research_aimd(cookie_id):
+            logger.info("[Research] Slot-Queue zu tief — Request übersprungen (Burst-Schutz)")
+            return None
         with _research_limiter:
-            _throttle_research(0.2)   # tiny gap as final safety net
-            resp = _do_research_request(url, headers, use_proxy)
+            resp = _do_research_request(url, cookie, cookie_id, use_proxy)
     except TimeoutError:
         logger.info("[Research] Limiter timeout — too many concurrent calls")
         return None
@@ -567,28 +1552,14 @@ def _fetch_research_stats_uncached(keywords: str, day_range: int, cache_key: str
         logger.info(f"[Research] HTTP {resp.status_code}: {resp.text[:160]}")
         return None
 
-    modules = _parse_ndjson_modules(resp.text)
-    aggregates = next((m for m in modules if m.get("_type") == "ResearchAggregateModule"), None)
-    search_results = next((m for m in modules if m.get("_type") == "SearchResultsModule"), None)
-    if not aggregates:
+    parsed = _parse_research_modules(resp.text)
+    if not parsed.get("_has_aggregates"):
         return None
-
-    sections = aggregates.get("sections", [])
-    def _val(sec_idx: int, item_idx: int) -> Optional[str]:
-        try:
-            return sections[sec_idx]["dataItems"][item_idx]["value"]["textSpans"][0]["text"]
-        except Exception:
-            return None
-    avg_text = _val(0, 0)
-    sold_text = _val(2, 0)
-    avg_price = _parse_price_number(avg_text) if avg_text else None
-    digits = re.sub(r"[^\d]", "", sold_text or "")
-    sold_count = int(digits) if digits else None
-    med_price = None
-    if search_results:
-        med_price = _extract_median_from_search_results(search_results)
-
-    data = {"avg_price": avg_price, "median_price": med_price, "monthly_sales": sold_count}
+    data = {
+        "avg_price": parsed.get("avg_price"),
+        "median_price": parsed.get("median_price"),
+        "monthly_sales": parsed.get("monthly_sales"),
+    }
     _RESEARCH_CACHE.set(cache_key, data)
     return data
 def _normalize_metrics_trends(mod: Dict[str, Any]) -> Dict[str, Any]:
@@ -633,35 +1604,46 @@ def _normalize_metrics_trends(mod: Dict[str, Any]) -> Dict[str, Any]:
             regression = {"from": reg_points[0], "to": reg_points[-1]}
     return {"granularity": gran, "currency": currency, "points": points, "regression": regression}
 def fetch_research_trends(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
-    """Fetch eBay research price/qty trends for an EAN.
-    Coalesced + cached + circuit-breakered + retried."""
-    if not EBAY_RESEARCH_COOKIE:
+    """Adapter → slices the normalized trends dict out of the ONE combined research
+    fetch. Same return shape as before ({granularity,currency,points,regression})."""
+    if not _has_any_research_cookie():
         return None
+    if not EBAY_RESEARCH_COMBINED:
+        return _fetch_research_trends_legacy(keywords, day_range)
+    combined = fetch_research_combined(keywords, day_range=_normalized_combined_day_range(90))
+    if combined is None:
+        return None
+    return combined.get("trends")
+
+
+def _fetch_research_trends_legacy(keywords: str, day_range: int = 30) -> Optional[Dict[str, Any]]:
+    """Legacy trends path (EBAY_RESEARCH_COMBINED=0)."""
     try:
         day_range = int(day_range or 30)
     except Exception:
         day_range = 30
     cache_key = f"trends:{keywords}:{day_range}"
-
     cached = _RESEARCH_TRENDS_CACHE.get(cache_key)
     if cached is not None:
         return cached
-
     return _trends_coalescer.run(cache_key, _fetch_research_trends_uncached, keywords, day_range, cache_key)
 
 
 def _fetch_research_trends_uncached(keywords: str, day_range: int, cache_key: str) -> Optional[Dict[str, Any]]:
     url = _build_research_url(keywords, day_range=day_range, include_trends=True)
-    headers = _research_headers()
-    # Default ON — proxy rotation gives IP-block resilience. Combined with
-    # ProxyHealth, dead proxies get auto-skipped after first failure.
-    # Set EBAY_RESEARCH_USE_PROXY=0 to disable (cookie must be server-IP-bound).
     use_proxy = os.getenv("EBAY_RESEARCH_USE_PROXY", "1") == "1"
-
+    cookie, cookie_id = _pick_cookie()
+    if not cookie:
+        return None
     try:
+        # Pace FIRST, outside the limiter: the per-cookie wait can be tens of seconds
+        # on a batch, and sleeping while holding a limiter slot starved everyone else
+        # into the 15s acquire timeout. The limiter now only guards the actual HTTP call.
+        if not _throttle_research_aimd(cookie_id):
+            logger.info("[Research] Slot-Queue zu tief — Request übersprungen (Burst-Schutz)")
+            return None
         with _research_limiter:
-            _throttle_research(0.2)
-            resp = _do_research_request(url, headers, use_proxy)
+            resp = _do_research_request(url, cookie, cookie_id, use_proxy)
     except TimeoutError:
         logger.info("[Research-Trends] Limiter timeout — too many concurrent calls")
         return None
@@ -709,6 +1691,7 @@ def lookup_ebay_metrics_query(
     fee_up_to_200: float = 0.12,
     fee_above_200: float = 0.12,
     trends_day_range: int = 30,
+    title: Optional[str] = None,
     bad_words: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     q = (query or "").strip()
@@ -719,15 +1702,29 @@ def lookup_ebay_metrics_query(
     # ✅ Research-only Mode: Browse komplett skippen
     if EBAY_DISABLE_BROWSE:
         research = None
-        if EBAY_RESEARCH_COOKIE:
+        if _has_any_research_cookie():
             research = fetch_research_stats(q, day_range=int(trends_day_range))
 
-        # Wenn Research kein Ergebnis → Public Sold Scrape als Fallback
+        # Wenn Research kein Ergebnis → Public Sold Scrape als Fallback.
+        # Mit Produkt-Titel: nach dem Namen suchen (bessere Treffer als die nackte EAN,
+        # die eBay nur fuzzy matcht) und per Modell-Token auf die echte Variante filtern.
+        # EBAY_SCRAPE_FALLBACK=0 → research-only: lieber GAR KEINE Daten als eine
+        # Scrape-Schätzung, die als exakte Zahl missverstanden wird (die hat schon
+        # falsche BUY-Signale erzeugt). Erst einschalten, wenn die Hetzner-Probe
+        # (check_ebay_cookie.py) bestätigt, dass Research vom Server aus durchkommt.
         if not research or (research.get("avg_price") is None and research.get("median_price") is None):
-            fallback = _fetch_public_sold_prices(q)
+            if not EBAY_SCRAPE_FALLBACK:
+                logger.info(f"[Research-only] Keine Research-Daten für '{q}' — Scrape-Fallback ist aus")
+                return {"error": "Keine Research-Daten (Scrape-Fallback deaktiviert: EBAY_SCRAPE_FALLBACK=0)."}
+            scrape_query = (title or "").strip() or q
+            match_tokens = _relevance_tokens(title)
+            fallback = _fetch_public_sold_prices(scrape_query, match_tokens=match_tokens)
             if fallback:
                 research = fallback
-                logger.info(f"[Fallback] Nutze Public Sold Scrape für '{q}'")
+                logger.info(
+                    f"[Fallback] Public Sold Scrape für '{scrape_query}'"
+                    + (f" (Filter: {match_tokens})" if match_tokens else "")
+                )
 
         if not research:
             return {"error": "Keine Preisdaten verfügbar (Research-Cookie fehlt/tot und Public-Scrape ohne Ergebnis)."}
@@ -745,7 +1742,10 @@ def lookup_ebay_metrics_query(
             avg_gross_basis = float(med_gross_basis)
         if med_gross_basis is None:
             med_gross_basis = float(avg_gross_basis)
-        trends = fetch_research_trends(q, day_range=90) if EBAY_RESEARCH_COOKIE else None
+        # Trends come from the SAME combined cache entry (no extra upstream call).
+        trends = None
+        if research.get("_source") != "public_scrape" and _has_any_research_cookie():
+            trends = fetch_research_trends(q, day_range=90)
         avg_stats = calc_profit_net(
             sale_gross=float(avg_gross_basis),
             buy_net=float(ek_net),
@@ -831,6 +1831,7 @@ def lookup_ebay_metrics_query(
                 "rep_itemId": None,
                 "research_ok": True,
                 "research_source": research.get("_source", "research_api"),
+                "velocity_approx": bool(research.get("velocity_approx")),
                 "trends_range": int(trends_day_range),
                 "trends_ok": bool(trends and (trends.get("points") is not None)),
                 "keyword_filtered": False,
@@ -860,7 +1861,7 @@ def lookup_ebay_metrics_query(
         return {"error": "Konnte keinen gültigen Preis extrahieren."}
     research = fetch_research_stats(q, day_range=int(trends_day_range))
     research_ok = bool(research and (research.get("monthly_sales") is not None))
-    trends = fetch_research_trends(q, day_range=90) if EBAY_RESEARCH_COOKIE else None
+    trends = fetch_research_trends(q, day_range=90) if _has_any_research_cookie() else None
     browse_avg_gross = float(browse_prices["browse_avg"])
     browse_median_gross = float(browse_prices["browse_median"])
     research_avg_gross = research.get("avg_price") if research else None

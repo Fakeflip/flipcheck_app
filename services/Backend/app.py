@@ -870,7 +870,8 @@ async def flipcheck(request: Request):
     # ── eBay lookup (sell prices, days_to_cash, sales_30d) ──────────────────
     # Pass a neutral fee_rate — we recalculate everything below with tiered fees.
     try:
-        m = lookup_ebay_metrics(ean, float(ek), trends_day_range=trends_day_range)
+        _ebay_title = str((_src.get("title") or "")).strip() or None
+        m = lookup_ebay_metrics(ean, float(ek), trends_day_range=trends_day_range, title=_ebay_title)
     except Exception as e:
         if is_json:
             return JSONResponse({"ok": False, "verdict": "SKIP", "error": str(e), "reason": "ebay_lookup_failed"})
@@ -1281,9 +1282,14 @@ async def _iter_amazon_deals(
                     continue
                 ean = eans[0]
 
-                # eBay resale lookup (sync → run in thread)
+                # eBay resale lookup (sync → run in thread). Pass the Keepa product
+                # title: eBay only fuzzy-matches a bare EAN, which mixes in other
+                # variants/bundles and skews price + velocity.
                 try:
-                    ebay = await asyncio.to_thread(lookup_ebay_metrics, ean, ek)
+                    ebay = await asyncio.to_thread(
+                        lookup_ebay_metrics, ean, ek,
+                        title=((product.get("title") or "").strip() or None),
+                    )
                 except Exception:
                     continue
 
@@ -1475,16 +1481,18 @@ async def ean_competition(ean: str, limit: int = 50):
 
 
 @app.get("/compare")
-async def compare_marketplaces(ean: str, ek: float = 0):
+async def compare_marketplaces(ean: str, ek: float = 0, title: str = ""):
     """
     Live price comparison across eBay, Kaufland, and Amazon (via Keepa).
     All three platforms are fetched in parallel.
+    `title` is optional but recommended: eBay only fuzzy-matches a bare EAN, which
+    mixes in other variants/bundles and skews the price + velocity.
     """
     import concurrent.futures
 
     def fetch_ebay():
         try:
-            return lookup_ebay_metrics(ean, ek)
+            return lookup_ebay_metrics(ean, ek, title=(title.strip() or None))
         except Exception as exc:
             return {"_error": str(exc)}
 
@@ -1658,11 +1666,32 @@ async def update_research_cookie(request: Request, body: CookieUpdateBody):
     if not cookie:
         return JSONResponse({"ok": False, "error": "empty cookie"}, status_code=400)
 
-    # Update in-memory variable used by fetch_research_stats
+    # Update in-memory variable used by fetch_research_stats.
+    # The cookie pool + CookieHealth are rebuilt lazily from this module var,
+    # so a single-cookie hot-swap takes effect immediately.
     ebay_live.EBAY_RESEARCH_COOKIE = cookie
 
-    # Clear research cache so next request uses the fresh cookie
-    ebay_live._RESEARCH_CACHE.clear()
+    # Clear ALL research caches (in-process combined/stats/trends/negative) so
+    # the next request re-fetches with the fresh cookie.
+    _clear = getattr(ebay_live, "_clear_research_caches", None)
+    if callable(_clear):
+        _clear()
+    else:
+        ebay_live._RESEARCH_CACHE.clear()
+    # Purge the persistent sqlite cache too, so a stale-cookie result cannot mask
+    # the fresh cookie after a restart.
+    try:
+        import sqlite3 as _sqlite3
+        _db = getattr(ebay_live, "_PERSIST_DB_PATH", None)
+        if _db is not None and _db.exists():
+            _c = _sqlite3.connect(str(_db), timeout=5.0)
+            try:
+                _c.execute("DELETE FROM research_cache")
+                _c.commit()
+            finally:
+                _c.close()
+    except Exception:
+        pass
 
     # Persist to .env so it survives restart
     env_path = BASE_DIR / ".env"
@@ -2524,6 +2553,7 @@ class UnifiedCheckRequest(BaseModel):
     ean: Optional[str] = None
     sku: Optional[str] = None
     asin: Optional[str] = None
+    title: Optional[str] = None         # product name → eBay scrape query + relevance filter
     ek: float = 0.0
     mode: str = "mid"
     category: str = "sonstiges"
@@ -2556,7 +2586,7 @@ async def unified_check(request: Request, body: UnifiedCheckRequest):
             "shipping_out": body.shipping_out, "vat_mode": body.vat_mode,
             "ek_mode": body.ek_mode, "ship_mode": body.ship_mode,
             "market": market, "trends_day_range": body.trends_day_range,
-            "sell_custom": body.sell_custom,
+            "sell_custom": body.sell_custom, "title": body.title or "",
         }
         async with httpx.AsyncClient(app=app, base_url="http://internal") as client:
             resp = await client.post("/flipcheck", json=fake_body)
