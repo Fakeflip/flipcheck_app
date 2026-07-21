@@ -1,3 +1,15 @@
+/* ── Inter (self-hosted, latin subset) ───────────────────────────────────────
+   Locally hosted instead of Google Fonts: no request to Google's servers → no IP
+   transfer to a third party, so the site needs no cookie/consent banner for fonts
+   (LG München I, 3 O 17493/20). Files in /fonts/. */
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;   /* variable weight axis — one file covers all weights */
+  font-display: swap;
+  src: url('/fonts/inter-var.woff2') format('woff2');
+}
+
 /* ── Tokens ──────────────────────────────────────────────────────────────── */
 :root {
   --bg:          #09090B;

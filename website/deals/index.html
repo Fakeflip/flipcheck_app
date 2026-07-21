@@ -4,13 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Top Deals &amp; Empfehlungen — FLIPCHECK</title>
-  <meta name="description" content="Die besten Produkte auf Amazon — handverlesen von Flipcheck. Technik, Küche, Fitness und Büro Empfehlungen mit echten Bewertungen." />
+  <meta name="description" content="Ausgewählte Produkte auf Amazon — handverlesen von Flipcheck. Technik, Küche, Fitness und Büro. Anzeige / Affiliate-Links." />
   <meta property="og:title" content="Top Deals & Empfehlungen — FLIPCHECK" />
   <meta property="og:description" content="Die besten Produkte auf Amazon — handverlesen von Flipcheck. Ehrliche Empfehlungen für jeden Bereich." />
   <link rel="icon" href="/favicon.ico" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
   <style>
     /* ── Deals-specific styles ─────────────────────────────────────── */
@@ -107,20 +104,22 @@
       position: relative;
     }
 
-    .deal-badge {
+    /* Werbekennzeichnung: Affiliate-Links sind kennzeichnungspflichtige Werbung
+       (§ 5a Abs. 4 UWG, § 6 DDG). Muss am Teaser selbst stehen (OLG München, 29 U 2633/24). */
+    .deal-ad {
       position: absolute;
       top: 12px;
-      left: 12px;
+      right: 12px;
       font-size: 11px;
       font-weight: 700;
       padding: 4px 10px;
       border-radius: var(--r-full);
       text-transform: uppercase;
       letter-spacing: .03em;
+      background: rgba(255,255,255,.08);
+      color: var(--text2);
+      border: 1px solid var(--border);
     }
-    .deal-badge.bestseller { background: var(--accent); color: #fff; }
-    .deal-badge.top { background: var(--green-sub); color: var(--green); border: 1px solid var(--green-bdr); }
-    .deal-badge.premium { background: var(--yellow-sub); color: var(--yellow); border: 1px solid var(--yellow-bdr); }
 
     .deal-body {
       padding: 20px;
@@ -145,22 +144,6 @@
       -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
-    }
-
-    /* Stars */
-    .deal-stars {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      margin-bottom: 16px;
-    }
-    .deal-stars svg { width: 14px; height: 14px; }
-    .star-filled { color: var(--yellow); }
-    .star-empty { color: var(--dim); }
-    .deal-stars span {
-      font-size: 12px;
-      color: var(--text2);
-      margin-left: 4px;
     }
 
     /* Amazon button */
@@ -234,16 +217,14 @@
   <!-- ── Header ─────────────────────────────────────────────────────────── -->
   <header class="header">
     <div class="container header-inner">
-      <a href="/" class="logo"><span>▲</span> FLIPCHECK</a>
+      <a href="/deals" class="logo"><span>▲</span> FLIPCHECK</a>
       <nav class="nav">
-        <a href="/#features">Features</a>
-        <a href="/#pricing">Preise</a>
-        <a href="/guides">Guides</a>
+        <a href="/deals">Deals</a>
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
       </nav>
       <div style="display:flex;align-items:center;gap:8px">
-        <a href="/account" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Mein Konto</a>
-        <a href="/dashboard" class="btn btn-sm btn-primary">Jetzt starten</a>
+        <a href="https://app.joinflipcheck.app" class="btn btn-sm" style="background:transparent;border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.6)">Mein Konto</a>
+        <a href="https://app.joinflipcheck.app" class="btn btn-sm btn-primary">Jetzt starten</a>
       </div>
       <button class="hamburger" id="hamburger" aria-label="Menü öffnen" aria-expanded="false">
         <span></span><span></span><span></span>
@@ -251,11 +232,9 @@
     </div>
   </header>
   <nav class="mobile-nav" id="mobileNav">
-    <a href="/#features" class="mobile-link">Features</a>
-    <a href="/#pricing" class="mobile-link">Preise</a>
-    <a href="/guides" class="mobile-link">Guides</a>
+    <a href="/deals" class="mobile-link">Deals</a>
     <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener" class="mobile-link">Discord</a>
-    <a href="/dashboard" class="btn btn-primary mobile-link">Jetzt starten</a>
+    <a href="https://app.joinflipcheck.app" class="btn btn-primary mobile-link">Jetzt starten</a>
   </nav>
 
   <!-- ── Hero ───────────────────────────────────────────────────────────── -->
@@ -263,7 +242,7 @@
     <div class="container">
       <h1 class="animate-up">Top Deals &amp; Empfehlungen</h1>
       <p class="animate-up animate-up-d1">
-        Die besten Produkte auf Amazon — handverlesen vom Flipcheck-Team. Ehrliche Empfehlungen basierend auf echten Bewertungen und Marktdaten.
+        Ausgewählte Produkte auf Amazon — handverlesen vom Flipcheck-Team. Empfehlungen basierend auf öffentlich verfügbaren Produkt- und Marktdaten.
       </p>
     </div>
   </section>
@@ -306,7 +285,7 @@
     <div class="deals-info">
       <h2>Wie wir Produkte auswählen</h2>
       <p>
-        Alle hier gezeigten Produkte wurden sorgfältig ausgewählt und basieren auf echten Nutzerbewertungen, Testergebnissen und unserem eigenen Vergleich. Wir aktualisieren unsere Empfehlungen regelmäßig, damit du immer die besten Produkte findest.
+        Alle hier gezeigten Produkte wurden sorgfältig ausgewählt und basieren auf öffentlich verfügbaren Produktdaten und unserem eigenen Vergleich. Wir aktualisieren unsere Empfehlungen regelmäßig, damit du immer die besten Produkte findest.
       </p>
       <p>
         Die Links auf dieser Seite sind sogenannte Affiliate-Links (mit * gekennzeichnet). Wenn du über diese Links einkaufst, erhalten wir eine kleine Provision von Amazon — für dich ändert sich am Preis nichts. Damit unterstützt du unsere unabhängige Arbeit und die Weiterentwicklung von Flipcheck.
@@ -321,8 +300,6 @@
       <div class="footer-links">
         <a href="https://discord.gg/AUYvAsebA3" target="_blank" rel="noopener">Discord</a>
         <a href="mailto:marco.arnold.sk8@gmail.com">Kontakt</a>
-        <a href="/terms">AGB</a>
-        <a href="/withdrawal">Widerruf</a>
         <a href="/privacy">Datenschutz</a>
         <a href="/imprint">Impressum</a>
       </div>
@@ -343,61 +320,45 @@
     // ── Product Data ──────────────────────────────────────────────────
     const products = [
       // Tech
-      { title: 'Sony WH-1000XM5 Noise Cancelling Kopfhörer', desc: 'Kabelloser Bluetooth-Kopfhörer mit branchenführendem Noise Cancelling und 30 Stunden Akkulaufzeit. Hervorragender Klang via LDAC-Codec.', asin: 'B09Y2MYL5C', cat: 'tech', rating: 4.2, badge: 'bestseller', icon: '🎧' },
-      { title: 'Apple iPad Air (M2) 11 Zoll', desc: '11-Zoll-Tablet mit M2-Chip, Liquid Retina Display und ganztägiger Akkulaufzeit. WLAN 6E in einem schlanken Aluminiumgehäuse.', asin: 'B0D3J7Q6PS', cat: 'tech', rating: 4.6, badge: 'top', icon: '📱' },
-      { title: 'Anker USB-C Hub 7-in-1', desc: 'Kompakter USB-C Hub mit 4K-HDMI, 85W Power Delivery, zwei USB-A 3.0 Ports und SD-Kartenleser. Ideal für MacBook und USB-C-Laptops.', asin: 'B07ZVKTP53', cat: 'tech', rating: 4.5, icon: '🔌' },
-      { title: 'Logitech MX Master 3S Maus', desc: 'Ergonomische kabellose Performance-Maus mit ultraschnellem MagSpeed-Scrollrad und 8K DPI Sensor. Funktioniert auf jeder Oberfläche inkl. Glas.', asin: 'B07W5JKHFZ', cat: 'tech', rating: 4.7, icon: '🖱️' },
+      { title: 'Sony WH-1000XM5 Noise Cancelling Kopfhörer', desc: 'Kabelloser Bluetooth-Kopfhörer mit branchenführendem Noise Cancelling und 30 Stunden Akkulaufzeit. Hervorragender Klang via LDAC-Codec.', asin: 'B09Y2MYL5C', cat: 'tech', icon: '🎧' },
+      { title: 'Apple iPad Air (M2) 11 Zoll', desc: '11-Zoll-Tablet mit M2-Chip, Liquid Retina Display und ganztägiger Akkulaufzeit. WLAN 6E in einem schlanken Aluminiumgehäuse.', asin: 'B0D3J7Q6PS', cat: 'tech', icon: '📱' },
+      { title: 'Anker USB-C Hub 7-in-1', desc: 'Kompakter USB-C Hub mit 4K-HDMI, 85W Power Delivery, zwei USB-A 3.0 Ports und SD-Kartenleser. Ideal für MacBook und USB-C-Laptops.', asin: 'B07ZVKTP53', cat: 'tech', icon: '🔌' },
+      { title: 'Logitech MX Master 3S Maus', desc: 'Ergonomische kabellose Performance-Maus mit ultraschnellem MagSpeed-Scrollrad und 8K DPI Sensor. Funktioniert auf jeder Oberfläche inkl. Glas.', asin: 'B07W5JKHFZ', cat: 'tech', icon: '🖱️' },
 
       // Küche
-      { title: 'Philips Airfryer XXL Premium', desc: 'Premium-Heißluftfritteuse mit 7,3 Liter XXL-Fassungsvermögen und Rapid Air Technologie für bis zu 90% weniger Fett. Spülmaschinengeeignet.', asin: 'B0767DNSMH', cat: 'kueche', rating: 4.6, badge: 'bestseller', icon: '🍟' },
-      { title: 'KitchenAid Artisan Küchenmaschine 4.8L', desc: 'Ikonische Küchenmaschine mit 300W Direktantrieb, 4,8L Edelstahlschüssel und planetarischem Rührsystem. Robuste Metallkonstruktion.', asin: 'B01HKZZ4XU', cat: 'kueche', rating: 4.6, badge: 'premium', icon: '👨‍🍳' },
-      { title: 'Sage Barista Express Espressomaschine', desc: 'Siebträger-Espressomaschine mit integriertem Kegelmahlwerk aus Edelstahl und 15-Bar-Pumpendruck. Ideal für Barista-Einsteiger.', asin: 'B07B2X1VXZ', cat: 'kueche', rating: 4.4, icon: '☕' },
-      { title: 'Zwilling Four Star Messerblock 8-teilig', desc: '8-teiliger Messerblock mit FRIODUR eisgehärteten Klingen aus rostfreiem Spezialstahl inkl. Wetzstahl und Schere. Made in Germany.', asin: 'B00008S0T6', cat: 'kueche', rating: 4.7, icon: '🔪' },
+      { title: 'Philips Airfryer XXL Premium', desc: 'Premium-Heißluftfritteuse mit 7,3 Liter XXL-Fassungsvermögen und Rapid Air Technologie für bis zu 90% weniger Fett. Spülmaschinengeeignet.', asin: 'B0767DNSMH', cat: 'kueche', icon: '🍟' },
+      { title: 'KitchenAid Artisan Küchenmaschine 4.8L', desc: 'Ikonische Küchenmaschine mit 300W Direktantrieb, 4,8L Edelstahlschüssel und planetarischem Rührsystem. Robuste Metallkonstruktion.', asin: 'B01HKZZ4XU', cat: 'kueche', icon: '👨‍🍳' },
+      { title: 'Sage Barista Express Espressomaschine', desc: 'Siebträger-Espressomaschine mit integriertem Kegelmahlwerk aus Edelstahl und 15-Bar-Pumpendruck. Ideal für Barista-Einsteiger.', asin: 'B07B2X1VXZ', cat: 'kueche', icon: '☕' },
+      { title: 'Zwilling Four Star Messerblock 8-teilig', desc: '8-teiliger Messerblock mit FRIODUR eisgehärteten Klingen aus rostfreiem Spezialstahl inkl. Wetzstahl und Schere. Made in Germany.', asin: 'B00008S0T6', cat: 'kueche', icon: '🔪' },
 
       // Fitness
-      { title: 'Apple Watch Series 9', desc: 'Smartwatch mit Always-On Retina Display, S9-Chip und Double-Tap-Geste. Blutsauerstoff- und EKG-Messung mit ganztägiger Akkulaufzeit.', asin: 'B0CHX5HSHM', cat: 'fitness', rating: 4.6, badge: 'top', icon: '⌚' },
-      { title: 'BLACKROLL Standard Faszienrolle', desc: 'Original-Faszienrolle mit mittlerer Härte zur Selbstmassage und Faszientraining. Made in Germany, ideal zur Regeneration.', asin: 'B00B1GCLNK', cat: 'fitness', rating: 4.6, icon: '🧘' },
-      { title: 'Sportstech F37 Laufband', desc: 'Professionelles klappbares Laufband mit 7 PS Motor, bis 20 km/h und Kinomap-App-Anbindung. TÜV/GS-zertifiziert.', asin: 'B075SJ6C9F', cat: 'fitness', rating: 4.3, icon: '🏃' },
-      { title: 'Fitbit Charge 6 Fitness-Tracker', desc: 'Fitness-Tracker mit EKG, Blutsauerstoffmessung und integriertem GPS. 7 Tage Akkulaufzeit mit Google Wallet und Maps.', asin: 'B0CK2VCWLS', cat: 'fitness', rating: 4.0, icon: '💪' },
+      { title: 'Apple Watch Series 9', desc: 'Smartwatch mit Always-On Retina Display, S9-Chip und Double-Tap-Geste. Blutsauerstoff- und EKG-Messung mit ganztägiger Akkulaufzeit.', asin: 'B0CHX5HSHM', cat: 'fitness', icon: '⌚' },
+      { title: 'BLACKROLL Standard Faszienrolle', desc: 'Original-Faszienrolle mit mittlerer Härte zur Selbstmassage und Faszientraining. Made in Germany, ideal zur Regeneration.', asin: 'B00B1GCLNK', cat: 'fitness', icon: '🧘' },
+      { title: 'Sportstech F37 Laufband', desc: 'Professionelles klappbares Laufband mit 7 PS Motor, bis 20 km/h und Kinomap-App-Anbindung. TÜV/GS-zertifiziert.', asin: 'B075SJ6C9F', cat: 'fitness', icon: '🏃' },
+      { title: 'Fitbit Charge 6 Fitness-Tracker', desc: 'Fitness-Tracker mit EKG, Blutsauerstoffmessung und integriertem GPS. 7 Tage Akkulaufzeit mit Google Wallet und Maps.', asin: 'B0CK2VCWLS', cat: 'fitness', icon: '💪' },
 
       // Büro
-      { title: 'Ergotopia NextBack Bürostuhl', desc: 'Ergonomischer Bürostuhl mit integrierter Lordosenstütze und verstellbarer Kopfstütze. Belastbar bis 150 kg mit 5 Jahren Garantie.', asin: 'B07DCMVBMM', cat: 'buero', rating: 4.4, badge: 'bestseller', icon: '🪑' },
-      { title: 'BenQ ScreenBar Monitor Lampe', desc: 'LED-Monitorlampe mit automatischer Helligkeits- und Farbtemperaturanpassung. Blendfrei, flimmerfrei, platzsparend per USB.', asin: 'B0785D93KD', cat: 'buero', rating: 4.6, icon: '💡' },
-      { title: 'FLEXISPOT E7 Höhenverstellbarer Schreibtisch', desc: 'Elektrisch höhenverstellbares Tischgestell mit Dual-Motor, LED-Touchscreen und 4 Speicherplätzen. Tragkraft 125 kg.', asin: 'B09WD67L9G', cat: 'buero', rating: 4.5, badge: 'top', icon: '🖥️' },
-      { title: 'Dell UltraSharp U2723QE 27" 4K Monitor', desc: '27-Zoll 4K UHD IPS-Monitor mit USB-C-Hub und 90W Stromversorgung. 98% DCI-P3 Farbraumabdeckung und HDR400.', asin: 'B09RSTWVTP', cat: 'buero', rating: 4.5, icon: '🖥️' },
+      { title: 'Ergotopia NextBack Bürostuhl', desc: 'Ergonomischer Bürostuhl mit integrierter Lordosenstütze und verstellbarer Kopfstütze. Belastbar bis 150 kg mit 5 Jahren Garantie.', asin: 'B07DCMVBMM', cat: 'buero', icon: '🪑' },
+      { title: 'BenQ ScreenBar Monitor Lampe', desc: 'LED-Monitorlampe mit automatischer Helligkeits- und Farbtemperaturanpassung. Blendfrei, flimmerfrei, platzsparend per USB.', asin: 'B0785D93KD', cat: 'buero', icon: '💡' },
+      { title: 'FLEXISPOT E7 Höhenverstellbarer Schreibtisch', desc: 'Elektrisch höhenverstellbares Tischgestell mit Dual-Motor, LED-Touchscreen und 4 Speicherplätzen. Tragkraft 125 kg.', asin: 'B09WD67L9G', cat: 'buero', icon: '🖥️' },
+      { title: 'Dell UltraSharp U2723QE 27" 4K Monitor', desc: '27-Zoll 4K UHD IPS-Monitor mit USB-C-Hub und 90W Stromversorgung. 98% DCI-P3 Farbraumabdeckung und HDR400.', asin: 'B09RSTWVTP', cat: 'buero', icon: '🖥️' },
     ];
 
     const catNames = { tech: 'Technik & Elektronik', kueche: 'Küche & Haushalt', fitness: 'Sport & Fitness', buero: 'Büro & Schreibtisch' };
     const catIcons = { tech: '💻', kueche: '🍳', fitness: '💪', buero: '🪑' };
 
     // ── Render Functions ──────────────────────────────────────────────
-    function stars(rating) {
-      const full = Math.floor(rating);
-      let html = '';
-      for (let i = 0; i < 5; i++) {
-        html += `<svg viewBox="0 0 20 20" fill="currentColor" class="${i < full ? 'star-filled' : 'star-empty'}"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg>`;
-      }
-      return html + `<span>${rating}</span>`;
-    }
-
-    function badgeHTML(b) {
-      if (!b) return '';
-      const labels = { bestseller: 'Bestseller', top: 'Top Empfehlung', premium: 'Premium' };
-      return `<div class="deal-badge ${b}">${labels[b] || b}</div>`;
-    }
-
     function card(p) {
       const c = countries[currentCountry];
       return `
         <div class="deal-card" data-cat="${p.cat}">
           <div class="deal-img">
+            <span class="deal-ad">Anzeige</span>
             ${p.icon}
-            ${badgeHTML(p.badge)}
           </div>
           <div class="deal-body">
             <div class="deal-title">${p.title}</div>
             <div class="deal-desc">${p.desc}</div>
-            <div class="deal-stars">${stars(p.rating)}</div>
             <a href="https://www.${c.domain}/dp/${p.asin}?tag=${c.tag}" target="_blank" rel="noopener noreferrer nofollow" class="deal-cta">${c.cta}</a>
           </div>
         </div>`;

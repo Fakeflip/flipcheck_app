@@ -1,28 +1,21 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
-  "rewrites": [
-    { "source": "/dashboard/(.*)", "destination": "/dashboard/index.html" },
-    { "source": "/account",        "destination": "/account/index.html" },
-    { "source": "/guides",            "destination": "/guides/index.html" },
-    { "source": "/guides/repricer",   "destination": "/guides/repricer/index.html" },
-    { "source": "/guides/flipcheck",  "destination": "/guides/flipcheck/index.html" },
-    { "source": "/guides/inventory",  "destination": "/guides/inventory/index.html" },
-    { "source": "/guides/history",    "destination": "/guides/history/index.html" },
-    { "source": "/guides/competition","destination": "/guides/competition/index.html" },
-    { "source": "/guides/alerts",     "destination": "/guides/alerts/index.html" },
-    { "source": "/guides/marketplace","destination": "/guides/marketplace/index.html" },
-    { "source": "/guides/sales",      "destination": "/guides/sales/index.html" },
-    { "source": "/guides/analytics",  "destination": "/guides/analytics/index.html" }
-  ],
-  "headers": [
+  "routes": [
     {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "X-Frame-Options", "value": "DENY" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
-      ]
-    }
+      "src": "/(.*)",
+      "headers": {
+        "X-Content-Type-Options": "nosniff",
+        "X-Frame-Options": "DENY",
+        "Referrer-Policy": "strict-origin-when-cross-origin"
+      },
+      "continue": true
+    },
+
+    { "src": "^/$", "status": 308, "headers": { "Location": "/deals" } },
+
+    { "src": "^/(deals|imprint|privacy)/?$", "dest": "/$1/index.html" },
+
+    { "src": "/(.*\\.(?:css|js|mjs|png|jpe?g|svg|webp|gif|ico|avif|woff2?|ttf|otf|map|txt|xml|json|webmanifest))", "dest": "/$1" },
+
+    { "src": "/(.*)", "status": 404, "dest": "/404.html" }
   ]
 }

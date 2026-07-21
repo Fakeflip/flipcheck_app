@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Datenschutzerklärung — FLIPCHECK</title>
   <link rel="icon" href="/favicon.ico" />
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/style.css" />
   <style>
     .legal-wrap { max-width: 720px; margin: 80px auto; padding: 0 24px 80px; }
@@ -34,19 +31,20 @@
 
   <header class="header">
     <div class="container header-inner">
-      <a href="/" class="logo">▲ FLIPCHECK</a>
+      <a href="/deals" class="logo">▲ FLIPCHECK</a>
     </div>
   </header>
 
   <div class="legal-wrap">
-    <a href="/" class="back-link">← Zurück zur Startseite</a>
+    <a href="/deals" class="back-link">← Zurück zur Startseite</a>
     <h1>Datenschutzerklärung</h1>
-    <p class="subtitle">Stand: 5. April 2026</p>
+    <p class="subtitle">Stand: 21. Juli 2026</p>
 
     <div class="toc">
       <h3>Inhaltsübersicht</h3>
       <ol>
         <li><a href="#praembel">Präambel</a></li>
+        <li><a href="#cookies">Cookies und Zugriff auf Endgeräte (§ 25 TDDDG)</a></li>
         <li><a href="#verantwortlicher">Verantwortlicher</a></li>
         <li><a href="#verarbeitungen">Übersicht der Verarbeitungen</a></li>
         <li><a href="#rechtsgrundlagen">Maßgebliche Rechtsgrundlagen</a></li>
@@ -57,12 +55,15 @@
         <li><a href="#rechte">Rechte der betroffenen Personen</a></li>
         <li><a href="#webhosting">Bereitstellung des Onlineangebots und Webhosting</a></li>
         <li><a href="#discord">Authentifizierung über Discord</a></li>
-        <li><a href="#stripe">Zahlungsabwicklung über Stripe</a></li>
         <li><a href="#ebay-seller">eBay Seller Sync</a></li>
         <li><a href="#kaufland-seller">Kaufland Seller Sync</a></li>
         <li><a href="#lokale-speicherung">Lokale Datenspeicherung auf dem Gerät</a></li>
+        <li><a href="#supabase">Datenspeicherung (Supabase)</a></li>
         <li><a href="#sneaker">Sneaker-Marktdaten (StockX / GOAT)</a></li>
         <li><a href="#kontakt">Kontaktaufnahme</a></li>
+        <li><a href="#affiliate">Affiliate-Programme / Amazon PartnerNet</a></li>
+        <li><a href="#ehemalige-abonnenten">Daten ehemaliger Abonnenten</a></li>
+        <li><a href="#altkunden">Daten ehemaliger Abonnenten (Aufbewahrungspflichten)</a></li>
         <li><a href="#aenderung">Änderung und Aktualisierung</a></li>
       </ol>
     </div>
@@ -70,6 +71,12 @@
     <h2 id="praembel">Präambel</h2>
     <p>Mit der folgenden Datenschutzerklärung möchten wir Sie darüber aufklären, welche Arten Ihrer personenbezogenen Daten (nachfolgend auch kurz als „Daten" bezeichnet) wir zu welchen Zwecken und in welchem Umfang verarbeiten. Die Datenschutzerklärung gilt für alle von uns durchgeführten Verarbeitungen personenbezogener Daten, sowohl im Rahmen der Erbringung unserer Leistungen als auch insbesondere auf unserer Website.</p>
     <p>Die verwendeten Begriffe sind nicht geschlechtsspezifisch.</p>
+    <p><strong>Geltungsbereich:</strong> Diese Datenschutzerklärung gilt für unsere öffentliche Website <a href="https://joinflipcheck.app/deals">joinflipcheck.app</a> sowie für die FlipCheck-Anwendung (Desktop-App und Web-App unter <a href="https://app.joinflipcheck.app">app.joinflipcheck.app</a>). Die nachfolgend beschriebenen Verarbeitungen im Zusammenhang mit Nutzerkonto und Authentifizierung (Discord), eBay- und Kaufland-Seller-Sync, Datenspeicherung (Supabase) sowie Sneaker-Marktdaten (StockX/GOAT) betreffen ausschließlich die FlipCheck-Anwendung und finden auf der öffentlichen Website nicht statt.</p>
+
+    <h2 id="cookies">Cookies und Zugriff auf Endgeräte (§ 25 TDDDG)</h2>
+    <p>Der Zugriff auf Informationen im Endgerät der Nutzer bzw. die Speicherung von Informationen (z. B. Cookies) richtet sich nach § 25 des Telekommunikation-Digitale-Dienste-Datenschutz-Gesetzes (TDDDG).</p>
+    <p><strong>Öffentliche Website:</strong> Unsere Website setzt keine nicht notwendigen Cookies und bindet keine Dienste ein, die einen einwilligungsbedürftigen Zugriff auf Ihr Endgerät erfordern. Die verwendete Schriftart (Inter) wird lokal von unserem Server ausgeliefert; es findet keine Verbindung zu Google Fonts statt. Ein Cookie-Einwilligungsbanner ist daher nicht erforderlich. Amazon-Cookies (siehe „Affiliate-Programme / Amazon PartnerNet") werden erst gesetzt, nachdem Sie einen als Werbung gekennzeichneten Partnerlink (Kennzeichnung „Anzeige" sowie Sternchen *) angeklickt haben, und zwar durch Amazon auf der Amazon-Website.</p>
+    <p><strong>FlipCheck-Anwendung:</strong> Soweit die Anwendung Informationen auf Ihrem Endgerät speichert oder darauf zugreift (z. B. verschlüsselte Zugangs-Token, lokale Einstellungen), ist dies gemäß § 25 Abs. 2 Nr. 2 TDDDG unbedingt erforderlich, um den von Ihnen ausdrücklich gewünschten Dienst bereitzustellen; eine Einwilligung ist hierfür nicht erforderlich. Ein etwaiger nicht notwendiger Zugriff erfolgt ausschließlich nach Ihrer Einwilligung (§ 25 Abs. 1 TDDDG), die Sie jederzeit widerrufen können.</p>
 
     <h2 id="verantwortlicher">Verantwortlicher</h2>
     <p>
@@ -91,14 +98,12 @@
       <li>Meta-, Kommunikations- und Verfahrensdaten (z. B. IP-Adressen, Zeitstempel)</li>
       <li>Kontaktdaten (z. B. E-Mail-Adresse, sofern Sie uns per E-Mail kontaktieren)</li>
       <li>Authentifizierungsdaten (Discord-ID, Discord-Benutzername, Discord-Avatar)</li>
-      <li>Zahlungsdaten (verarbeitet ausschließlich durch Stripe; wir erhalten keine vollständigen Zahlungsdaten)</li>
-      <li>Vertragsdaten (Abonnementstatus, Lizenzdaten, Nutzungszähler)</li>
+      <li>Kontodaten (Lizenzdaten, Nutzungszähler)</li>
     </ul>
 
     <h3>Kategorien betroffener Personen</h3>
     <ul>
       <li>Nutzer unserer Website und der Desktop-Applikation</li>
-      <li>Abonnenten des Pro-Tarifs</li>
       <li>Kommunikationspartner (bei E-Mail-Kontakt)</li>
     </ul>
 
@@ -106,7 +111,6 @@
     <ul>
       <li>Bereitstellung unseres Onlineangebots und Nutzerfreundlichkeit</li>
       <li>Authentifizierung und Kontoverwaltung (Discord OAuth)</li>
-      <li>Abwicklung von Zahlungen und Abonnementverwaltung (Stripe)</li>
       <li>Vertragsdurchführung und Lizenzaktivierung</li>
       <li>Sicherheitsmaßnahmen und Fehleranalyse</li>
       <li>Verwaltung und Beantwortung von Anfragen</li>
@@ -115,7 +119,7 @@
     <h2 id="rechtsgrundlagen">Maßgebliche Rechtsgrundlagen</h2>
     <p>Im Folgenden erhalten Sie eine Übersicht der Rechtsgrundlagen der DSGVO, auf deren Basis wir personenbezogene Daten verarbeiten.</p>
     <ul>
-      <li><strong>Vertragserfüllung und vorvertragliche Anfragen (Art. 6 Abs. 1 S. 1 lit. b) DSGVO)</strong> – Verarbeitung im Rahmen des Abonnements (Authentifizierung, Lizenzaktivierung, Zahlungsabwicklung).</li>
+      <li><strong>Vertragserfüllung und vorvertragliche Anfragen (Art. 6 Abs. 1 S. 1 lit. b) DSGVO)</strong> – Verarbeitung im Rahmen der Nutzung der Anwendung (Authentifizierung, Lizenzaktivierung).</li>
       <li><strong>Rechtliche Verpflichtung (Art. 6 Abs. 1 S. 1 lit. c) DSGVO)</strong> – Verarbeitung zur Erfüllung gesetzlicher Pflichten (z. B. Buchführung, steuerrechtliche Aufbewahrungspflichten).</li>
       <li><strong>Berechtigte Interessen (Art. 6 Abs. 1 S. 1 lit. f) DSGVO)</strong> – Bereitstellung und Betrieb der Website, Sicherheitsmaßnahmen, Betrugsverhinderung.</li>
     </ul>
@@ -176,13 +180,6 @@
     <p>Wir erhalten keine Discord-E-Mail-Adresse und kein Passwort. Die Authentifizierung erfolgt über OAuth 2.0. Die Übermittlung von Daten an Discord Inc. in die USA erfolgt auf Grundlage der EU-Standardvertragsklauseln. Weitere Informationen zum Datenschutz bei Discord finden Sie unter: <a href="https://discord.com/privacy" target="_blank" rel="noopener">discord.com/privacy</a>.</p>
     <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung) sowie Art. 6 Abs. 1 S. 1 lit. f) DSGVO (berechtigte Interessen an einer sicheren Authentifizierung).</p>
 
-    <h2 id="stripe">Zahlungsabwicklung über Stripe</h2>
-    <p>Für die Zahlungsabwicklung nutzen wir den Dienst Stripe der Stripe, Inc. (354 Oyster Point Blvd, South San Francisco, CA 94080, USA) bzw. der Stripe Payments Europe, Ltd. (1 Grand Canal Street Lower, Grand Canal Dock, Dublin, D02 H210, Ireland) für Kunden in der EU.</p>
-    <p>Beim Abschluss eines Abonnements werden Ihre Zahlungsdaten direkt an Stripe übermittelt. Wir speichern keine vollständigen Zahlungsdaten (Kreditkartennummern, IBAN etc.) auf unseren Servern. Stripe stellt uns lediglich eine Kunden-ID und Abonnementstatus zur Verfügung.</p>
-    <p>Von Stripe verarbeitete Daten umfassen insbesondere: Name, E-Mail-Adresse, Zahlungsmitteldetails, IP-Adresse, Transaktionsdaten.</p>
-    <p>Die Übermittlung von Daten an Stripe Inc. in die USA erfolgt auf Grundlage des EU-U.S. Data Privacy Framework und der EU-Standardvertragsklauseln. Weitere Informationen finden Sie in der Datenschutzerklärung von Stripe: <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">stripe.com/de/privacy</a>.</p>
-    <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
-
     <h2 id="ebay-seller">eBay Seller Sync</h2>
     <p>Nutzer können ihren eBay-Seller-Account mit FLIPCHECK verbinden, um Listings, Verkäufe und Retouren automatisch zu synchronisieren. Die Verbindung erfolgt über eBay OAuth 2.0. FLIPCHECK erhält dabei Zugriff auf folgende Daten:</p>
     <ul>
@@ -215,7 +212,7 @@
     <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
 
     <h2 id="supabase">Datenspeicherung (Supabase)</h2>
-    <p>Nutzerprofildaten (Discord-ID, Benutzername, Abonnementstatus, Gerätepaarungen) werden in einer PostgreSQL-Datenbank gespeichert, die über den Dienst Supabase (Supabase Inc., 970 Toa Payoh North, #07-04, Toa Payoh Industrial Park, Singapore 318992) betrieben wird. Die Datenbank befindet sich in der EU (Frankfurt, AWS eu-central-1). Details: <a href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a>.</p>
+    <p>Nutzerprofildaten (Discord-ID, Benutzername, Gerätepaarungen) werden in einer PostgreSQL-Datenbank gespeichert, die über den Dienst Supabase (Supabase Inc., 970 Toa Payoh North, #07-04, Toa Payoh Industrial Park, Singapore 318992) betrieben wird. Die Datenbank befindet sich in der EU (Frankfurt, AWS eu-central-1). Details: <a href="https://supabase.com/privacy" target="_blank" rel="noopener">supabase.com/privacy</a>.</p>
     <p><strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. b) DSGVO (Vertragserfüllung).</p>
 
     <h2 id="sneaker">Sneaker-Marktdaten (StockX / GOAT)</h2>
@@ -243,9 +240,19 @@
     <p>Die Daten werden gelöscht, sobald sie für die Erreichung des Zweckes ihrer Erhebung nicht mehr erforderlich sind. Für personenbezogene Daten aus E-Mails ist dies grundsätzlich dann der Fall, wenn die jeweilige Konversation beendet ist. Beendet ist die Konversation dann, wenn sich aus den Umständen entnehmen lässt, dass der betroffene Sachverhalt abschließend geklärt ist. Wir löschen oder sperren die Daten spätestens nach 3 Jahren.</p>
 
     <h2 id="affiliate">Affiliate-Programme / Amazon PartnerNet</h2>
-    <p>Wir sind Teilnehmer des Partnerprogramms von Amazon Europe Core S.à r.l. Auf unseren Seiten werden durch Amazon Werbeanzeigen und Links zum Angebot von Amazon.de eingebunden, an denen wir über Werbekostenerstattung Geld verdienen können (sog. Affiliate-Links, gekennzeichnet mit *).</p>
+    <p>Wir sind Teilnehmer des Partnerprogramms von Amazon Europe Core S.à r.l. Auf unseren Seiten werden durch Amazon Werbeanzeigen und Links zum Angebot von Amazon.de eingebunden, an denen wir über Werbekostenerstattung Geld verdienen können (sog. Affiliate-Links, als „Anzeige" gekennzeichnet und zusätzlich mit einem Sternchen (*) markiert).</p>
     <p>Amazon setzt dazu Cookies ein, um die Herkunft der Bestellungen nachvollziehen zu können. Dadurch kann Amazon erkennen, dass Sie den Partnerlink auf unserer Website geklickt haben. Die Speicherung von Amazon-Cookies erfolgt auf Grundlage von Art. 6 Abs. 1 S. 1 lit. f) DSGVO. Der Websitebetreiber hat hieran ein berechtigtes Interesse, da nur durch die Cookies die Höhe seiner Affiliate-Vergütung feststellbar ist.</p>
     <p>Weitere Informationen zur Datennutzung durch Amazon erhalten Sie in der <a href="https://www.amazon.de/gp/help/customer/display.html?nodeId=201909010" target="_blank" rel="noopener">Datenschutzerklärung von Amazon</a>.</p>
+
+    <h2 id="altkunden">Daten ehemaliger Abonnenten (Aufbewahrungspflichten)</h2>
+    <p>Das kostenpflichtige Pro-Abonnement wird nicht mehr angeboten; es bestehen keine laufenden Abonnements mehr. Rechnungs-, Buchungs- und Vertragsdaten aus dem früheren kostenpflichtigen Angebot (z. B. Rechnungen, Zahlungshistorie, Vertragsbestätigungen) bewahren wir jedoch weiterhin auf, soweit wir hierzu gesetzlich verpflichtet sind. Rechtsgrundlage ist Art. 6 Abs. 1 S. 1 lit. c) DSGVO in Verbindung mit den steuer- und handelsrechtlichen Aufbewahrungspflichten (insbesondere § 147 AO, § 14b UStG: acht Jahre für Rechnungen und Buchungsbelege; sechs Jahre für Geschäftsbriefe einschließlich geschäftlicher E-Mail-Korrespondenz).</p>
+    <p>Die Verarbeitung dieser Daten ist auf den Zweck der gesetzlichen Aufbewahrung beschränkt; eine Nutzung zu anderen Zwecken (etwa Werbung) findet nicht statt. Nach Ablauf der jeweiligen Fristen werden die Daten gelöscht.</p>
+    <p>Die Zahlungsabwicklung erfolgte über den Zahlungsdienstleister Stripe (Stripe Payments Europe, Ltd., Irland / Stripe, Inc., USA). Stripe verarbeitet Transaktionsdaten teilweise in eigener Verantwortlichkeit, um eigene gesetzliche Pflichten (z. B. zahlungsdienste- und geldwäscherechtliche Vorgaben) zu erfüllen; hierauf haben wir keinen Einfluss. Weitere Informationen finden Sie in der <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Stripe</a>.</p>
+
+    <h2 id="ehemalige-abonnenten">Daten ehemaliger Abonnenten</h2>
+    <p>Das kostenpflichtige Pro-Abo wird nicht mehr angeboten. Aus zurückliegenden Abonnements verarbeiten wir weiterhin Daten ehemaliger zahlender Kunden, soweit dies zur Erfüllung gesetzlicher Aufbewahrungspflichten erforderlich ist. Dies betrifft insbesondere Rechnungen und Buchungsbelege (z. B. Name, Rechnungsanschrift, Rechnungsbetrag, Zahlungs- und Transaktionsdaten).</p>
+    <p><strong>Zweck:</strong> Erfüllung handels- und steuerrechtlicher Aufbewahrungspflichten. <strong>Rechtsgrundlage:</strong> Art. 6 Abs. 1 S. 1 lit. c) DSGVO in Verbindung mit § 147 AO und § 14b UStG. <strong>Speicherdauer:</strong> Rechnungen und Buchungsbelege 8 Jahre, geschäftliche Korrespondenz 6 Jahre. Nach Ablauf der Fristen werden die Daten gelöscht.</p>
+    <p>Diese Daten werden ausschließlich zweckgebunden zur Erfüllung der genannten Pflichten aufbewahrt und nicht mehr für werbliche oder sonstige Zwecke verwendet (Verarbeitungseinschränkung gemäß Art. 17 Abs. 3 lit. b) DSGVO). Der zuvor eingesetzte Zahlungsdienstleister Stripe verarbeitet Transaktionsdaten teilweise als eigener Verantwortlicher aufgrund eigener gesetzlicher Pflichten; Einzelheiten hierzu finden Sie in der <a href="https://stripe.com/de/privacy" target="_blank" rel="noopener">Datenschutzerklärung von Stripe</a>.</p>
 
     <h2 id="aenderung">Änderung und Aktualisierung</h2>
     <p>Wir bitten Sie, sich regelmäßig über den Inhalt unserer Datenschutzerklärung zu informieren. Wir passen die Datenschutzerklärung an, sobald die Änderungen der von uns durchgeführten Datenverarbeitungen dies erforderlich machen. Wir informieren Sie, sobald durch die Änderungen eine Mitwirkungshandlung Ihrerseits (z. B. Einwilligung) oder eine sonstige individuelle Benachrichtigung erforderlich wird.</p>
