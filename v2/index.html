@@ -5,10 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FLIPCHECK</title>
 
-  <!-- Inter Font -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <!-- Fonts (Sora + JetBrains Mono) werden lokal via @font-face in style.css geladen -->
 
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -55,51 +52,11 @@
     </div>
 
     <nav class="sidebar-nav">
-      <div class="nav-section-label">Analyse</div>
-
-      <a class="nav-item" data-view="analytics" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="9" width="3" height="6" rx="1" fill="currentColor" opacity=".4"/>
-          <rect x="6" y="5" width="3" height="10" rx="1" fill="currentColor" opacity=".7"/>
-          <rect x="11" y="1" width="3" height="14" rx="1" fill="currentColor"/>
-        </svg>
-        <span data-i18n="nav.analytics">Analytics</span>
-      </a>
-
       <a class="nav-item" data-view="flipcheck" href="#">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
           <path d="M8.5 1.5L2 9h5.5L7 14.5L14 7H8.5L8.5 1.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
         </svg>
         <span data-i18n="nav.flipcheck">Flipcheck</span>
-      </a>
-
-      <a class="nav-item" data-view="batch" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="1" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="1" y="6.25" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-          <rect x="1" y="11.5" width="14" height="3.5" rx="1" stroke="currentColor" stroke-width="1.5"/>
-        </svg>
-        <span data-i18n="nav.batch">Batch</span>
-        <span class="nav-badge">NEU</span>
-      </a>
-
-      <div class="nav-section-label nav-section-label--spaced" data-i18n="nav.section.management">Verwaltung</div>
-
-      <a class="nav-item" data-view="inventory" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="5" width="14" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M5 5V3.5A3 3 0 0 1 11 3.5V5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <path d="M5.5 9h5M8 7v4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span data-i18n="nav.inventory">Inventory</span>
-      </a>
-
-      <a class="nav-item" data-view="history" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <polyline points="1,12 5,7 8,9 12,4 15,6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M12 4h3v3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span data-i18n="nav.history">Preishistorie</span>
       </a>
 
       <a class="nav-item" data-view="competition" href="#">
@@ -111,24 +68,6 @@
         <span data-i18n="nav.competition">Konkurrenz</span>
       </a>
 
-      <a class="nav-item" data-view="repricer" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <path d="M2 8h12M10 5l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M1 3h5M1 13h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".5"/>
-        </svg>
-        <span>Repricer</span>
-        <span class="nav-badge">NEU</span>
-      </a>
-
-      <a class="nav-item" data-view="alerts" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <path d="M8 2a5 5 0 0 0-5 5c0 5.5-2 7-2 7h14s-2-1.5-2-7a5 5 0 0 0-5-5z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M9.73 14a2 2 0 0 1-3.46 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-        </svg>
-        <span data-i18n="nav.alerts">Preisalarm</span>
-        <span class="nav-badge">NEU</span>
-      </a>
-
       <a class="nav-item" data-view="marketplace" href="#">
         <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
           <rect x="1" y="3" width="4.5" height="10" rx="1" stroke="currentColor" stroke-width="1.5"/>
@@ -136,37 +75,6 @@
           <rect x="10.5" y="5" width="4.5" height="8" rx="1" stroke="currentColor" stroke-width="1.5"/>
         </svg>
         <span data-i18n="nav.marketplace">Marktplatz</span>
-        <span class="nav-badge">NEU</span>
-      </a>
-
-      <a class="nav-item" data-view="sales" href="#">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <polyline points="1,11 5,6 8,8 12,3 15,5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          <path d="M13 3h2v2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-        <span data-i18n="nav.sales">Verkäufe</span>
-        <span class="nav-badge">NEU</span>
-      </a>
-
-      <div class="nav-section-label nav-section-label--spaced" data-i18n="nav.section.quicklinks">Quicklinks</div>
-
-      <a class="nav-item nav-external" href="https://www.ebay.de/sh/ovw" target="_blank" rel="noopener noreferrer">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <rect x="1" y="5" width="14" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M5 5V4a3 3 0 0 1 6 0v1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          <circle cx="8" cy="9.5" r="1.3" stroke="currentColor" stroke-width="1.3"/>
-        </svg>
-        <span>eBay Verkäufe</span>
-        <span class="nav-ext-badge">↗</span>
-      </a>
-
-      <a class="nav-item nav-external" href="https://www.idealo.de" target="_blank" rel="noopener noreferrer">
-        <svg class="nav-icon" viewBox="0 0 16 16" fill="none">
-          <path d="M2 8.5L7.5 3H13v5.5L8 14a1.4 1.4 0 0 1-2 0L2 10.5A1.4 1.4 0 0 1 2 8.5z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
-          <circle cx="10.5" cy="5.5" r="1.2" fill="currentColor"/>
-        </svg>
-        <span>Idealo</span>
-        <span class="nav-ext-badge">↗</span>
       </a>
     </nav>
 
@@ -251,14 +159,14 @@
       </svg>
     </div>
     <h2 class="gate-title">FLIPCHECK</h2>
-    <p class="gate-sub">Melde dich an um fortzufahren</p>
-    <button class="btn btn-primary btn-gate" id="btnLogin">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="5" r="2.5" stroke="currentColor" stroke-width="1.5"/>
-        <path d="M2.5 13.5c0-3.038 2.462-5.5 5.5-5.5s5.5 2.462 5.5 5.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-      </svg>
-      Mit Discord anmelden
-    </button>
+    <p class="gate-sub">Gib deinen Lizenz-Key ein, um Flipcheck freizuschalten.</p>
+    <input id="keyInput" class="input" type="text" autocomplete="off" autocapitalize="characters" spellcheck="false"
+           placeholder="FC-XXXX-XXXX-XXXX"
+           style="width:100%;text-align:center;letter-spacing:.06em;font-family:var(--font-mono);text-transform:uppercase;margin-bottom:10px;" />
+    <button class="btn btn-primary btn-gate" id="btnKeyLogin">Freischalten</button>
+    <div id="keyError" style="display:none;color:var(--red);font-size:12px;margin-top:10px;"></div>
+    <!-- Discord-Login (Alt-Weg, ausgeblendet – Zugang läuft über den Lizenz-Key) -->
+    <button class="btn btn-primary btn-gate" id="btnLogin" style="display:none">Mit Discord anmelden</button>
     <div class="gate-hint" id="gateHint"></div>
   </div>
 </div>
@@ -271,19 +179,15 @@
     </svg>
   </div>
   <div>
-    <div class="gate-heading">Kein aktiver Plan</div>
+    <div class="gate-heading">Zugang nicht aktiv</div>
     <div class="gate-desc">
-      Du benötigst ein aktives Flipcheck-Abo um die App zu nutzen.
+      Deine Mitgliedschaft ist aktuell nicht aktiv. Aktiviere sie, um Flipcheck weiter zu nutzen.
     </div>
   </div>
   <div class="gate-actions">
-    <button id="btnLicenseTrial" class="gate-btn-primary">
-      7 Tage kostenlos testen
+    <button id="btnLicenseManage" class="gate-btn-primary">
+      Mitgliedschaft verwalten
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-    </button>
-    <button id="btnLicenseUpgrade" class="gate-btn-secondary">
-      Direkt kaufen
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
     </button>
   </div>
   <button id="btnLicenseLogout" class="gate-btn-link">Abmelden</button>

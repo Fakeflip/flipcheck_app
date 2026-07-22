@@ -3,26 +3,35 @@
    Linear / Vercel inspired dark theme
 ══════════════════════════════════════════════════════════════════════ */
 
+/* ── Self-hosted Fonts (offline, kein CDN) ───────────────────────────── */
+@font-face { font-family:'Sora'; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/sora-400.woff2") format("woff2"); }
+@font-face { font-family:'Sora'; font-style:normal; font-weight:500; font-display:swap; src:url("fonts/sora-500.woff2") format("woff2"); }
+@font-face { font-family:'Sora'; font-style:normal; font-weight:600; font-display:swap; src:url("fonts/sora-600.woff2") format("woff2"); }
+@font-face { font-family:'Sora'; font-style:normal; font-weight:700; font-display:swap; src:url("fonts/sora-700.woff2") format("woff2"); }
+@font-face { font-family:'JetBrains Mono'; font-style:normal; font-weight:400; font-display:swap; src:url("fonts/jetbrains-mono-400.woff2") format("woff2"); }
+@font-face { font-family:'JetBrains Mono'; font-style:normal; font-weight:500; font-display:swap; src:url("fonts/jetbrains-mono-500.woff2") format("woff2"); }
+@font-face { font-family:'JetBrains Mono'; font-style:normal; font-weight:600; font-display:swap; src:url("fonts/jetbrains-mono-600.woff2") format("woff2"); }
+
 /* ── Tokens ─────────────────────────────────────────────────────────── */
 :root {
-  /* Backgrounds */
-  --bg-base:      #0A0A0F;
-  --bg-panel:     #111118;
-  --bg-elevated:  #16161F;
-  --bg-hover:     #1A1A26;
-  --bg-active:    #1E1E2E;
+  /* Backgrounds — Premium Dark (subtiler Violett-Unterton, mehr Tiefe) */
+  --bg-base:      #0B0B11;
+  --bg-panel:     #14141D;
+  --bg-elevated:  #1B1B27;
+  --bg-hover:     #212130;
+  --bg-active:    #29293C;
 
   /* Borders */
-  --border:        #1E1E2E;
-  --border-subtle: #161620;
-  --border-strong: #2E2E42;
+  --border:        #262633;
+  --border-subtle: #1A1A24;
+  --border-strong: #35354C;
 
-  /* Accent — Indigo */
-  --accent:        #6366F1;
-  --accent-hover:  #5558E8;
-  --accent-subtle: rgba(99, 102, 241, 0.10);
-  --accent-text:   #A5B4FC;
-  --accent-border: rgba(99, 102, 241, 0.25);
+  /* Accent — Marken-Violett (KETER/Flipcheck) */
+  --accent:        #5B51E0;
+  --accent-hover:  #6D64EA;
+  --accent-subtle: rgba(91, 81, 224, 0.12);
+  --accent-text:   #B8B1F7;
+  --accent-border: rgba(91, 81, 224, 0.30);
 
   /* Text */
   --text-primary:   #F1F5F9;
@@ -61,14 +70,14 @@
   --topbar-h:    52px;
 
   /* Typography */
-  --font:   'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Monaco, Consolas, monospace;
+  --font:   'Sora', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, Monaco, Consolas, monospace;
 
-  /* Radius */
-  --r-sm:  5px;
-  --r:     8px;
-  --r-lg:  12px;
-  --r-xl:  16px;
+  /* Radius — etwas weicher/premiumiger */
+  --r-sm:  6px;
+  --r:     10px;
+  --r-lg:  14px;
+  --r-xl:  18px;
   --r-full: 9999px;
 
   /* Shadow */
@@ -117,7 +126,7 @@
   --green-glow:    rgba(16, 185, 129, 0.04);
   --yellow-glow:   rgba(245, 158, 11, 0.04);
   --red-glow:      rgba(239, 68, 68, 0.04);
-  --accent-dim:    rgba(99, 102, 241, 0.06);
+  --accent-dim:    rgba(91, 81, 224, 0.06);
 
   /* Overlay / Backdrop */
   --modal-backdrop: rgba(0, 0, 0, 0.60);
@@ -144,11 +153,11 @@
   --border-subtle: #EDEEF0;
   --border-strong: #D0D3DA;
 
-  --accent:        #6366F1;
-  --accent-hover:  #5558E8;
-  --accent-subtle: rgba(99, 102, 241, 0.08);
-  --accent-text:   #4F46E5;
-  --accent-border: rgba(99, 102, 241, 0.20);
+  --accent:        #5B51E0;
+  --accent-hover:  #4D43D4;
+  --accent-subtle: rgba(91, 81, 224, 0.08);
+  --accent-text:   #4B41C7;
+  --accent-border: rgba(91, 81, 224, 0.20);
 
   --text-primary:   #1A1A2E;
   --text-secondary: #5A6070;
@@ -582,8 +591,8 @@ img { display: block; max-width: 100%; }
 .btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
+  gap: 7px;
+  padding: 8px 15px;
   border-radius: var(--r);
   font-size: 13px;
   font-weight: 600;
@@ -648,7 +657,7 @@ img { display: block; max-width: 100%; }
   background: var(--bg-elevated);
   border: 1px solid var(--border-strong);
   border-radius: var(--r);
-  padding: 8px 10px;
+  padding: 9px 12px;
   font-size: 13px;
   color: var(--text-primary);
   transition: border-color var(--t-fast), box-shadow var(--t-fast);

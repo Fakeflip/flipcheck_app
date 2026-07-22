@@ -906,8 +906,31 @@ ipcMain.handle("auth:getToken", async () => {
   return { token };
 });
 ipcMain.handle("auth:login", () => shell.openExternal(AUTH_URL));
+// Key-Login: prüft den Flipcheck-Lizenz-Key gegen das Gate (POST /auth/key) und
+// speichert bei Erfolg das zurückgegebene Token (wie beim Discord-Deep-Link).
+ipcMain.handle("auth:loginKey", async (_e, key) => {
+  const k = String(key || "").trim().toUpperCase();
+  if (!k) return { ok: false, error: "empty" };
+  try {
+    const { status, data } = await mainApiPost(`${REMOTE_BASE}/auth/key`, { key: k });
+    if (status === 200 && data && data.token) {
+      await saveToken(data.token);
+      return { ok: true, token: data.token, plan: (data && data.plan) || "pro" };
+    }
+    const error = status === 403 ? "inactive" : status === 401 ? "invalid" : "error";
+    return { ok: false, error, status: status || 0 };
+  } catch (e) {
+    return { ok: false, error: "network", detail: String((e && e.message) || e) };
+  }
+});
 ipcMain.handle("auth:logout", async () => { await deleteToken(); return { ok: true }; });
 ipcMain.handle("app:relaunch", () => { app.relaunch(); app.exit(0); });
+// Öffnet eine (nur http/https) URL im System-Browser.
+ipcMain.handle("app:openExternal", (_e, url) => {
+  const u = String(url || "");
+  if (/^https?:\/\//i.test(u)) { shell.openExternal(u); return true; }
+  return false;
+});
 
 // ─── IPC: Settings ────────────────────────────────────────────────────────────
 ipcMain.handle("settings:get", () => loadSettings());

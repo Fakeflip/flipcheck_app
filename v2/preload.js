@@ -68,10 +68,14 @@ contextBridge.exposeInMainWorld("fc", {
   getToken: async () => (await ipcRenderer.invoke("auth:getToken"))?.token || null,
   /** Open Discord OAuth flow in the system browser. @returns {void} */
   login:    () => ipcRenderer.invoke("auth:login"),
+  /** Log in with a Flipcheck license key. @param {string} key @returns {Promise<{ok:boolean, token?:string, plan?:string, error?:string}>} */
+  loginKey: (key) => ipcRenderer.invoke("auth:loginKey", key),
   /** @returns {Promise<{ok: boolean}>} */
   logout:   () => ipcRenderer.invoke("auth:logout"),
   /** Relaunch the app (used for forced updates). */
   relaunch: () => ipcRenderer.invoke("app:relaunch"),
+  /** Open an http/https URL in the system browser. @param {string} url */
+  openExternal: (url) => ipcRenderer.invoke("app:openExternal", url),
   /**
    * Register a listener for deep-link auth token events (fired after Discord OAuth redirect).
    * @param {(token: string) => void} fn

@@ -638,26 +638,10 @@ function showLicenseGate(licGate) {
   licGate.style.display = "flex";
   document.getElementById("app").style.display = "none";
 
-  /** @param {HTMLElement|null} btn @param {string} label @param {string} resetHtml */
-  async function handleCheckout(btn, trialDays, resetHtml) {
-    if (btn) { btn.disabled = true; btn.textContent = "Lade…"; }
-    try {
-      const r = await API.createCheckoutSession(trialDays);
-      if (r.ok && r.data?.checkout_url) window.open(r.data.checkout_url, "_blank");
-      else Toast.error("Fehler", "Checkout konnte nicht geöffnet werden.");
-    } catch { Toast.error("Fehler", "Verbindung fehlgeschlagen."); }
-    if (btn) { btn.disabled = false; btn.innerHTML = resetHtml; }
-  }
-
-  const trialBtn = document.getElementById("btnLicenseTrial");
-  const buyBtn   = document.getElementById("btnLicenseUpgrade");
-  const arrowSvg14 = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
-  const arrowSvg12 = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>`;
-
-  trialBtn?.addEventListener("click", () =>
-    handleCheckout(trialBtn, 7, `7 Tage kostenlos testen ${arrowSvg14}`));
-  buyBtn?.addEventListener("click", () =>
-    handleCheckout(buyBtn, 0, `Direkt kaufen ${arrowSvg12}`));
+  // Zugang läuft über die Mitgliedschaft — „Verwalten" öffnet die Seite im Browser.
+  document.getElementById("btnLicenseManage")?.addEventListener("click", () => {
+    try { window.fc?.openExternal?.("https://keterflips.de"); } catch {}
+  });
   document.getElementById("btnLicenseLogout")?.addEventListener("click", () => {
     window.fc?.logout?.();
     showGate();
@@ -757,34 +741,42 @@ async function boot() {
     }
   });
 
-  // Login button
+  // Login button (Discord — ausgeblendeter Alt-Weg)
   document.getElementById("btnLogin")?.addEventListener("click", () => {
     try { window.fc.login(); } catch {}
     const hint = document.getElementById("gateHint");
     if (hint) hint.textContent = "Browser geöffnet — bitte anmelden…";
   });
 
-  // Listen for deep-link auth token
+  // Key-Login (Flipcheck-Lizenz-Key) — der Hauptweg
+  {
+    const keyInput = /** @type {HTMLInputElement|null} */ (document.getElementById("keyInput"));
+    const keyErr   = document.getElementById("keyError");
+    const btnKey   = document.getElementById("btnKeyLogin");
+    const showKeyErr = (m) => { if (keyErr) { keyErr.textContent = m; keyErr.style.display = ""; } };
+    async function doKeyLogin() {
+      const key = (keyInput?.value || "").trim().toUpperCase();
+      if (keyErr) { keyErr.style.display = "none"; keyErr.textContent = ""; }
+      if (!key || key.length < 10) { showKeyErr("Bitte gib deinen Lizenz-Key ein (FC-XXXX-XXXX-XXXX)."); return; }
+      if (btnKey) { btnKey.disabled = true; btnKey.textContent = "Prüfe…"; }
+      let res;
+      try { res = await window.fc.loginKey(key); } catch { res = { ok: false, error: "network" }; }
+      if (btnKey) { btnKey.disabled = false; btnKey.textContent = "Freischalten"; }
+      if (res && res.ok && res.token) { completeLogin(res.token); return; }
+      showKeyErr(
+        res?.error === "inactive" ? "Dieser Zugang ist aktuell nicht aktiv." :
+        res?.error === "invalid"  ? "Key ungültig – bitte prüfe deine Eingabe." :
+        res?.error === "network"  ? "Keine Verbindung – bitte prüfe dein Internet." :
+                                    "Login fehlgeschlagen – bitte versuch es erneut."
+      );
+    }
+    btnKey?.addEventListener("click", doKeyLogin);
+    keyInput?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); doKeyLogin(); } });
+  }
+
+  // Listen for deep-link auth token (Discord flow → shared login handler)
   try {
-    window.fc.onAuthToken(async (token) => {
-      App.token = token;
-      const gate = document.getElementById("auth-gate");
-      if (gate) gate.style.display = "none";
-
-      // Check license before showing app
-      try {
-        const { ok, data } = await API.call("/auth/me");
-        if (ok && data && !data.license_ok) {
-          showLicenseGate(document.getElementById("license-gate"));
-          return;
-        }
-      } catch {}
-
-      const appEl = document.getElementById("app");
-      if (appEl) appEl.style.display = "flex";
-      Toast.success("Angemeldet", "Willkommen bei Flipcheck!");
-      initApp();
-    });
+    window.fc.onAuthToken((token) => { completeLogin(token); });
   } catch {}
 
   // Listen for eBay seller token received (after OAuth deep link) → refresh current view
@@ -907,6 +899,30 @@ async function boot() {
 }
 
 /**
+ * Shared post-login flow — used by both the key-login and the Discord deep-link.
+ * Stores the token, hides the auth gate, enforces the license, then boots the app.
+ * @param {string} token
+ * @returns {Promise<void>}
+ */
+async function completeLogin(token) {
+  App.token = token;
+  const gate = document.getElementById("auth-gate");
+  if (gate) gate.style.display = "none";
+  // Check license before showing the app
+  try {
+    const { ok, data } = await API.call("/auth/me");
+    if (ok && data && !data.license_ok) {
+      showLicenseGate(document.getElementById("license-gate"));
+      return;
+    }
+  } catch {}
+  const appEl = document.getElementById("app");
+  if (appEl) appEl.style.display = "flex";
+  try { Toast.success("Angemeldet", "Willkommen bei Flipcheck!"); } catch {}
+  initApp();
+}
+
+/**
  * Post-auth initialisation: onboarding check, initial view, polling timers.
  * Called after a successful `checkAuth()` or deep-link auth token arrival.
  * @returns {Promise<void>}
@@ -926,12 +942,12 @@ async function initApp() {
         if (inp) { inp.value = firstEan; inp.dispatchEvent(new Event("input")); }
       }, 150);
     } else {
-      navigateTo("analytics");
+      navigateTo("flipcheck");
     }
   } else {
-    // Normal start: restore last view from hash or default to analytics
+    // Normal start: restore last view from hash or default to Flipcheck
     const hash    = window.location.hash.replace("#", "");
-    const initial = VIEW_MAP[hash] ? hash : "analytics";
+    const initial = VIEW_MAP[hash] ? hash : "flipcheck";
     navigateTo(initial);
   }
 
@@ -998,15 +1014,10 @@ async function initApp() {
     if (!isMod || e.shiftKey || e.altKey) return;
 
     const viewShortcuts = {
-      "1": "analytics",
-      "2": "flipcheck",
-      "3": "batch",
-      "4": "inventory",
-      "5": "history",
-      "6": "competition",
-      "7": "repricer",
-      "8": "alerts",
-      "9": "settings",
+      "1": "flipcheck",
+      "2": "competition",
+      "3": "marketplace",
+      "4": "settings",
     };
     const view = viewShortcuts[e.key];
     if (view && VIEW_MAP[view]) {
