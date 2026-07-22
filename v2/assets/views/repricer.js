@@ -46,27 +46,29 @@ const RepricerView = (() => {
   };
 
   const EBAY_CATEGORIES = {
-    sonstiges:         { label: "Sonstiges / Standard",    fee: 0.13  },
-    handy_zubehoer:    { label: "Handy-Zubehör",           fee: 0.11  },
-    kabel:             { label: "Kabel & Adapter",         fee: 0.11  },
-    audio_zubehoer:    { label: "Audio-Zubehör",           fee: 0.11  },
-    pc_zubehoer:       { label: "PC-Zubehör",              fee: 0.11  },
-    tv_zubehoer:       { label: "TV-Zubehör",              fee: 0.11  },
-    tastaturen_maeuse: { label: "Tastaturen & Mäuse",      fee: 0.11  },
-    drucker_zubehoer:  { label: "Drucker-Zubehör",         fee: 0.11  },
-    batterien:         { label: "Batterien",               fee: 0.11  },
-    kameras_zubehoer:  { label: "Kamera-Zubehör",          fee: 0.11  },
-    notebook_zubehoer: { label: "Notebook-Zubehör",        fee: 0.11  },
-    objektive:         { label: "Objektive",               fee: 0.11  },
-    stative:           { label: "Stative",                 fee: 0.11  },
-    tablet_zubehoer:   { label: "Tablet-Zubehör",          fee: 0.11  },
-    sport_freizeit:    { label: "Sport & Freizeit",        fee: 0.115 },
-    spielzeug:         { label: "Spielzeug",               fee: 0.115 },
-    haushalt_garten:   { label: "Haushalt & Garten",       fee: 0.115 },
+    sonstiges:         { label: "Sonstiges / Standard",    fee: 0.14  },
+    handy_zubehoer:    { label: "Handy-Zubehör",           fee: 0.12  },
+    kabel:             { label: "Kabel & Adapter",         fee: 0.12  },
+    audio_zubehoer:    { label: "Audio-Zubehör",           fee: 0.12  },
+    pc_zubehoer:       { label: "PC-Zubehör",              fee: 0.12  },
+    tv_zubehoer:       { label: "TV-Zubehör",              fee: 0.12  },
+    tastaturen_maeuse: { label: "Tastaturen & Mäuse",      fee: 0.12  },
+    drucker_zubehoer:  { label: "Drucker-Zubehör",         fee: 0.12  },
+    batterien:         { label: "Batterien",               fee: 0.12  },
+    kameras_zubehoer:  { label: "Kamera-Zubehör",          fee: 0.12  },
+    notebook_zubehoer: { label: "Notebook-Zubehör",        fee: 0.12  },
+    objektive:         { label: "Objektive",               fee: 0.07  },
+    stative:           { label: "Stative",                 fee: 0.12  },
+    tablet_zubehoer:   { label: "Tablet-Zubehör",          fee: 0.12  },
+    sport_freizeit:    { label: "Sport & Freizeit",        fee: 0.14  },
+    spielzeug:         { label: "Spielzeug",               fee: 0.12  },
+    haushalt:          { label: "Haushalt",                 fee: 0.14  },
+    garten:            { label: "Garten",                   fee: 0.13  },
+    haushalt_garten:   { label: "Haushalt & Garten",       fee: 0.14  },
   };
 
   function _calcFloor(ek, ship, marginPct, categoryId) {
-    const feeRate = EBAY_CATEGORIES[categoryId || "sonstiges"]?.fee ?? 0.13;
+    const feeRate = EBAY_CATEGORIES[categoryId || "sonstiges"]?.fee ?? 0.14;
     return Math.round(((ek * (1 + marginPct / 100) + ship) / (1 - feeRate)) * 100) / 100;
   }
 
@@ -333,7 +335,7 @@ const RepricerView = (() => {
     const itemEk            = invMatch?.ek   ?? null;
     const itemShip          = invMatch?.ship_out ?? 0;
     const currentFloor      = itemEk != null ? _calcFloor(itemEk, itemShip, minMargin, ebayCategory) : item.floor_price;
-    const feeRate           = EBAY_CATEGORIES[ebayCategory]?.fee ?? 0.13;
+    const feeRate           = EBAY_CATEGORIES[ebayCategory]?.fee ?? 0.14;
     const feePct            = Math.round(feeRate * 100 * 10) / 10;
 
     const strategyOpts = Object.entries(STRATEGY_LABELS).map(([v, l]) =>

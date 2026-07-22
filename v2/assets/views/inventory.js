@@ -974,9 +974,9 @@ const InventoryView = (() => {
 
   function _buildCatOptions(selectedId) {
     const GROUPS = {
-      "Geräte (6,5% + 3%)":        ["computer_tablets","drucker","foto_camcorder","handys","haushaltsgeraete","konsolen","scanner","speicherkarten","tv_video_audio","koerperpflege"],
-      "Zubehör (11% + 3%)":        ["drucker_zubehoer","handy_zubehoer","batterien","kabel","kameras_zubehoer","notebook_zubehoer","objektive","stative","tablet_zubehoer","tastaturen_maeuse","tv_zubehoer","pc_zubehoer","audio_zubehoer"],
-      "Sonstiges (Flat)":          ["mode","sport_freizeit","spielzeug","haushalt_garten","buecher","sonstiges"],
+      "Geräte (7%)":               ["computer_tablets","drucker","foto_camcorder","handys","haushaltsgeraete","konsolen","scanner","speicherkarten","tv_video_audio","koerperpflege","objektive"],
+      "Zubehör (12%)":             ["drucker_zubehoer","handy_zubehoer","batterien","kabel","kameras_zubehoer","notebook_zubehoer","stative","tablet_zubehoer","tastaturen_maeuse","tv_zubehoer","pc_zubehoer","audio_zubehoer"],
+      "Sonstiges (Flat)":          ["mode","sport_freizeit","spielzeug","haushalt","garten","buecher","sonstiges"],
       "Sonderkonditionen (0 %)":   ["durchstarter"],
     };
     const sel = selectedId || "sonstiges";
